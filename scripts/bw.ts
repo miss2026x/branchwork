@@ -109,17 +109,29 @@ if (cmd === "new") {
     console.log(dim("\n[停车中…再按一次 Ctrl+C 直接退出]"));
     core.stop(route.id);
   });
+  // 每个关键时点前面标上“从问出去算起过了多少秒”，这样能看出时间花在哪
+  const t0 = Date.now();
+  const at = () => `[${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s]`;
+  let waited = 0; // 等人批准花掉的时间，不算在 Claude 头上
+  let firstText = true;
   core.on(async (e) => {
-    if (e.type === "stop.created") console.log(dim(`${route.name} 第 ${e.stop.seq} 站「${e.stop.name}」出发\n`));
-    if (e.type === "stop.delta") process.stdout.write(e.text);
-    if (e.type === "stop.tool") console.log(dim(`\n  ▸ ${e.tool} ${JSON.stringify(e.input).slice(0, 100)}`));
-    if (e.type === "stop.updated" && e.stop.status === "done" && e.stop.syncState === "none" && e.stop.endedAt) console.log(dim("\n\n[已到站，正在同步…]"));
+    if (e.type === "stop.created") console.log(dim(`${at()} ${route.name} 第 ${e.stop.seq} 站「${e.stop.name}」出发（站前同步已完成，开始启动 Claude）\n`));
+    if (e.type === "stop.delta") {
+      if (firstText) console.log(dim(`${at()} Claude 开始输出`));
+      firstText = false;
+      process.stdout.write(e.text);
+    }
+    if (e.type === "stop.tool") console.log(dim(`\n${at()}   ▸ ${e.tool} ${JSON.stringify(e.input).slice(0, 100)}`));
+    if (e.type === "stop.updated" && e.stop.status === "done" && e.stop.syncState === "none" && e.stop.endedAt) console.log(dim(`\n\n${at()} [已到站，正在同步…]`));
+    if (e.type === "sync.result") console.log(dim(`${at()} 同步结束`));
     if (e.type === "permission.request") {
-      console.log(`\n\n等你批准：${e.tool} ${JSON.stringify(e.input).slice(0, 300)}`);
+      console.log(`\n\n${dim(at())} 等你批准：${e.tool} ${JSON.stringify(e.input).slice(0, 300)}`);
       if (autoAllow || !interactive) {
         console.log(autoAllow ? dim("  → 自动批准（--allow）") : "  → 没有人能回答，按拒绝处理（加 --allow 可自动批准）");
         return core.answerPermission(e.requestId, autoAllow ? "allow" : "deny");
       }
+      const asked = Date.now();
+      setImmediate(() => rl.once("line", () => (waited += Date.now() - asked)));
       const a = (await rl.question(e.canRemember ? "  [y] 允许  [a] 这一路以后都允许  [n] 拒绝 > " : "  [y] 允许  [n] 拒绝 > ").catch(() => "n")).trim().toLowerCase();
       core.answerPermission(e.requestId, a === "y" ? "allow" : a === "a" && e.canRemember ? "allow-always" : "deny");
     }
@@ -134,7 +146,7 @@ if (cmd === "new") {
     showSync(report.sync);
   } else {
     const s = report.stop;
-    console.log(`第 ${s.seq} 站：${s.status === "done" ? "已到站" : "没答完"}${s.error ? "（" + s.error + "）" : ""}，用时 ${((Date.now() - started) / 1000).toFixed(1)} 秒`);
+    console.log(`第 ${s.seq} 站：${s.status === "done" ? "已到站" : "没答完"}${s.error ? "（" + s.error + "）" : ""}，总用时 ${((Date.now() - started) / 1000).toFixed(1)} 秒${waited ? `（其中等你批准 ${(waited / 1000).toFixed(1)} 秒）` : ""}`);
     if (s.status === "done") showSync(report.sync);
     else console.log(dim(`没有同步；工作区保留在 ${route.worktreePath}（同步状态：${s.syncState}）`));
     // 第 0 步留下的问题：没答完时，已经说出的半截回答有没有留在会话文件里

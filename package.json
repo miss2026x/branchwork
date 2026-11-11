@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "bench:sync": "tsx scripts/bench-sync.ts",
     "diagnose": "tsx scripts/diagnose.ts",
-    "bw": "tsx scripts/bw.ts"
+    "bw": "node --disable-warning=ExperimentalWarning --import tsx scripts/bw.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
