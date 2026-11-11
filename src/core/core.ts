@@ -268,7 +268,10 @@ export function createCore(opts: CoreOptions): Core {
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
           signal: abort.signal,
           onEvent: (e) => {
-            if (e.type === "text") emit({ type: "stop.delta", routeId, stopId, text: e.text });
+            // 停车之后 Claude 进程可能还要几秒才真正停下，这期间它吐出来的内容不再往界面送
+            if (abort.signal.aborted) return;
+            if (e.type === "started") emit({ type: "stop.started", routeId, stopId });
+            else if (e.type === "text") emit({ type: "stop.delta", routeId, stopId, text: e.text });
             else emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input });
           },
           onPermission: (req) =>

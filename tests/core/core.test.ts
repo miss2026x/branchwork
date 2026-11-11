@@ -80,7 +80,7 @@ describe("问一站", () => {
     ]);
   });
 
-  it("事件的先后：这一路开始回答 → 站出现 → 文字流出 → 到站 → 同步结果 → 这一路空闲", async () => {
+  it("事件的先后：这一路开始回答 → 站出现 → Claude 已启动 → 文字流出 → 到站 → 同步结果 → 这一路空闲", async () => {
     const route = await core.createRoute(project.id);
     events.length = 0;
     claude.script = (t) => {
@@ -90,7 +90,7 @@ describe("问一站", () => {
       write(t.cwd, "b.txt", "x\n");
     };
     await core.ask(route.id, "改一下");
-    expect(types()).toEqual(["route.updated", "stop.created", "stop.delta", "stop.tool", "stop.delta", "route.updated", "stop.updated", "sync.result", "stop.updated", "route.updated"]);
+    expect(types()).toEqual(["route.updated", "stop.created", "stop.started", "stop.delta", "stop.tool", "stop.delta", "route.updated", "stop.updated", "sync.result", "stop.updated", "route.updated"]);
     const done = events.find((e) => e.type === "stop.updated")!;
     expect(done).toMatchObject({ stop: { status: "done", syncState: "none" } }); // 先到站，同步在后
     expect(events.at(-1)).toMatchObject({ route: { status: "idle" } });
@@ -162,6 +162,22 @@ describe("没答完", () => {
       ["done", "synced"],
     ]);
     expect(routeOf(route.id).status).toBe("idle");
+  });
+
+  it("停车后 Claude 没有马上停下、还在往外吐字：这些字不再送给界面", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = async (t) => {
+      t.say("停车前");
+      await new Promise<void>((r) => t.signal.addEventListener("abort", () => r()));
+      t.say("停车后还在吐的字");
+      t.tool("Edit", {});
+    };
+    const asking = core.ask(route.id, "数数");
+    await until("stop.delta");
+    core.stop(route.id);
+    await asking;
+    const shown = events.filter((e) => e.type === "stop.delta" || e.type === "stop.tool");
+    expect(shown).toMatchObject([{ text: "停车前" }]);
   });
 
   it("刚问出去、Claude 还没开始就停车：也算数，不启动 Claude，提问留在这一站里", async () => {

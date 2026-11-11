@@ -65,6 +65,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk): ClaudeClient {
         for await (const raw of fns.query({ prompt: opts.prompt, options })) {
           const m = raw as SdkMessage;
           if (m.session_id) sessionId = m.session_id;
+          if (m.type === "system" && m.subtype === "init") opts.onEvent?.({ type: "started" });
 
           if (m.type === "stream_event" && !m.parent_tool_use_id) {
             const d = m.event?.delta;

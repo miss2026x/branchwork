@@ -45,6 +45,7 @@ describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () =
     const r = await client.ask({ cwd: "/wt/r1", prompt: "第二站", sessionId: "S1", afterMessageId: "a1", onEvent: (e) => events.push(e) });
     expect(r).toEqual({ outcome: "completed", sessionId: "S1", text: "改好了", error: null, promptMessageId: "u2", lastMessageId: "a3" });
     expect(events).toEqual([
+      { type: "started" },
       { type: "text", text: "改" },
       { type: "text", text: "好了" },
       { type: "tool", tool: "Edit", input: { file_path: "a.ts" } },

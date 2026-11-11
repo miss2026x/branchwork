@@ -121,6 +121,7 @@ if (cmd === "new") {
   let firstText = true;
   core.on(async (e) => {
     if (e.type === "stop.created") console.log(dim(`${at()} ${route.name} 第 ${e.stop.seq} 站「${e.stop.name}」出发（站前同步已完成，开始启动 Claude）\n`));
+    if (e.type === "stop.started") console.log(dim(`${at()} Claude 已启动，开始处理`));
     if (e.type === "stop.delta") {
       if (firstText) {
         console.log(dim(`${at()} Claude 开始输出`));

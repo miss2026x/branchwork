@@ -7,6 +7,8 @@ export type BwEvent =
   | { type: "route.updated"; route: Route }
   | { type: "stop.created"; stop: Stop }
   | { type: "stop.updated"; stop: Stop }
+  /** Claude 已启动，开始处理这一站（在这之前界面显示“正在启动”） */
+  | { type: "stop.started"; routeId: string; stopId: string }
   /** 回答的流式文字 */
   | { type: "stop.delta"; routeId: string; stopId: string; text: string }
   /** Claude 用了一个工具 */

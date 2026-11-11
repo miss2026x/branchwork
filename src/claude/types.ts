@@ -2,6 +2,8 @@ import type { PermissionDecision } from "../shared";
 
 /** 回答过程中的事件 */
 export type ClaudeEvent =
+  /** Claude 进程已启动、会话已就绪；在这之前是启动时间，在这之后才是它在想和写 */
+  | { type: "started" }
   | { type: "text"; text: string }
   | { type: "tool"; tool: string; input: Record<string, unknown> };
 

@@ -36,6 +36,7 @@ export class FakeClaude implements ClaudeClient {
     let outcome: AskResult["outcome"] = "completed";
     let error: string | null = null;
     try {
+      opts.onEvent?.({ type: "started" });
       const r = await this.script({
         cwd: opts.cwd,
         prompt: opts.prompt,
