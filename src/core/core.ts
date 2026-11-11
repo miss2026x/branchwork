@@ -34,6 +34,11 @@ export interface CoreOptions {
   claude: ClaudeClient;
   /** 放所有工作区的目录；每个项目一个子目录，每一路再一个子目录 */
   worktreesRoot: string;
+  /**
+   * 提前在后台启动 Claude（新开一路后、每一站结束后），下一站就不用等启动。默认开。
+   * 一次性的命令行调用应关掉：进程马上就退出，提前启动只是白费。
+   */
+  prewarm?: boolean;
   /** 测试里换成假的同步引擎工厂；默认用真的 */
   createEngine?: (localDir: string, worktreesDir: string) => Promise<SyncEngine>;
 }
@@ -60,6 +65,10 @@ export interface Core {
   /** 重新同步一次（比如你手工处理了冲突之后）。成功则解除这一路的冲突状态 */
   resync(routeId: string): Promise<SyncLogEntry[]>;
   syncLog(routeId: string): SyncLogEntry[];
+  /** 为这一路提前启动 Claude（比如用户点开这一路时） */
+  warm(routeId: string): void;
+  /** 应用退出时调：关掉提前启动的 Claude */
+  dispose(): void;
 }
 
 export function createCore(opts: CoreOptions): Core {
@@ -157,6 +166,11 @@ export function createCore(opts: CoreOptions): Core {
     }
   };
 
+  const prewarm = opts.prewarm ?? true;
+  const warmRoute = (route: Route) => {
+    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined);
+  };
+
   const tempName = (prompt: string) => Array.from(prompt.replace(/\s+/g, " ").trim()).slice(0, 6).join("") || "新的一站";
 
   return {
@@ -202,6 +216,7 @@ export function createCore(opts: CoreOptions): Core {
       };
       db.routes.insert(route);
       emit({ type: "route.updated", route });
+      warmRoute(route);
       return route;
     },
 
@@ -288,6 +303,7 @@ export function createCore(opts: CoreOptions): Core {
 
       if (result.sessionId && result.sessionId !== route.sessionId) route = setRoute(routeId, { sessionId: result.sessionId });
       const ended = { endedAt: Date.now(), messageId: result.promptMessageId, lastMessageId: result.lastMessageId };
+      warmRoute(route); // 这一站一结束就为下一站把 Claude 启动好
 
       // ── 没答完：不同步，工作区保留 ──
       if (result.outcome !== "completed") {
@@ -363,5 +379,9 @@ export function createCore(opts: CoreOptions): Core {
     },
 
     syncLog: (routeId) => db.syncLog.listByRoute(routeId),
+
+    warm: (routeId) => warmRoute(mustRoute(routeId)),
+
+    dispose: () => claude.dispose(),
   };
 }

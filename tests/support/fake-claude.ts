@@ -61,6 +61,16 @@ export class FakeClaude implements ClaudeClient {
     return { outcome, sessionId, text, error, promptMessageId, lastMessageId: history.at(-1)!.id };
   }
 
+  /** 记下被要求提前启动的（目录, 会话） */
+  readonly warmed: [string, string | undefined][] = [];
+  disposed = false;
+  warm(cwd: string, sessionId?: string): void {
+    this.warmed.push([cwd, sessionId]);
+  }
+  dispose(): void {
+    this.disposed = true;
+  }
+
   async fork(sessionId: string, upToMessageId?: string): Promise<string> {
     const src = this.sessions.get(sessionId);
     if (!src) throw new Error(`no session ${sessionId}`);

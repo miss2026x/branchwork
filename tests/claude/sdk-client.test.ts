@@ -25,6 +25,9 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
         if (extra.throwAfter) throw extra.throwAfter;
       })();
     },
+    startup: async () => {
+      throw new Error("这个测试没有用到提前启动");
+    },
     forkSession: async (_id, o) => ({ sessionId: `fork-up-to-${o?.upToMessageId ?? "end"}` }),
     getSessionMessages: async () => transcript,
     deleteSession: async () => {},
@@ -165,5 +168,119 @@ describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () =
     const h = await client.history("S1");
     expect(h).toHaveLength(6);
     expect(h[0]).toEqual({ id: "u1", role: "user", content: "第一站" });
+  });
+});
+
+describe("提前启动：启动 Claude 要几十秒的机器上，问的时候不用再等", () => {
+  /** 假的 SDK：记录每次 startup / query；startup 要手动放行才算启动完 */
+  function warmSdk() {
+    const log: string[] = [];
+    const starts: { options: Record<string, unknown>; finish: () => void; fail: () => void; closed: boolean }[] = [];
+    const turn = (label: string, options: Record<string, unknown>) =>
+      (async function* () {
+        log.push(label);
+        yield { type: "system", subtype: "init", session_id: (options.resume as string) ?? "NEW" };
+        yield success;
+      })();
+    const fns = fakeSdk([], {
+      query: (p) => turn(`cold:${p.prompt}`, p.options as never),
+      startup: (p) =>
+        new Promise((resolve, reject) => {
+          const s = {
+            options: p.options as Record<string, unknown>,
+            closed: false,
+            finish: () => resolve({ query: (prompt: string) => turn(`warm:${prompt}`, p.options as never), close: () => void (s.closed = true) }),
+            fail: () => reject(new Error("startup timeout")),
+          };
+          starts.push(s);
+        }),
+    });
+    return { fns, log, starts };
+  }
+
+  it("提前启动好了：直接用它问，不再现启动；一个进程只用一次", async () => {
+    const { fns, log, starts } = warmSdk();
+    const client = createClaudeClient(fns);
+    client.warm("/wt/r1", "S1");
+    client.warm("/wt/r1", "S1"); // 重复要求不会启动第二个
+    expect(starts).toHaveLength(1);
+    expect(starts[0]!.options).toMatchObject({ cwd: "/wt/r1", resume: "S1" });
+    starts[0]!.finish();
+    const events: ClaudeEvent[] = [];
+    expect(await client.ask({ cwd: "/wt/r1", prompt: "第三站", sessionId: "S1", onEvent: (e) => events.push(e) })).toMatchObject({ outcome: "completed" });
+    expect(events[0]).toEqual({ type: "started" });
+    await client.ask({ cwd: "/wt/r1", prompt: "第四站", sessionId: "S1" });
+    expect(log).toEqual(["warm:第三站", "cold:第四站"]);
+  });
+
+  it("还在启动时就问了：等它启动完再用，不另起一个", async () => {
+    const { fns, log, starts } = warmSdk();
+    const client = createClaudeClient(fns);
+    client.warm("/wt/r1");
+    const asking = client.ask({ cwd: "/wt/r1", prompt: "第一站" });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(log).toEqual([]);
+    starts[0]!.finish();
+    await asking;
+    expect(log).toEqual(["warm:第一站"]);
+  });
+
+  it("提前启动失败：问的时候照常现启动，不报错", async () => {
+    const { fns, log, starts } = warmSdk();
+    const client = createClaudeClient(fns);
+    client.warm("/wt/r1", "S1");
+    starts[0]!.fail();
+    expect(await client.ask({ cwd: "/wt/r1", prompt: "x", sessionId: "S1" })).toMatchObject({ outcome: "completed" });
+    expect(log).toEqual(["cold:x"]);
+  });
+
+  it("会话对不上（比如这一路换了会话）：不用它，关掉，现启动", async () => {
+    const { fns, log, starts } = warmSdk();
+    const client = createClaudeClient(fns);
+    client.warm("/wt/r1", "OLD");
+    starts[0]!.finish();
+    await client.ask({ cwd: "/wt/r1", prompt: "x", sessionId: "S1" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(log).toEqual(["cold:x"]);
+    expect(starts[0]!.closed).toBe(true);
+  });
+
+  it("最多同时留 3 个，最旧的被关掉；dispose 全部关掉；maxWarm 为 0 时不提前启动", async () => {
+    const { fns, starts } = warmSdk();
+    const client = createClaudeClient(fns);
+    for (const r of ["a", "b", "c", "d"]) client.warm(`/wt/${r}`);
+    starts.forEach((s) => s.finish());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(starts.map((s) => s.closed)).toEqual([true, false, false, false]);
+    client.dispose();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(starts.map((s) => s.closed)).toEqual([true, true, true, true]);
+
+    const off = warmSdk();
+    createClaudeClient(off.fns, { maxWarm: 0 }).warm("/wt/a");
+    expect(off.starts).toHaveLength(0);
+  });
+
+  it("用提前启动的进程时，批准和停车照样有效", async () => {
+    const decisions: unknown[] = [];
+    const ac = new AbortController();
+    const fns = fakeSdk([], {
+      startup: async (p) => ({
+        close: () => {},
+        query: () =>
+          (async function* () {
+            const o = p.options as { canUseTool: (...a: unknown[]) => Promise<unknown>; abortController: AbortController };
+            decisions.push(await o.canUseTool("Bash", { command: "ls" }, { signal: new AbortController().signal }));
+            ac.abort();
+            if (o.abortController.signal.aborted) throw new Error("Operation aborted");
+            yield success;
+          })(),
+      }),
+    });
+    const client = createClaudeClient(fns);
+    client.warm("/wt/r1");
+    const r = await client.ask({ cwd: "/wt/r1", prompt: "x", signal: ac.signal, onPermission: async () => "allow" });
+    expect(decisions[0]).toEqual({ behavior: "allow", updatedInput: { command: "ls" } });
+    expect(r.outcome).toBe("interrupted");
   });
 });

@@ -31,11 +31,12 @@ npm run bench:sync -- 100000   # 大仓库耗时测试（参数是文件数）
 pnpm bw ask <项目目录> "把 README 的标题改成中文"     # 在 1 路上问一站
 pnpm bw ask <项目目录> "再加一段安装说明"            # 接着同一个会话问第二站
 pnpm bw ask <项目目录> "另一件事" --route 2          # 在 2 路上问
+pnpm bw chat <项目目录>                            # 连着问：每输入一行就是一站
 pnpm bw status <项目目录>                          # 各路、各站、同步状态
 pnpm bw resync <项目目录> --route 2                 # 手工处理冲突后重新同步
 ```
 
-回答途中按 Ctrl+C 是停车。让别的程序（比如另一个 AI）代跑时没有人能回答批准提示，会一律按拒绝处理；加 `--allow` 自动批准，加 `--stop-after 5` 在问出去 5 秒后自动停车，加 `--stop-after-output 3` 在 Claude 开始输出 3 秒后自动停车，加 `--trace` 列出每条 git 命令的耗时。数据（数据库和各路的工作区）放在 `~/.branchwork-dev`，删掉这个目录即可重来。
+回答途中按 Ctrl+C 是停车。`chat` 不退出，所以每一站结束后会在后台提前把 Claude 启动好，下一站不用再等启动（启动在有些机器上要几十秒）。让别的程序（比如另一个 AI）代跑时没有人能回答批准提示，会一律按拒绝处理；加 `--allow` 自动批准，加 `--stop-after 5` 在问出去 5 秒后自动停车，加 `--stop-after-output 3` 在 Claude 开始输出 3 秒后自动停车，加 `--trace` 列出每条 git 命令的耗时。数据（数据库和各路的工作区）放在 `~/.branchwork-dev`，删掉这个目录即可重来。
 
 ## 模块规则
 

@@ -56,6 +56,13 @@ export interface HistoryMessage {
 export interface ClaudeClient {
   /** 问一站 */
   ask(opts: AskOptions): Promise<AskResult>;
+  /**
+   * 提前在后台把 Claude 启动好，等下一站用。启动 Claude 在有些机器上要几十秒，
+   * 提前做掉，问的时候就不用等。尽力而为：失败了不报错，问的时候照常现启动。
+   */
+  warm(cwd: string, sessionId?: string): void;
+  /** 关掉所有提前启动好的 Claude（应用退出时调） */
+  dispose(): void;
   /** 复制会话到某条消息为止（含），返回新会话的 ID；不传就复制全部 */
   fork(sessionId: string, upToMessageId?: string): Promise<string>;
   history(sessionId: string): Promise<HistoryMessage[]>;

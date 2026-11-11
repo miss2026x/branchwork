@@ -19,6 +19,8 @@ interface SdkMessage {
 /** 用到的 SDK 函数。默认是真的 SDK；测试里换成假的 */
 export interface SdkFunctions {
   query(params: { prompt: string; options?: Options }): AsyncIterable<unknown>;
+  /** 提前启动 Claude 进程；返回的对象只能问一次 */
+  startup(params: { options?: Options; initializeTimeoutMs?: number }): Promise<{ query(prompt: string): AsyncIterable<unknown>; close(): void }>;
   forkSession(sessionId: string, options?: { upToMessageId?: string }): Promise<{ sessionId: string }>;
   getSessionMessages(sessionId: string): Promise<{ type: string; uuid: string; message: unknown }[]>;
   deleteSession(sessionId: string): Promise<void>;
@@ -26,46 +28,134 @@ export interface SdkFunctions {
 
 const realSdk: SdkFunctions = {
   query: (p) => sdk.query(p),
+  startup: (p) => sdk.startup(p),
   forkSession: (id, o) => sdk.forkSession(id, o),
   getSessionMessages: (id) => sdk.getSessionMessages(id),
   deleteSession: (id) => sdk.deleteSession(id),
 };
 
-export function createClaudeClient(fns: SdkFunctions = realSdk): ClaudeClient {
+export interface ClaudeClientOptions {
+  /** 最多同时留几个提前启动好的 Claude 进程（每个占一份内存）。默认 3，设 0 关闭 */
+  maxWarm?: number;
+  /** 提前启动最多等多久。默认 3 分钟 */
+  warmTimeoutMs?: number;
+}
+
+/** 一次提问期间才有的东西。进程可能是提前启动的，启动时还不知道这些，所以放在一个可以后填的格子里 */
+interface Turn {
+  onPermission?: AskOptions["onPermission"];
+}
+
+/** 一个 Claude 进程用的配置：目录、接着哪个会话、怎么停、怎么问批准 */
+function processOptions(cwd: string, sessionId: string | undefined, abort: AbortController, turn: Turn): Options {
+  const canUseTool: CanUseTool = async (toolName, input, extra) => {
+    const suggestions = extra.suggestions ?? [];
+    const decision = turn.onPermission ? await turn.onPermission({ tool: toolName, input, canRemember: suggestions.length > 0 }) : "deny";
+    if (decision === "deny") return { behavior: "deny", message: "用户没有批准这个操作" };
+    // “以后都允许”：把 SDK 给的建议原样交回去
+    return decision === "allow-always" ? { behavior: "allow", updatedInput: input, updatedPermissions: suggestions } : { behavior: "allow", updatedInput: input };
+  };
   return {
-    async ask(opts: AskOptions): Promise<AskResult> {
+    cwd,
+    abortController: abort,
+    includePartialMessages: true,
+    systemPrompt: { type: "preset", preset: "claude_code" },
+    canUseTool,
+    ...(sessionId ? { resume: sessionId } : {}),
+  };
+}
+
+interface Warm {
+  cwd: string;
+  sessionId: string | undefined;
+  abort: AbortController;
+  turn: Turn;
+  /** 启动好了得到可以提问的对象；启动失败得到 null */
+  ready: Promise<{ query(prompt: string): AsyncIterable<unknown>; close(): void } | null>;
+}
+
+export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: ClaudeClientOptions = {}): ClaudeClient {
+  const maxWarm = clientOpts.maxWarm ?? 3;
+  /** 提前启动好的进程，按目录找；Map 的先后就是新旧，最旧的先被挤掉 */
+  const warmed = new Map<string, Warm>();
+
+  const discard = (w: Warm) => {
+    if (warmed.get(w.cwd) === w) warmed.delete(w.cwd);
+    void w.ready.then((q) => q?.close());
+    w.abort.abort();
+  };
+
+  return {
+    warm(cwd, sessionId) {
+      if (maxWarm <= 0) return;
+      const existing = warmed.get(cwd);
+      if (existing) {
+        if (existing.sessionId === sessionId) return; // 已经在准备了
+        discard(existing); // 会话变了，旧的没用了
+      }
       const abort = new AbortController();
+      const turn: Turn = {};
+      const w: Warm = {
+        cwd,
+        sessionId,
+        abort,
+        turn,
+        ready: fns.startup({ options: processOptions(cwd, sessionId, abort, turn), initializeTimeoutMs: clientOpts.warmTimeoutMs ?? 180_000 }).catch(() => {
+          if (warmed.get(cwd) === w) warmed.delete(cwd);
+          return null;
+        }),
+      };
+      warmed.set(cwd, w);
+      while (warmed.size > maxWarm) discard(warmed.values().next().value!);
+    },
+
+    dispose() {
+      for (const w of [...warmed.values()]) discard(w);
+    },
+
+    async ask(opts: AskOptions): Promise<AskResult> {
+      // 有没有为这一路提前启动好的进程（目录和会话都对得上才能用）
+      let abort = new AbortController();
+      let turn: Turn = {};
+      let stream: AsyncIterable<unknown> | null = null;
+      let prewarmed = false;
+      const w = warmed.get(opts.cwd);
+      if (w) {
+        warmed.delete(opts.cwd);
+        if (w.sessionId === opts.sessionId) {
+          const q = await w.ready; // 还在启动的话等它：已经跑了一段，比现在重新启动快
+          if (q && !w.abort.signal.aborted) {
+            abort = w.abort;
+            turn = w.turn;
+            stream = q.query(opts.prompt);
+            prewarmed = true;
+          }
+        } else {
+          discard(w);
+        }
+      }
+      turn.onPermission = opts.onPermission;
       const onAbort = () => abort.abort();
       if (opts.signal?.aborted) abort.abort();
       opts.signal?.addEventListener("abort", onAbort, { once: true });
-
-      const canUseTool: CanUseTool = async (toolName, input, extra) => {
-        const suggestions = extra.suggestions ?? [];
-        const decision = opts.onPermission ? await opts.onPermission({ tool: toolName, input, canRemember: suggestions.length > 0 }) : "deny";
-        if (decision === "deny") return { behavior: "deny", message: "用户没有批准这个操作" };
-        // “以后都允许”：把 SDK 给的建议原样交回去
-        return decision === "allow-always" ? { behavior: "allow", updatedInput: input, updatedPermissions: suggestions } : { behavior: "allow", updatedInput: input };
-      };
-
-      const options: Options = {
-        cwd: opts.cwd,
-        abortController: abort,
-        includePartialMessages: true,
-        systemPrompt: { type: "preset", preset: "claude_code" },
-        canUseTool,
-        ...(opts.sessionId ? { resume: opts.sessionId } : {}),
-      };
 
       let sessionId: string | null = opts.sessionId ?? null;
       let text = "";
       let outcome: AskResult["outcome"] = "interrupted"; // 没收到结果消息就算没答完
       let error: string | null = null;
+      let started = false;
+      const markStarted = () => {
+        if (!started) opts.onEvent?.({ type: "started" });
+        started = true;
+      };
 
       try {
-        for await (const raw of fns.query({ prompt: opts.prompt, options })) {
+        stream ??= fns.query({ prompt: opts.prompt, options: processOptions(opts.cwd, opts.sessionId, abort, turn) });
+        if (prewarmed) markStarted(); // 进程早就启动好了
+        for await (const raw of stream) {
           const m = raw as SdkMessage;
           if (m.session_id) sessionId = m.session_id;
-          if (m.type === "system" && m.subtype === "init") opts.onEvent?.({ type: "started" });
+          if (m.type === "system" && m.subtype === "init") markStarted();
 
           if (m.type === "stream_event" && !m.parent_tool_use_id) {
             const d = m.event?.delta;
@@ -100,6 +190,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk): ClaudeClient {
         }
       } finally {
         opts.signal?.removeEventListener("abort", onAbort);
+        turn.onPermission = undefined;
       }
       if (abort.signal.aborted && outcome === "completed") outcome = "interrupted";
 

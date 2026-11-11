@@ -322,6 +322,30 @@ describe("等你批准", () => {
   });
 });
 
+describe("提前启动 Claude", () => {
+  it("新开一路后、每一站结束后（不管怎么结束）都为下一站准备好；用的是这一路的目录和最新的会话", async () => {
+    const route = await core.createRoute(project.id);
+    expect(claude.warmed).toEqual([[route.worktreePath, undefined]]);
+    await core.ask(route.id, "第一站");
+    const session = routeOf(route.id).sessionId!;
+    expect(claude.warmed.at(-1)).toEqual([route.worktreePath, session]);
+    claude.script = () => "failed";
+    await core.ask(route.id, "第二站");
+    expect(claude.warmed).toHaveLength(3);
+    core.warm(route.id);
+    expect(claude.warmed).toHaveLength(4);
+    core.dispose();
+    expect(claude.disposed).toBe(true);
+  });
+
+  it("关掉这个选项后不提前启动", async () => {
+    core = createCore({ db, claude, worktreesRoot: path.join(lab.worktrees, "..", "bw-worktrees"), prewarm: false });
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "第一站");
+    expect(claude.warmed).toEqual([]);
+  });
+});
+
 describe("项目", () => {
   it("同一个目录加两次得到同一个项目；不是仓库的目录加不进来", async () => {
     expect((await core.addProject(lab.local)).id).toBe(project.id);
