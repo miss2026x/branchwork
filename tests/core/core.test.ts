@@ -20,6 +20,16 @@ const boot = () => {
   core.on((e) => events.push(e));
 };
 const types = () => events.map((e) => e.type);
+/** 等到某种事件出现（不靠猜时间：慢机器上站前同步就要好几秒） */
+const until = (type: BwEvent["type"]) =>
+  new Promise<void>((resolve) => {
+    if (events.some((e) => e.type === type)) return resolve();
+    const off = core.on((e) => {
+      if (e.type !== type) return;
+      off();
+      resolve();
+    });
+  });
 const stopsOf = (routeId: string) => core.snapshot(project.id).stops.filter((s) => s.routeId === routeId);
 const routeOf = (routeId: string) => core.snapshot(project.id).routes.find((r) => r.id === routeId)!;
 
@@ -134,7 +144,7 @@ describe("没答完", () => {
       await new Promise<void>((r) => t.signal.addEventListener("abort", () => r()));
     };
     const asking = core.ask(route.id, "改两个文件");
-    await new Promise((r) => setTimeout(r, 50));
+    await until("stop.delta");
     core.stop(route.id);
     const r = await asking;
     expect(r).toMatchObject({ kind: "answered", sync: null, stop: { status: "interrupted", syncState: "unsynced", error: "已停车" } });
@@ -154,6 +164,22 @@ describe("没答完", () => {
     expect(routeOf(route.id).status).toBe("idle");
   });
 
+  it("刚问出去、Claude 还没开始就停车：也算数，不启动 Claude，提问留在这一站里", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = () => {
+      throw new Error("不该被调用");
+    };
+    const asking = core.ask(route.id, "问完马上后悔");
+    core.stop(route.id); // 此刻还在做站前同步
+    const r = await asking;
+    expect(r).toMatchObject({ kind: "answered", stop: { status: "interrupted", error: "已停车", prompt: "问完马上后悔" } });
+    expect(claude.asks).toHaveLength(0);
+    expect(routeOf(route.id).status).toBe("interrupted");
+    // 之后还能正常问
+    claude.script = (t) => write(t.cwd, "b.txt", "ok\n");
+    expect(await core.ask(route.id, "重新问")).toMatchObject({ stop: { status: "done", syncState: "synced" } });
+  });
+
   it("Claude 报错结束：同样不同步，并记下原因", async () => {
     const route = await core.createRoute(project.id);
     claude.script = (t) => {
@@ -169,7 +195,7 @@ describe("没答完", () => {
     const route = await core.createRoute(project.id);
     claude.script = () => new Promise(() => {}); // 永远不结束
     void core.ask(route.id, "改一下");
-    await new Promise((r) => setTimeout(r, 50));
+    await until("stop.created");
     expect(routeOf(route.id).status).toBe("answering");
 
     boot(); // 同一个数据库，重新启动

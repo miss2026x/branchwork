@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { ClaudeClient } from "../claude";
+import type { AskResult, ClaudeClient } from "../claude";
 import type { Db } from "../db";
 import type {
   BwEvent,
@@ -211,13 +211,17 @@ export function createCore(opts: CoreOptions): Core {
       if (route.status === "conflict") throw new CoreError("ROUTE_BLOCKED", "这一路有同步冲突，解决后才能问下一站");
       if (route.status === "archived") throw new CoreError("ROUTE_ARCHIVED", "这一路已归档");
       const before = route.status;
-      // 先占住这一路，再做任何要等的事，避免同一路被同时问两次
+      // 先占住这一路，再做任何要等的事，避免同一路被同时问两次。
+      // 停车的开关也从这一刻起就有效：站前同步、启动 Claude 期间按停车都算数
       route = setRoute(routeId, { status: "answering" });
+      const abort = new AbortController();
+      running.set(routeId, abort);
 
       let engine: SyncEngine;
       try {
         engine = await engineFor(mustProject(route.projectId));
       } catch (e) {
+        running.delete(routeId);
         setRoute(routeId, { status: before });
         throw e;
       }
@@ -225,6 +229,7 @@ export function createCore(opts: CoreOptions): Core {
       // ── 站前：Local → 工作区 ──
       const pulled = await sync(routeId, null, "pull", () => engine.pullBeforeStop(routeId));
       if (pulled && pulled.status !== "ok") {
+        running.delete(routeId);
         setRoute(routeId, { status: pulled.status === "conflict" ? "conflict" : before });
         return { kind: "blocked", sync: pulled };
       }
@@ -250,10 +255,12 @@ export function createCore(opts: CoreOptions): Core {
       db.stops.insert(stop);
       emit({ type: "stop.created", stop });
 
-      const abort = new AbortController();
-      running.set(routeId, abort);
       const stopId = stop.id;
-      const result = await claude
+      const stoppedEarly: AskResult = { outcome: "interrupted", sessionId: route.sessionId, text: "", error: null, promptMessageId: null, lastMessageId: null };
+      // 还没轮到 Claude 就已经停车了：不启动它
+      const result: AskResult = abort.signal.aborted
+        ? stoppedEarly
+        : await claude
         .ask({
           cwd: route.worktreePath,
           prompt: text,

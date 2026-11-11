@@ -102,6 +102,9 @@ export async function git(cwd: string, args: string[], opts: GitOptions = {}): P
   delete env.GIT_INDEX_FILE;
   Object.assign(env, opts.env);
 
+  // 只给测试用：模拟启动进程很慢的机器（毫秒）
+  const slow = Number(process.env.BRANCHWORK_TEST_GIT_DELAY_MS ?? 0);
+  if (slow > 0) await new Promise((r) => setTimeout(r, slow));
   const r = await raw(bin, [...BASE_ARGS, ...args], withPath(env, pathPrefix), cwd, opts.input);
   gitStats.trace?.(args, performance.now() - started);
   if (r.code === 0 || opts.okCodes?.includes(r.code)) return { stdout: r.stdout, stderr: r.stderr, code: r.code };

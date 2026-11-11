@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:fast": "vitest run tests/db tests/claude tests/architecture.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "bench:sync": "tsx scripts/bench-sync.ts",

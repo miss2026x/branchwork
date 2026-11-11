@@ -19,7 +19,8 @@ Claude CLI 的多对话图形客户端。技术方案见设计文档；这里是
 
 ```
 npm install
-npm test            # 跑全部测试
+npm test            # 跑全部测试（要启动很多次 git；启动进程慢的机器上要十几分钟）
+npm run test:fast   # 只跑不碰 git 的测试，几秒钟
 npm run typecheck   # 类型检查
 npm run bench:sync -- 100000   # 大仓库耗时测试（参数是文件数）
 ```

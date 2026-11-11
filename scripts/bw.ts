@@ -8,6 +8,7 @@
 //   pnpm bw resync <项目目录> [--route N]         重新同步一次
 //
 // 回答途中按 Ctrl+C 是“停车”。数据放在 ~/.branchwork-dev（可用环境变量 BRANCHWORK_HOME 改）。
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -34,6 +35,16 @@ const routeNo = flags.route ? Number(flags.route) : 1;
 const question = words.join(" ");
 const autoAllow = flags.allow === "1";
 const interactive = Boolean(process.stdin.isTTY);
+
+// 开头先报版本和读到的选项：这样从输出就能看出跑的是哪一版、选项有没有生效
+const version = (() => {
+  try {
+    return execFileSync("git", ["log", "-1", "--format=%h %cd", "--date=format:%m-%d %H:%M"], { cwd: path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return "（不在 git 仓库里）";
+  }
+})();
+console.log(`\x1b[2mbw 版本 ${version} | 命令 ${cmd} | ${routeNo} 路 | 自动批准：${autoAllow ? "是" : "否"} | 自动停车：${flags["stop-after"] ? flags["stop-after"] + " 秒" : "否"} | 终端有人：${interactive ? "是" : "否"}\x1b[0m`);
 
 const home = process.env.BRANCHWORK_HOME ?? path.join(os.homedir(), ".branchwork-dev");
 fs.mkdirSync(home, { recursive: true });
