@@ -3,7 +3,9 @@
 //   pnpm bw new    <项目目录>                    新开一路
 //   pnpm bw ask    <项目目录> "<问题>" [--route N]  在第 N 路上问一站（默认 1 路；没有就新开）
 //                  [--allow]          不问，自动批准 Claude 的所有操作（没有人守着终端时用）
-//                  [--stop-after 秒]   过这么多秒自动停车（用来测“没答完”）
+//                  [--stop-after 秒]   问出去这么多秒后自动停车（用来测“没答完”）
+//                  [--stop-after-output 秒]  Claude 开始输出这么多秒后自动停车
+//                  [--trace]          列出每条 git 命令的耗时
 //   pnpm bw status <项目目录>                    列出各路、各站和最近的同步记录
 //   pnpm bw resync <项目目录> [--route N]         重新同步一次
 //
@@ -14,13 +16,14 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { createClaudeClient } from "../src/claude";
+import { gitStats } from "../src/sync/git";
 import { createCore } from "../src/core";
 import { openDb } from "../src/db";
 import type { Route, SyncLogEntry } from "../src/shared";
 
 const [cmd, dirArg, ...rest] = process.argv.slice(2);
 if (!cmd || !dirArg || !["new", "ask", "status", "resync"].includes(cmd)) {
-  console.log(fs.readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(2, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  console.log(fs.readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(2, 12).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
   process.exit(1);
 }
 const words: string[] = [];
@@ -28,7 +31,8 @@ const flags: Record<string, string> = {};
 for (let i = 0; i < rest.length; i++) {
   const a = rest[i]!;
   if (a === "--allow") flags.allow = "1";
-  else if (a === "--route" || a === "--stop-after") flags[a.slice(2)] = rest[++i] ?? "";
+  else if (a === "--trace") flags.trace = "1";
+  else if (a === "--route" || a === "--stop-after" || a === "--stop-after-output") flags[a.slice(2)] = rest[++i] ?? "";
   else words.push(a);
 }
 const routeNo = flags.route ? Number(flags.route) : 1;
@@ -44,7 +48,7 @@ const version = (() => {
     return "（不在 git 仓库里）";
   }
 })();
-console.log(`\x1b[2mbw 版本 ${version} | 命令 ${cmd} | ${routeNo} 路 | 自动批准：${autoAllow ? "是" : "否"} | 自动停车：${flags["stop-after"] ? flags["stop-after"] + " 秒" : "否"} | 终端有人：${interactive ? "是" : "否"}\x1b[0m`);
+console.log(`\x1b[2mbw 版本 ${version} | 命令 ${cmd} | ${routeNo} 路 | 自动批准：${autoAllow ? "是" : "否"} | 自动停车：${flags["stop-after"] ? "问出去 " + flags["stop-after"] + " 秒后" : flags["stop-after-output"] ? "开始输出 " + flags["stop-after-output"] + " 秒后" : "否"} | 终端有人：${interactive ? "是" : "否"}\x1b[0m`);
 
 const home = process.env.BRANCHWORK_HOME ?? path.join(os.homedir(), ".branchwork-dev");
 fs.mkdirSync(home, { recursive: true });
@@ -97,9 +101,13 @@ if (cmd === "new") {
   const route = await pickRoute(true);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   if (!autoAllow && !interactive) console.log("注意：现在没有人守着终端，Claude 要批准的操作会一律按拒绝处理。要让它能改文件，加 --allow。\n");
+  // 每个关键时点前面标上“从问出去算起过了多少秒”，这样能看出时间花在哪
+  const t0 = Date.now();
+  const at = () => `[${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s]`;
+  if (flags.trace) gitStats.trace = (args, ms) => console.log(dim(`${at()}     git ${args.slice(0, 3).join(" ").slice(0, 50).padEnd(50)} ${ms.toFixed(0).padStart(6)} ms`));
   if (flags["stop-after"]) {
     setTimeout(() => {
-      console.log(dim(`\n[到 ${flags["stop-after"]} 秒，自动停车]`));
+      console.log(dim(`\n${at()} [到 ${flags["stop-after"]} 秒，自动停车]`));
       core.stop(route.id);
     }, Number(flags["stop-after"]) * 1000);
   }
@@ -109,15 +117,20 @@ if (cmd === "new") {
     console.log(dim("\n[停车中…再按一次 Ctrl+C 直接退出]"));
     core.stop(route.id);
   });
-  // 每个关键时点前面标上“从问出去算起过了多少秒”，这样能看出时间花在哪
-  const t0 = Date.now();
-  const at = () => `[${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s]`;
   let waited = 0; // 等人批准花掉的时间，不算在 Claude 头上
   let firstText = true;
   core.on(async (e) => {
     if (e.type === "stop.created") console.log(dim(`${at()} ${route.name} 第 ${e.stop.seq} 站「${e.stop.name}」出发（站前同步已完成，开始启动 Claude）\n`));
     if (e.type === "stop.delta") {
-      if (firstText) console.log(dim(`${at()} Claude 开始输出`));
+      if (firstText) {
+        console.log(dim(`${at()} Claude 开始输出`));
+        if (flags["stop-after-output"]) {
+          setTimeout(() => {
+            console.log(dim(`\n${at()} [开始输出已 ${flags["stop-after-output"]} 秒，自动停车]`));
+            core.stop(route.id);
+          }, Number(flags["stop-after-output"]) * 1000);
+        }
+      }
       firstText = false;
       process.stdout.write(e.text);
     }
@@ -154,7 +167,9 @@ if (cmd === "new") {
     if (s.status !== "done" && sessionId) {
       const h = await claude.history(sessionId).catch(() => []);
       const last = h.at(-1);
-      console.log(dim(`会话文件里现在有 ${h.length} 条消息，最后一条是 ${last?.role ?? "（无）"}：${JSON.stringify(last?.content ?? null).slice(0, 160)}`));
+      const mine = s.messageId ? h.slice(h.findIndex((m) => m.id === s.messageId)) : [];
+      if (mine.length === 0) console.log(dim("这一站在会话文件里没有留下消息（Claude 还没开始就停车了）"));
+      else console.log(dim(`这一站在会话文件里留下了 ${mine.length} 条消息，最后一条是 ${last?.role ?? "（无）"}：${JSON.stringify(last?.content ?? null).slice(0, 200)}`));
     }
     console.log(dim(`消息 ID：提问 ${s.messageId ?? "（没拿到）"}，最后一条 ${s.lastMessageId ?? "（没拿到）"}`));
   }
