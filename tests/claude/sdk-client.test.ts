@@ -52,6 +52,7 @@ describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () =
       { type: "text", text: "改" },
       { type: "text", text: "好了" },
       { type: "tool", tool: "Edit", input: { file_path: "a.ts" } },
+      { type: "answered" },
     ]);
     expect(seen?.prompt).toBe("第二站");
     expect(seen?.options).toMatchObject({ cwd: "/wt/r1", resume: "S1", includePartialMessages: true });

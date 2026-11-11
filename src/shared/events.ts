@@ -9,6 +9,8 @@ export type BwEvent =
   | { type: "stop.updated"; stop: Stop }
   /** Claude 已启动，开始处理这一站（在这之前界面显示“正在启动”） */
   | { type: "stop.started"; routeId: string; stopId: string }
+  /** Claude 已给出结果，正在收尾（界面可以停掉“正在输入”的光标） */
+  | { type: "stop.answered"; routeId: string; stopId: string }
   /** 回答的流式文字 */
   | { type: "stop.delta"; routeId: string; stopId: string; text: string }
   /** Claude 用了一个工具 */

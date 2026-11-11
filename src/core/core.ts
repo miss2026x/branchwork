@@ -286,6 +286,7 @@ export function createCore(opts: CoreOptions): Core {
             // 停车之后 Claude 进程可能还要几秒才真正停下，这期间它吐出来的内容不再往界面送
             if (abort.signal.aborted) return;
             if (e.type === "started") emit({ type: "stop.started", routeId, stopId });
+            else if (e.type === "answered") emit({ type: "stop.answered", routeId, stopId });
             else if (e.type === "text") emit({ type: "stop.delta", routeId, stopId, text: e.text });
             else emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input });
           },

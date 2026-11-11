@@ -168,6 +168,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
               }
             }
           } else if (m.type === "result") {
+            opts.onEvent?.({ type: "answered" });
             // 实测（2026-11-10）：正常结束是 success / is_error:false / terminal_reason:"completed"
             const ok = m.subtype === "success" && m.is_error !== true && (m.terminal_reason === undefined || m.terminal_reason === "completed");
             if (ok) {
