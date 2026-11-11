@@ -1,0 +1,61 @@
+/** 建表语句。每个版本一段，只追加，不修改已发布的版本。 */
+export const MIGRATIONS: string[] = [
+  `
+  CREATE TABLE project (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    local_dir TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE route (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    number INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    session_id TEXT,
+    worktree_path TEXT NOT NULL,
+    parent_route_id TEXT,
+    fork_stop_id TEXT,
+    created_at INTEGER NOT NULL,
+    archived_at INTEGER
+  );
+  CREATE INDEX route_project ON route(project_id, number);
+  CREATE TABLE stop (
+    id TEXT PRIMARY KEY,
+    route_id TEXT NOT NULL REFERENCES route(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_state TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    status TEXT NOT NULL,
+    sync_state TEXT NOT NULL,
+    message_id TEXT,
+    last_message_id TEXT,
+    error TEXT,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    UNIQUE(route_id, seq)
+  );
+  CREATE TABLE queue_item (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    route_id TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE sync_log (
+    id TEXT PRIMARY KEY,
+    route_id TEXT NOT NULL REFERENCES route(id) ON DELETE CASCADE,
+    stop_id TEXT,
+    direction TEXT NOT NULL,
+    status TEXT NOT NULL,
+    files TEXT NOT NULL,
+    message TEXT,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX sync_log_route ON sync_log(route_id, at);
+  `,
+];

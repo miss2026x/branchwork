@@ -1,0 +1,23 @@
+{
+  "name": "branchwork",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "bench:sync": "tsx scripts/bench-sync.ts",
+    "diagnose": "tsx scripts/diagnose.ts",
+    "bw": "tsx scripts/bw.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.322"
+  }
+}
