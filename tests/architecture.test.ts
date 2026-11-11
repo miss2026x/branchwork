@@ -9,18 +9,24 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
   db: { modules: ["shared"], packages: [] },
   claude: { modules: ["shared"], packages: ["@anthropic-ai/claude-agent-sdk"] },
   core: { modules: ["shared", "sync", "db", "claude"], packages: [] },
+  // Electron 只进这两个模块
+  main: { modules: ["shared", "core", "db", "claude"], packages: ["electron"] },
+  preload: { modules: ["shared"], packages: ["electron"] },
+  // 界面只认识 shared 里的类型；数据只能经 window.bw 来
+  renderer: { modules: ["shared"], packages: ["react", "react-dom/client", "zustand", "react-markdown", "remark-gfm"] },
 };
 
 const SRC = path.resolve(__dirname, "..", "src");
 const files = (dir: string): string[] =>
-  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(path.join(dir, e.name)) : e.name.endsWith(".ts") ? [path.join(dir, e.name)] : []));
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : []));
 const imports = (file: string) => [...fs.readFileSync(file, "utf8").matchAll(/(?:from|import)\s+["']([^"']+)["']/g)].map((m) => m[1]!);
 
 describe("模块规则", () => {
   it("src 下的每个目录都登记了规则，且都有 index.ts 作为入口", () => {
     const dirs = fs.readdirSync(SRC, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     expect(dirs.sort()).toEqual(Object.keys(RULES).sort());
-    for (const d of dirs) expect(fs.existsSync(path.join(SRC, d, "index.ts")), `${d}/index.ts`).toBe(true);
+    // 界面的入口是 main.tsx（它是一个页面，不被别的模块引用）
+    for (const d of dirs) expect(fs.existsSync(path.join(SRC, d, d === "renderer" ? "main.tsx" : "index.ts")), `${d} 的入口`).toBe(true);
   });
 
   it.each(Object.keys(RULES))("%s 只依赖允许的模块，且只从对方的入口引用", (mod) => {
@@ -30,6 +36,7 @@ describe("模块规则", () => {
       for (const spec of imports(file)) {
         const where = `${path.relative(SRC, file)} → ${spec}`;
         if (spec.startsWith("node:")) continue;
+        if (/\.css$/.test(spec)) continue;
         if (!spec.startsWith(".")) {
           if (!rule.packages.includes(spec)) problems.push(`${where}（不允许的外部包）`);
           continue;
@@ -42,5 +49,14 @@ describe("模块规则", () => {
       }
     }
     expect(problems).toEqual([]);
+  });
+
+  it("界面里只有数据仓库碰 window.bw；组件只收数据、发事件", () => {
+    const allowed = ["stores/store.ts", "dev/mock-bw.ts", "main.tsx", "env.d.ts"];
+    const offenders = files(path.join(SRC, "renderer"))
+      .filter((f) => /window\.bw\b/.test(fs.readFileSync(f, "utf8")))
+      .map((f) => path.relative(path.join(SRC, "renderer"), f).split(path.sep).join("/"))
+      .filter((f) => !allowed.includes(f));
+    expect(offenders).toEqual([]);
   });
 });

@@ -322,6 +322,35 @@ describe("等你批准", () => {
   });
 });
 
+describe("回答内容", () => {
+  it("从会话里按站切出每一站的文字；没答完的站也有；还没问过的路是空的", async () => {
+    const route = await core.createRoute(project.id);
+    expect(await core.history(route.id)).toEqual([]);
+    claude.script = (t) => t.say(`回答：${t.prompt}`);
+    await core.ask(route.id, "第一站");
+    await core.ask(route.id, "第二站");
+    claude.script = (t) => {
+      t.say("说到一半");
+      return "interrupted" as const;
+    };
+    await core.ask(route.id, "第三站");
+    const h = await core.history(route.id);
+    expect(h.map((c) => c.items)).toEqual([[{ kind: "text", text: "回答：第一站" }], [{ kind: "text", text: "回答：第二站" }], [{ kind: "text", text: "说到一半" }]]);
+    expect(h.map((c) => c.stopId)).toEqual(stopsOf(route.id).map((s) => s.id));
+  });
+
+  it("工具事件带一行说明", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      t.tool("Edit", { file_path: path.join(t.cwd, "src", "a.ts"), old_string: "x" });
+      t.tool("Read", { file_path: path.join(lab.local, "outside.ts") });
+      t.tool("Bash", { command: "npm  test\n-- auth" });
+    };
+    await core.ask(route.id, "改");
+    expect(events.filter((e) => e.type === "stop.tool")).toMatchObject([{ detail: "src/a.ts" }, { detail: path.join(lab.local, "outside.ts") }, { detail: "npm test -- auth" }]);
+  });
+});
+
 describe("提前启动 Claude", () => {
   it("新开一路后、每一站结束后（不管怎么结束）都为下一站准备好；用的是这一路的目录和最新的会话", async () => {
     const route = await core.createRoute(project.id);

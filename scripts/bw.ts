@@ -140,7 +140,7 @@ if (cmd === "new") {
       firstText = false;
       process.stdout.write(e.text);
     }
-    if (e.type === "stop.tool") console.log(dim(`\n${at()}   ▸ ${e.tool} ${JSON.stringify(e.input).slice(0, 100)}`));
+    if (e.type === "stop.tool") console.log(dim(`\n${at()}   ▸ ${e.tool} ${e.detail}`));
     if (e.type === "stop.updated" && e.stop.status === "done" && e.stop.syncState === "none" && e.stop.endedAt) console.log(dim(`\n\n${at()} [已到站，正在同步…]`));
     if (e.type === "sync.result") console.log(dim(`${at()} 同步结束`));
     if (e.type === "permission.request") {

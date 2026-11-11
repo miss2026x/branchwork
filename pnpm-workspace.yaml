@@ -1,0 +1,4 @@
+# pnpm 默认不运行依赖包的安装脚本。Electron 要靠安装脚本下载它的程序本体，所以在这里放行
+onlyBuiltDependencies:
+  - electron
+  - esbuild

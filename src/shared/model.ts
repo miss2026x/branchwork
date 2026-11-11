@@ -95,3 +95,11 @@ export interface ProjectSnapshot {
   routes: Route[];
   stops: Stop[];
 }
+
+/** 一站回答里的一段：一段文字，或一次工具调用 */
+export type ChatItem = { kind: "text"; text: string } | { kind: "tool"; tool: string; detail: string };
+
+export interface StopContent {
+  stopId: string;
+  items: ChatItem[];
+}

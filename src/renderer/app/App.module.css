@@ -1,0 +1,107 @@
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 880px;
+}
+.top {
+  flex: none;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 16px;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text-3);
+}
+.crumbs i {
+  font-style: normal;
+  color: var(--text-4);
+}
+.crumbs b {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.center {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: var(--canvas);
+}
+.empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+}
+.empty h1 {
+  margin: 12px 0 0;
+  font-size: 22px;
+  line-height: 30px;
+}
+.empty p {
+  margin: 0 0 12px;
+  max-width: 440px;
+  color: var(--text-3);
+  line-height: 22px;
+}
+.primary {
+  height: 40px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--r-8);
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 600;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: min(720px, calc(100% - 48px));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 12px 12px 16px;
+  border-radius: var(--r-10);
+  background: var(--text-1);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(22, 27, 34, 0.28);
+  z-index: 10;
+}
+.toast span {
+  overflow-wrap: anywhere;
+}
+.toast button {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-6);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}

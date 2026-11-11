@@ -14,7 +14,7 @@ export type BwEvent =
   /** 回答的流式文字 */
   | { type: "stop.delta"; routeId: string; stopId: string; text: string }
   /** Claude 用了一个工具 */
-  | { type: "stop.tool"; routeId: string; stopId: string; tool: string; input: Record<string, unknown> }
+  | { type: "stop.tool"; routeId: string; stopId: string; tool: string; input: Record<string, unknown>; /** 一行说明：文件名、命令等 */ detail: string }
   /** 等你批准；用 answerPermission(requestId, …) 回答 */
   | {
       type: "permission.request";

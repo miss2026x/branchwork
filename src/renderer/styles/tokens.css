@@ -1,0 +1,117 @@
+/* 设计稿 v3 的 Tokens 画板。组件只引用这些变量，不写具体色值；深色模式以后只换这一份。 */
+:root {
+  /* 文字 */
+  --text-1: #161b22;
+  --text-2: #384250;
+  --text-3: #4f5966;
+  --text-4: #8a939e;
+  /* 线和边 */
+  --line-strong: #9aa4b0;
+  --line: #c8cfd8;
+  --border: #dce1e7;
+  --divider: #e6eaee;
+  /* 面 */
+  --canvas: #eef1f4;
+  --surface-2: #f5f7f9;
+  --surface-1: #fafbfc;
+  --surface-0: #ffffff;
+  /* 线路色：按路号循环 */
+  --route-1: #2563c9;
+  --route-2: #e0661c;
+  --route-2-tag: #b5500f;
+  --route-3: #7b4ccb;
+  --route-4: #0e7c86;
+  --route-5: #c23d7a;
+  --route-6: #6b7a1f;
+  --route-7: #475569;
+  --express: #16804f;
+  /* 状态 */
+  --amber: #e39a1f;
+  --amber-text: #8a5200;
+  --amber-bg: #fff1d6;
+  --red: #a3260f;
+  --red-bg: #fbe6e2;
+  --green: #16804f;
+  /* 阴影 */
+  --e1: 0 1px 2px rgba(22, 27, 34, 0.08);
+  --e2: 0 4px 12px rgba(22, 27, 34, 0.08);
+  --e3: 0 12px 32px rgba(22, 27, 34, 0.16), 0 0 0 1px rgba(22, 27, 34, 0.06);
+  /* 圆角 */
+  --r-4: 4px;
+  --r-6: 6px;
+  --r-8: 8px;
+  --r-10: 10px;
+  --r-12: 12px;
+  --r-16: 16px;
+  /* 动效 */
+  --t-fast: 120ms;
+  --t-base: 200ms;
+  --t-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* 字体 */
+  --font: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas, "Microsoft YaHei", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text-1);
+  font: 14px/20px var(--font);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+  transition: filter var(--t-fast) ease-out, background var(--t-fast) ease-out;
+}
+button:not(:disabled):hover {
+  filter: brightness(0.96);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid var(--route-1);
+  outline-offset: 2px;
+}
+.ell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

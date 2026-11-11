@@ -5,6 +5,8 @@ import type { Db } from "../db";
 import type {
   BwEvent,
   BwListener,
+  ChatItem,
+  StopContent,
   PermissionDecision,
   Project,
   ProjectSnapshot,
@@ -65,6 +67,8 @@ export interface Core {
   /** 重新同步一次（比如你手工处理了冲突之后）。成功则解除这一路的冲突状态 */
   resync(routeId: string): Promise<SyncLogEntry[]>;
   syncLog(routeId: string): SyncLogEntry[];
+  /** 这一路各站的回答内容，从 Claude 的会话文件里按站切出来 */
+  history(routeId: string): Promise<StopContent[]>;
   /** 为这一路提前启动 Claude（比如用户点开这一路时） */
   warm(routeId: string): void;
   /** 应用退出时调：关掉提前启动的 Claude */
@@ -288,7 +292,7 @@ export function createCore(opts: CoreOptions): Core {
             if (e.type === "started") emit({ type: "stop.started", routeId, stopId });
             else if (e.type === "answered") emit({ type: "stop.answered", routeId, stopId });
             else if (e.type === "text") emit({ type: "stop.delta", routeId, stopId, text: e.text });
-            else emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input });
+            else if (e.type === "tool") emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail: toolDetail(e.input, route.worktreePath) });
           },
           onPermission: (req) =>
             new Promise<PermissionDecision>((resolve) => {
@@ -381,8 +385,54 @@ export function createCore(opts: CoreOptions): Core {
 
     syncLog: (routeId) => db.syncLog.listByRoute(routeId),
 
+    async history(routeId) {
+      const route = mustRoute(routeId);
+      if (!route.sessionId) return [];
+      const messages = await claude.history(route.sessionId).catch(() => []);
+      const at = new Map(messages.map((m, i) => [m.id, i]));
+      return db.stops.listByRoute(routeId).map((stop): StopContent => {
+        const from = stop.messageId ? at.get(stop.messageId) : undefined;
+        const to = stop.lastMessageId ? at.get(stop.lastMessageId) : undefined;
+        if (from === undefined || to === undefined) return { stopId: stop.id, items: [] };
+        const items: ChatItem[] = [];
+        for (const m of messages.slice(from, to + 1)) {
+          if (m.role !== "assistant") continue;
+          if (typeof m.content === "string") {
+            if (m.content) pushText(items, m.content);
+            continue;
+          }
+          for (const b of Array.isArray(m.content) ? (m.content as { type?: string; text?: unknown; name?: unknown; input?: unknown }[]) : []) {
+            if (b.type === "text" && typeof b.text === "string" && b.text) pushText(items, b.text);
+            if (b.type === "tool_use" && typeof b.name === "string") items.push({ kind: "tool", tool: b.name, detail: toolDetail((b.input as Record<string, unknown>) ?? {}, route.worktreePath) });
+          }
+        }
+        return { stopId: stop.id, items };
+      });
+    },
+
     warm: (routeId) => warmRoute(mustRoute(routeId)),
 
     dispose: () => claude.dispose(),
   };
+}
+
+function pushText(items: ChatItem[], text: string): void {
+  const last = items.at(-1);
+  if (last?.kind === "text") last.text += "\n\n" + text;
+  else items.push({ kind: "text", text });
+}
+
+/** 工具调用的一行说明：改的是哪个文件、跑的是什么命令 */
+function toolDetail(input: Record<string, unknown>, cwd = ""): string {
+  for (const key of ["file_path", "path", "command", "pattern", "query", "url", "description", "prompt"]) {
+    const v = input[key];
+    if (typeof v !== "string" || !v) continue;
+    // 文件路径显示成相对这一路工作区的写法：工作区的完整路径又长又没有信息量
+    if ((key === "file_path" || key === "path") && cwd && path.isAbsolute(v)) {
+      const rel = path.relative(cwd, v);
+      if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return rel.split(path.sep).join("/");
+    }
+    return v.replace(/\s+/g, " ").slice(0, 200);
+  }
+  return "";
 }

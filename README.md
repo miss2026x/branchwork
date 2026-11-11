@@ -6,12 +6,13 @@ Claude CLI 的多对话图形客户端。技术方案见设计文档；这里是
 
 | 模块 | 做什么 | 状态 |
 | --- | --- | --- |
-| `src/shared` | 两边共用的类型和事件 | 完成 |
+| `src/shared` | 两边共用的类型、事件、`window.bw` 的接口 | 完成 |
 | `src/sync` | 工作区和 Local 之间的站级同步 | 完成 |
 | `src/db` | 存项目、路、站、同步记录 | 完成 |
-| `src/claude` | 和 Claude 对接（Agent SDK） | 完成，真实 Claude 需要在你的机器上验证 |
-| `src/core` | 把上面几块拼成“问一站”的完整流程 | 完成第 2 步的范围 |
-| 界面、Electron | | 未开始 |
+| `src/claude` | 和 Claude 对接（Agent SDK），含提前启动 | 完成 |
+| `src/core` | 把上面几块拼成“问一站”的完整流程 | 完成到第 3 步的范围 |
+| `src/main`、`src/preload` | Electron 窗口，把 `core` 接到界面上 | 完成 |
+| `src/renderer` | 界面：左栏、线路图、对话面板 | 第 3 步：问一站、批准、停车。分叉、候车、压缩等未做 |
 
 ## 运行
 
@@ -23,6 +24,34 @@ npm test            # 跑全部测试（要启动很多次 git；启动进程慢
 npm run test:fast   # 只跑不碰 git 的测试，几秒钟
 npm run typecheck   # 类型检查
 npm run bench:sync -- 100000   # 大仓库耗时测试（参数是文件数）
+```
+
+## 打开应用
+
+```
+pnpm dev                      # 打开窗口，用真的 Claude（需要本机已登录 Claude Code）
+pnpm build && pnpm start      # 构建后运行
+```
+
+不想等真的 Claude、只想看界面和同步，可以用演示模式：Claude 换成一个按固定剧本回答的假实现，其余都是真的（真的建工作区、真的把改动同步进项目目录，会往项目里写一个 `demo-notes.md`）。
+
+```
+$env:BRANCHWORK_DEMO=1; pnpm dev        # Windows PowerShell
+BRANCHWORK_DEMO=1 pnpm dev              # macOS / Linux
+```
+
+只调界面样式时，可以完全不启动 Electron，在浏览器里用内存里的假数据：
+
+```
+pnpm dev:web                  # 打开 http://localhost:5199 ；加 ?empty 看空白状态，?live 自动问一站
+```
+
+应用和命令行工具在开发时共用一份数据（`~/.branchwork-dev`），所以命令行里问过的项目和路在窗口里都能看到。
+
+整个应用的自动测试（真的启动 Electron，Claude 用演示实现）：
+
+```
+pnpm build && pnpm test:e2e
 ```
 
 ## 不带界面试用（需要本机已登录 Claude Code）
@@ -44,11 +73,11 @@ pnpm bw resync <项目目录> --route 2                 # 手工处理冲突后�
 
 ```
 shared  ←  sync（git）    ┐
-        ←  db（SQLite）   ├─  core  ←  （以后的 ipc、界面）
+        ←  db（SQLite）   ├─  core  ←  main（Electron） ⇠ window.bw ⇢  renderer（界面）
         ←  claude（SDK）  ┘
 ```
 
-`sync`、`db`、`claude` 互相不认识，只有 `core` 把它们连起来。这些规则由 `tests/architecture.test.ts` 检查，违反了测试会失败。
+`sync`、`db`、`claude` 互相不认识，只有 `core` 把它们连起来。界面碰不到 Node，只能通过 `window.bw` 调用主进程；界面内部只有 `stores/store.ts` 碰 `window.bw`，线路图、对话面板这些组件只收数据、发事件。这些规则由 `tests/architecture.test.ts` 检查，违反了测试会失败。
 
 数据库用的是 Node 自带的 `node:sqlite`（Node 22.13 起可用，运行时会打印一行“实验性功能”的提示），不需要编译原生模块。以后如果要换成 better-sqlite3，只改 `src/db/database.ts` 一个文件。
 

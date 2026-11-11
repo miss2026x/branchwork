@@ -1,0 +1,277 @@
+.map {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.tabs {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 16px;
+  right: 190px;
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+.tab {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 200px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface-0);
+  box-shadow: var(--e1);
+}
+.tab[aria-current="true"] {
+  font-weight: 600;
+}
+.zoom {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 16px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface-0);
+  box-shadow: var(--e1);
+  color: var(--text-3);
+}
+.zoom button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+}
+.zoom button:hover {
+  background: var(--surface-2);
+}
+.zoom span {
+  width: 44px;
+  text-align: center;
+  font-size: 12px;
+}
+.zoom i {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--divider);
+}
+.viewport {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.viewport:active {
+  cursor: grabbing;
+}
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.lines {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.lane[data-on="false"] .name,
+.lane[data-on="false"] .plate span {
+  color: var(--text-4);
+}
+.lane[data-on="false"] .plate > :first-child {
+  opacity: 0.55;
+}
+
+/* 路牌：贴在线的起点左边 */
+.plate {
+  position: absolute;
+  transform: translate(-100%, -50%);
+  max-width: 168px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 5px;
+  border: 2px solid;
+  border-radius: var(--r-6);
+  background: var(--surface-0);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 站 */
+.stop,
+.next {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.node {
+  position: absolute;
+  left: -11px;
+  top: -11px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 4px solid;
+  border-radius: 50%;
+  background: var(--surface-0);
+  transition: transform var(--t-fast) var(--ease);
+}
+.stop:hover .node {
+  transform: scale(1.12);
+}
+.stop[data-status="answering"] .node {
+  left: -15px;
+  top: -15px;
+  width: 30px;
+  height: 30px;
+  border-width: 3px;
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.9);
+}
+.stop[data-status="answering"] .node i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  animation: pulse 1400ms ease-in-out infinite;
+}
+/* 换乘站：有别的路从这里分叉出去 */
+.stop[data-junction="true"] .node {
+  top: -17px;
+  height: 34px;
+  border-radius: 11px;
+}
+.stop[data-junction="true"] .name {
+  top: 26px;
+}
+.stop[data-status="interrupted"] .node {
+  border-style: dashed;
+}
+.name {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  transform: translateX(-50%);
+  max-width: 96px;
+  padding: 0 4px;
+  border-radius: var(--r-4);
+  background: var(--canvas);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-2);
+}
+.stop[data-latest="true"] .name {
+  color: var(--text-1);
+  font-weight: 700;
+}
+.stop[data-status="answering"] .name {
+  top: 24px;
+}
+.ghost {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  width: 20px;
+  height: 20px;
+  border: 3px dashed;
+  border-radius: 50%;
+  background: var(--canvas);
+}
+.next .name {
+  color: var(--text-4);
+}
+.bus {
+  position: absolute;
+  left: 0;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.bus em {
+  position: absolute;
+  right: calc(100% + 6px);
+  bottom: 3px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--text-1);
+  color: #fff;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.flagAmber {
+  position: absolute;
+  left: 0;
+  bottom: 18px;
+  transform: translateX(-50%);
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.badgeRed,
+.badgeAmber {
+  position: absolute;
+  left: 6px;
+  top: -20px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--canvas);
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+  color: #fff;
+}
+.badgeRed {
+  background: var(--red);
+}
+.badgeAmber {
+  width: 12px;
+  height: 12px;
+  left: 8px;
+  top: -16px;
+  background: var(--amber);
+}
+
+/* 缩小后的简化显示 */
+.viewport[data-detail="dots"] .name,
+.viewport[data-detail="lines"] .name,
+.viewport[data-detail="lines"] .bus em,
+.viewport[data-detail="lines"] .flagAmber {
+  display: none;
+}
+.viewport[data-detail="lines"] .plate span {
+  display: none;
+}

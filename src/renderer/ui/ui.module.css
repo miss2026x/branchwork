@@ -1,0 +1,35 @@
+.plate,
+.plateL {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  border-radius: var(--r-4);
+  letter-spacing: -0.02em;
+}
+.plate {
+  min-width: 30px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 12px;
+  line-height: 20px;
+}
+.plate small {
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 1px;
+}
+.plateL {
+  min-width: 64px;
+  height: 64px;
+  padding: 0 10px;
+  font-size: 34px;
+  line-height: 64px;
+  border-radius: 0;
+}
+.plateL small {
+  font-size: 13px;
+  margin-left: 2px;
+}
