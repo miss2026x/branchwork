@@ -23,6 +23,10 @@ interface Props {
   permissionMode: PermissionMode;
   projectName: string;
   onPermissionMode(mode: PermissionMode): void;
+  /** 候车区里派给这一路的问题有几个 */
+  queued: number;
+  /** 这一路还在路上时“排队”：放进候车区，到站后自动发 */
+  onQueue(text: string): void;
 }
 
 const REASONS: Record<string, string> = {
@@ -35,7 +39,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, queued, onQueue }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -67,7 +71,14 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   }, [route.id]);
 
   const send = () => {
-    if (!busy && !blocked && draft.trim()) void ask(route.id, draft);
+    if (blocked || !draft.trim()) return;
+    if (busy) {
+      // 这一站还在路上：排队，到站后自动发
+      onQueue(draft);
+      setDraft(route.id, "");
+    } else {
+      void ask(route.id, draft);
+    }
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -216,15 +227,15 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           value={draft}
           onChange={(e) => setDraft(route.id, e.target.value)}
           onKeyDown={onKey}
-          placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上，到站后再问下一站" : "写下一个问题。Enter 发车，Shift+Enter 换行"}
+          placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，Enter 排队，到站后自动发" : "写下一个问题。Enter 发车，Shift+Enter 换行"}
           disabled={blocked}
           rows={3}
         />
         <div className={css.actions}>
           <PermissionModeControl mode={permissionMode} projectName={projectName} onChange={onPermissionMode} />
-          <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : ""}</span>
-          <button className={css.send} style={{ background: colors.tag }} disabled={busy || blocked || !draft.trim()} onClick={send}>
-            发车 <IconSend size={14} />
+          <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : queued > 0 ? `候车区里有 ${queued} 个问题派给了这一路` : ""}</span>
+          <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
+            {busy ? "排队" : "发车"} <IconSend size={14} />
           </button>
         </div>
       </footer>

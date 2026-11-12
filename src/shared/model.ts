@@ -69,13 +69,19 @@ export interface Stop {
   endedAt: number | null;
 }
 
+/**
+ * 候车的问题怎么上车：
+ * auto 派给了某一路，那一路正常到站后自动发出；manual 派给了某一路，到站后等你点“登车”；unassigned 还没派车
+ */
 export type QueueMode = "auto" | "manual" | "unassigned";
 
+/** 候车区里的一个问题 */
 export interface QueueItem {
   id: string;
   projectId: string;
   text: string;
   mode: QueueMode;
+  /** 派给了哪一路；没派车时为空 */
   routeId: string | null;
   createdAt: number;
 }
@@ -104,6 +110,7 @@ export interface ProjectSnapshot {
   project: Project;
   routes: Route[];
   stops: Stop[];
+  queue: QueueItem[];
 }
 
 /** 一站回答里的一段：一段文字，或一次工具调用 */

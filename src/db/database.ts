@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Project, Route, Stop, SyncLogEntry } from "../shared";
+import type { Project, QueueItem, Route, Stop, SyncLogEntry } from "../shared";
 import { MIGRATIONS } from "./schema";
 
 type Row = Record<string, unknown>;
@@ -29,6 +29,14 @@ export interface Db {
     listByProject(projectId: string): Stop[];
     update(id: string, patch: Partial<Omit<Stop, "id" | "routeId">>): Stop;
     nextSeq(routeId: string): number;
+  };
+  queue: {
+    insert(q: QueueItem): void;
+    get(id: string): QueueItem | null;
+    /** 按放进来的先后 */
+    listByProject(projectId: string): QueueItem[];
+    update(id: string, patch: Partial<Omit<QueueItem, "id" | "projectId">>): QueueItem;
+    delete(id: string): void;
   };
   syncLog: {
     insert(e: SyncLogEntry): void;
@@ -148,6 +156,15 @@ export function openDb(file: string): Db {
     }),
   );
 
+  const queue = table<QueueItem>("queue_item", { id: "id", projectId: "project_id", text: "text", mode: "mode", routeId: "route_id", createdAt: "created_at" }, (r) => ({
+    id: r.id as string,
+    projectId: r.project_id as string,
+    text: r.text as string,
+    mode: r.mode as QueueItem["mode"],
+    routeId: r.route_id as string | null,
+    createdAt: r.created_at as number,
+  }));
+
   const syncLog = table<SyncLogEntry>(
     "sync_log",
     { id: "id", routeId: "route_id", stopId: "stop_id", direction: "direction", status: "status", files: "files", message: "message", at: "at" },
@@ -187,6 +204,13 @@ export function openDb(file: string): Db {
       listByProject: (pid) => stops.where("route_id IN (SELECT id FROM route WHERE project_id = ?) ORDER BY started_at, seq", pid),
       update: (id, patch) => stops.update(id, patch),
       nextSeq: (rid) => ((one("SELECT MAX(seq) AS n FROM stop WHERE route_id = ?", rid)?.n as number | null) ?? 0) + 1,
+    },
+    queue: {
+      insert: queue.insert,
+      get: queue.get,
+      listByProject: (pid) => queue.where("project_id = ? ORDER BY created_at, rowid", pid),
+      update: (id, patch) => queue.update(id, patch),
+      delete: (id) => run("DELETE FROM queue_item WHERE id = ?", id),
     },
     syncLog: {
       insert: syncLog.insert,

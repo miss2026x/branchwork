@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, Project, Route, Stop, StopContent, SyncLogEntry } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -21,6 +21,7 @@ export function installMockBw(): void {
   const content = new Map<string, ChatItem[]>();
   const logs = new Map<string, SyncLogEntry[]>();
   const aborts = new Map<string, () => void>();
+  let queue: QueueItem[] = [];
   const permissions = new Map<string, (d: string) => void>();
 
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
@@ -62,6 +63,12 @@ export function installMockBw(): void {
     const r4 = addRoute(p.id, "修复 CI 缓存", { status: "interrupted" });
     addStop(r4.id, "看 CI 配置", "CI 的缓存为什么总是不命中？", [{ kind: "text", text: "缓存的 key 里带了提交号，所以每次都" }], { status: "interrupted", syncState: "unsynced", error: "已停车" });
     addRoute("p2", "首页改版");
+    queue = [
+      { id: "w1", projectId: p.id, text: "把错误码映射成用户能看懂的提示", routeId: r2.id, mode: "auto", createdAt: 1 },
+      { id: "w2", projectId: p.id, text: "README 补上 GitHub 环境变量说明", routeId: r2.id, mode: "manual", createdAt: 2 },
+      { id: "w3", projectId: p.id, text: "登录失败要不要加限流？", routeId: null, mode: "unassigned", createdAt: 3 },
+      { id: "w4", projectId: p.id, text: "CI 缓存老是失效，每次都重新装依赖", routeId: null, mode: "unassigned", createdAt: 4 },
+    ];
   }
 
   const setRoute = (routeId: string, patch: Partial<Route>) => {
@@ -150,6 +157,17 @@ export function installMockBw(): void {
     aborts.delete(routeId);
   }
 
+  const emitQueue = (projectId: string) => emit({ type: "queue.updated", projectId, items: queue.filter((x) => x.projectId === projectId) });
+  /** 这一路空着的话，发出派给它的下一个自动登车的问题 */
+  const autoBoard = (routeId: string) => {
+    if (routes.get(routeId)?.status !== "idle") return;
+    const next = queue.find((x) => x.routeId === routeId && x.mode === "auto");
+    if (!next) return;
+    queue = queue.filter((x) => x.id !== next.id);
+    emitQueue(next.projectId);
+    void run(routeId, next.text).then(() => autoBoard(routeId));
+  };
+
   const api: BwApi = {
     listProjects: async () => projects,
     pickDirectory: async () => `D:/work/demo-${projects.length + 1}`,
@@ -162,6 +180,7 @@ export function installMockBw(): void {
       project: projects.find((p) => p.id === projectId)!,
       routes: [...routes.values()].filter((r) => r.projectId === projectId),
       stops: [...stops.values()].filter((s) => routes.get(s.routeId)?.projectId === projectId),
+      queue: queue.filter((x) => x.projectId === projectId),
     }),
     async setPermissionMode(projectId, mode) {
       const i = projects.findIndex((p) => p.id === projectId);
@@ -180,7 +199,7 @@ export function installMockBw(): void {
       const r = routes.get(routeId)!;
       if (r.status === "answering" || r.status === "awaiting_permission") throw new Error("这一路正在回答，等它到站或先停车");
       if (r.status === "conflict" && text !== "解决同步冲突") throw new Error("这一路有同步冲突，解决后才能问下一站");
-      void run(routeId, text);
+      void run(routeId, text).then(() => autoBoard(routeId));
     },
     async fork(routeId, stopId, name) {
       const parent = routes.get(routeId)!;
@@ -189,6 +208,40 @@ export function installMockBw(): void {
       routes.set(r.id, named);
       emit({ type: "route.updated", route: named });
       return named;
+    },
+    async queueAdd(projectId, text, routeId, mode) {
+      const item: QueueItem = { id: id("w"), projectId, text: text.trim(), routeId: routeId ?? null, mode: routeId ? (mode === "manual" ? "manual" : "auto") : "unassigned", createdAt: Date.now() };
+      queue.push(item);
+      emitQueue(projectId);
+      if (item.routeId && item.mode === "auto") autoBoard(item.routeId);
+      return item;
+    },
+    async queueAssign(itemId, routeId, mode) {
+      const i = queue.findIndex((x) => x.id === itemId);
+      queue[i] = { ...queue[i]!, routeId, mode: routeId ? (mode === "manual" ? "manual" : "auto") : "unassigned" };
+      emitQueue(queue[i]!.projectId);
+      if (routeId && queue[i]!.mode === "auto") autoBoard(routeId);
+      return queue[i]!;
+    },
+    async queueRemove(itemId) {
+      const item = queue.find((x) => x.id === itemId);
+      queue = queue.filter((x) => x.id !== itemId);
+      if (item) emitQueue(item.projectId);
+    },
+    async queueBoard(itemId) {
+      const item = queue.find((x) => x.id === itemId)!;
+      queue = queue.filter((x) => x.id !== itemId);
+      emitQueue(item.projectId);
+      void run(item.routeId!, item.text).then(() => autoBoard(item.routeId!));
+    },
+    async queueStartNew(itemId) {
+      const item = queue.find((x) => x.id === itemId)!;
+      const r = addRoute(item.projectId, Array.from(item.text).slice(0, 8).join(""));
+      emit({ type: "route.updated", route: r });
+      queue = queue.filter((x) => x.id !== itemId);
+      emitQueue(item.projectId);
+      void run(r.id, item.text);
+      return r;
     },
     async distill(_routeId, _stopId, keep) {
       await wait(1800);

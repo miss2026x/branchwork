@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { PermissionMode, Project, ProjectSnapshot, Route, StopContent, SyncFile, SyncLogEntry } from "./model";
+import type { PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -28,6 +28,15 @@ export interface BwApi {
   resolveConflict(routeId: string): Promise<void>;
   /** 重新同步一次（手工处理了冲突之后）。结果走事件 */
   resync(routeId: string): Promise<void>;
+  /** 候车区：放一个问题进来。给了 routeId 就是派给那一路（默认自动登车） */
+  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): Promise<QueueItem>;
+  /** 派车 / 改派 / 撤回（routeId 为空） */
+  queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): Promise<QueueItem>;
+  queueRemove(itemId: string): Promise<void>;
+  /** 登车：现在就发出。发出即返回，过程走事件 */
+  queueBoard(itemId: string): Promise<void>;
+  /** 开新车：为这个问题新开一路并发出 */
+  queueStartNew(itemId: string): Promise<Route>;
   /** 归档：收起来，对话和工作区都留着 */
   archiveRoute(routeId: string): Promise<Route>;
   unarchiveRoute(routeId: string): Promise<Route>;

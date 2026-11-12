@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "setPermissionMode", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "resolveConflict", "resync", "setPermissionMode", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -215,5 +215,34 @@ describe("应用", () => {
     await expect.poll(() => worktrees().length, { timeout: 30000 }).toBe(2);
     // 它同步进 Local 的改动还在
     expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toContain("岔出去问");
+  });
+
+  it("候车区：这一站还在路上时排队，到站后自动发出；先放着的问题可以开新车", async () => {
+    const notes = () => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
+    // 项目此时是“全部不问”，所以不会停在批准上
+    await page.locator("textarea").fill("慢慢来，先占着");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await page.locator("textarea").fill("排队的问题");
+    expect(await page.getByRole("button", { name: "排队" }).isVisible()).toBe(true);
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("button", { name: "候车 1" }).isVisible()).toBe(true);
+    expect(notes()).not.toContain("排队的问题");
+    await shot("12-queued");
+    // 前一站到站后，它自己发出去了
+    await expect.poll(notes, { timeout: 60000 }).toContain("排队的问题");
+    await expect.poll(() => page.getByRole("button", { name: "候车 0" }).isVisible(), { timeout: 30000 }).toBe(true);
+
+    // 先放着，再开新车
+    await page.getByRole("button", { name: "候车 0" }).click();
+    await page.getByLabel("放一个问题进候车区").fill("另起一路问");
+    await page.getByRole("button", { name: "放进来" }).click();
+    const area = page.getByRole("region", { name: "候车区" });
+    await expect.poll(() => area.getByText("未派车").isVisible()).toBe(true);
+    await shot("13-waiting-area");
+    await area.getByRole("button", { name: "开新车" }).click();
+    await expect.poll(() => page.getByRole("heading", { name: "另起一路问" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(notes, { timeout: 60000 }).toContain("另起一路问");
+    expect(await area.getByText("还没有候车的问题").isVisible()).toBe(true);
   });
 });

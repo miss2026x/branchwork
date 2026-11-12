@@ -12,6 +12,8 @@ import type {
   PermissionMode,
   Project,
   ProjectSnapshot,
+  QueueItem,
+  QueueMode,
   Route,
   Stop,
   SyncDirection,
@@ -101,6 +103,16 @@ export interface Core {
    * 工作区里还有没进 Local 的改动时不删，返回这些文件；force 为 true 才会连它们一起删。
    */
   deleteRoute(routeId: string, force?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
+  // ── 候车区：准备好的问题先放着 ──
+  /** 放一个问题进候车区。给了 routeId 就是派给那一路（默认自动登车）；那一路空着的话自动登车的会马上发出 */
+  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): QueueItem;
+  /** 派车 / 改派 / 撤回：routeId 为空表示撤回到“未派车” */
+  queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): QueueItem;
+  queueRemove(itemId: string): void;
+  /** 登车：现在就在它派给的那一路上发出（那一路要空着） */
+  queueBoard(itemId: string): Promise<AskReport>;
+  /** 开新车：为这个问题新开一路并发出 */
+  queueStartNew(itemId: string): Promise<Route>;
   /** 停车：中止这一路正在进行的回答 */
   stop(routeId: string): void;
   answerPermission(requestId: string, decision: PermissionDecision): void;
@@ -215,6 +227,48 @@ export function createCore(opts: CoreOptions): Core {
       pendingPermissions.delete(requestId);
       p.resolve("deny");
     }
+  };
+
+  const emitQueue = (projectId: string) => emit({ type: "queue.updated", projectId, items: db.queue.listByProject(projectId) });
+  const mustItem = (itemId: string): QueueItem => {
+    const q = db.queue.get(itemId);
+    if (!q) throw new CoreError("NOT_FOUND", `候车区里没有这个问题：${itemId}`);
+    return q;
+  };
+  const canBoard = (route: Route) => route.status === "idle" || route.status === "interrupted";
+  /** 把候车的问题发出去；没发成（站前冲突）就放回候车区等你处理，不弄丢 */
+  const board = async (item: QueueItem, routeId: string): Promise<AskReport> => {
+    db.queue.delete(item.id);
+    emitQueue(item.projectId);
+    const putBack = () => {
+      db.queue.insert({ ...item, routeId, mode: "manual" });
+      emitQueue(item.projectId);
+    };
+    try {
+      const report = await runStop(routeId, item.text);
+      if (report.kind === "blocked") putBack();
+      return report;
+    } catch (e) {
+      putBack();
+      throw e;
+    }
+  };
+  /** 这一路空下来了：有自动登车的就发下一个。只在正常到站、没有冲突时才发 */
+  const dispatchNext = (routeId: string) => {
+    try {
+      const route = db.routes.get(routeId);
+      if (!route || route.status !== "idle") return;
+      const next = db.queue.listByProject(route.projectId).find((q) => q.routeId === routeId && q.mode === "auto");
+      if (next) void board(next, routeId).catch(() => {});
+    } catch {
+      // 这是在一站结束后稍晚一点才跑的；应用正在退出、数据库已经关了的话就算了
+    }
+  };
+  /** 这一路没了（归档、删除）：派给它的问题撤回到未派车 */
+  const releaseQueue = (route: Route) => {
+    const mine = db.queue.listByProject(route.projectId).filter((q) => q.routeId === route.id);
+    for (const q of mine) db.queue.update(q.id, { routeId: null, mode: "unassigned" });
+    if (mine.length > 0) emitQueue(route.projectId);
   };
 
   const prewarm = opts.prewarm ?? true;
@@ -336,10 +390,12 @@ export function createCore(opts: CoreOptions): Core {
       if (!pushed) {
         for (const s of earlier) setStop(s.id, { syncState: "none" });
         setRoute(routeId, { status: "idle" });
+        setImmediate(() => dispatchNext(routeId));
       } else if (pushed.status === "ok") {
         for (const s of earlier) setStop(s.id, { syncState: "synced" });
         stop = setStop(stopId, { syncState: "synced" });
         setRoute(routeId, { status: "idle" });
+        setImmediate(() => dispatchNext(routeId));
       } else if (pushed.status === "conflict") {
         stop = setStop(stopId, { syncState: "conflict" });
         setRoute(routeId, { status: "conflict" });
@@ -369,7 +425,52 @@ export function createCore(opts: CoreOptions): Core {
     listProjects: () => db.projects.list(),
 
     snapshot(projectId) {
-      return { project: mustProject(projectId), routes: db.routes.listByProject(projectId), stops: db.stops.listByProject(projectId) };
+      return { project: mustProject(projectId), routes: db.routes.listByProject(projectId), stops: db.stops.listByProject(projectId), queue: db.queue.listByProject(projectId) };
+    },
+
+    queueAdd(projectId, text, routeId = null, mode) {
+      mustProject(projectId);
+      const q = text.trim();
+      if (!q) throw new CoreError("NOT_FOUND", "问题是空的");
+      const route = routeId ? mustRoute(routeId) : null;
+      const item: QueueItem = { id: id("w"), projectId, text: q, routeId: route?.id ?? null, mode: route ? (mode === "manual" ? "manual" : "auto") : "unassigned", createdAt: Date.now() };
+      db.queue.insert(item);
+      emitQueue(projectId);
+      if (route && item.mode === "auto") setImmediate(() => dispatchNext(route.id));
+      return item;
+    },
+
+    queueAssign(itemId, routeId, mode) {
+      const item = mustItem(itemId);
+      const route = routeId ? mustRoute(routeId) : null;
+      if (route && route.projectId !== item.projectId) throw new CoreError("NOT_FOUND", "只能派给同一个项目里的路");
+      if (route?.status === "archived") throw new CoreError("ROUTE_ARCHIVED", "这一路已归档");
+      const updated = db.queue.update(itemId, { routeId: route?.id ?? null, mode: route ? (mode === "manual" ? "manual" : "auto") : "unassigned" });
+      emitQueue(item.projectId);
+      if (route && updated.mode === "auto") setImmediate(() => dispatchNext(route.id));
+      return updated;
+    },
+
+    queueRemove(itemId) {
+      const item = db.queue.get(itemId);
+      if (!item) return;
+      db.queue.delete(itemId);
+      emitQueue(item.projectId);
+    },
+
+    async queueBoard(itemId) {
+      const item = mustItem(itemId);
+      if (!item.routeId) throw new CoreError("NOT_FOUND", "这个问题还没派车");
+      const route = mustRoute(item.routeId);
+      if (!canBoard(route)) throw new CoreError(route.status === "conflict" ? "ROUTE_BLOCKED" : "ROUTE_BUSY", route.status === "conflict" ? "这一路有同步冲突，解决后才能登车" : "这一路还没到站");
+      return board(item, route.id);
+    },
+
+    async queueStartNew(itemId) {
+      const item = mustItem(itemId);
+      const route = await this.createRoute(item.projectId);
+      void board(item, route.id).catch(() => {});
+      return route;
     },
 
     setPermissionMode(projectId, mode) {
@@ -460,6 +561,7 @@ export function createCore(opts: CoreOptions): Core {
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能归档");
       if (route.status === "archived") return route;
       claude.cool(route.worktreePath);
+      releaseQueue(route);
       return setRoute(routeId, { status: "archived", archivedAt: Date.now() });
     },
 
@@ -482,6 +584,7 @@ export function createCore(opts: CoreOptions): Core {
       const removed = await engine.removeWorktree(routeId, { force });
       if (removed.status === "has-unsynced") return { status: "has-unsynced", files: removed.files.map((f) => ({ path: f.path, note: f.kind })) };
       if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
+      releaseQueue(route);
       db.routes.delete(routeId);
       emit({ type: "route.deleted", routeId, projectId: route.projectId });
       return { status: "deleted" };

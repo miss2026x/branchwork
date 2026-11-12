@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import type { Stop, SyncFile } from "../../shared";
+import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
 import { RouteMap } from "../map/RouteMap";
+import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
 import { BusMark, IconFolder } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./App.module.css";
+
+const EMPTY_QUEUE: QueueItem[] = [];
 
 export function App() {
   const init = useStore((s) => s.init);
@@ -39,6 +42,12 @@ export function App() {
   const [compressFrom, setCompressFrom] = useState<Stop | null>(null);
   /** 提炼好但还没用掉的摘要，按站记着：弹窗关了再打开还在 */
   const summaries = useRef(new Map<string, string>());
+  const queue = useStore((s) => (projectId ? s.queue[projectId] : undefined)) ?? EMPTY_QUEUE;
+  const queueAdd = useStore((s) => s.queueAdd);
+  const queueAssign = useStore((s) => s.queueAssign);
+  const queueRemove = useStore((s) => s.queueRemove);
+  const queueBoard = useStore((s) => s.queueBoard);
+  const queueStartNew = useStore((s) => s.queueStartNew);
   const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
   const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + stop.seq;
 
@@ -96,11 +105,22 @@ export function App() {
               </button>
             </div>
           ) : (
-            <RouteMap routes={routes} stops={projectStops} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={setCompressFrom} />
+            <>
+              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={setCompressFrom} />
+              <WaitingArea
+                items={queue}
+                routes={routes}
+                onAdd={(text) => projectId && void queueAdd(projectId, text)}
+                onAssign={(itemId, toRoute, mode) => void queueAssign(itemId, toRoute, mode)}
+                onRemove={(itemId) => void queueRemove(itemId)}
+                onBoard={(itemId) => void queueBoard(itemId)}
+                onStartNew={(itemId) => void queueStartNew(itemId)}
+              />
+            </>
           )}
         </main>
 
-        {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} />}
+        {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} queued={queue.filter((q) => q.routeId === route.id).length} onQueue={(text) => void queueAdd(route.projectId, text, route.id, "auto")} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -28,6 +28,8 @@ interface State {
   pendingAsk: Record<string, string>;
   permissions: Record<string, PendingPermission>;
   lastSync: Record<string, SyncLogEntry>;
+  /** 各项目候车区里的问题 */
+  queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
   historyLoaded: Record<string, boolean>;
   error: string | null;
@@ -54,6 +56,11 @@ interface State {
   stop(routeId: string): void;
   answerPermission(routeId: string, decision: PermissionDecision): void;
   setPermissionMode(projectId: string, mode: PermissionMode): Promise<void>;
+  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): Promise<void>;
+  queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): Promise<void>;
+  queueRemove(itemId: string): Promise<void>;
+  queueBoard(itemId: string): Promise<void>;
+  queueStartNew(itemId: string): Promise<void>;
   setDraft(routeId: string, text: string): void;
   dismissError(): void;
 }
@@ -145,6 +152,9 @@ export const useStore = create<State>((set, get) => {
           permissions: { ...s.permissions, [e.routeId]: { requestId: e.requestId, stopId: e.stopId, tool: e.tool, detail: summarize(e.input), canRemember: e.canRemember } },
         }));
         break;
+      case "queue.updated":
+        set((s) => ({ queue: { ...s.queue, [e.projectId]: e.items } }));
+        break;
       case "sync.result":
         set((s) => ({ lastSync: { ...s.lastSync, [e.entry.routeId]: e.entry } }));
         break;
@@ -171,6 +181,7 @@ export const useStore = create<State>((set, get) => {
     set((s) => ({
       routes: { ...s.routes, ...Object.fromEntries(snap.routes.map((r) => [r.id, r])) },
       stops: { ...s.stops, ...Object.fromEntries(snap.stops.map((x) => [x.id, x])) },
+      queue: { ...s.queue, [projectId]: snap.queue },
     }));
     return snap;
   };
@@ -185,6 +196,7 @@ export const useStore = create<State>((set, get) => {
     pendingAsk: {},
     permissions: {},
     lastSync: {},
+    queue: {},
     drafts: {},
     historyLoaded: {},
     error: null,
@@ -373,6 +385,29 @@ export const useStore = create<State>((set, get) => {
       try {
         const project = await window.bw.setPermissionMode(projectId, mode);
         set((s) => ({ projects: s.projects.map((p) => (p.id === project.id ? project : p)) }));
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    // 候车区的操作：结果都通过 queue.updated 事件回来，这里只管发出和报错
+    async queueAdd(projectId, text, routeId, mode) {
+      await window.bw.queueAdd(projectId, text, routeId, mode).catch((e) => set({ error: message(e) }));
+    },
+    async queueAssign(itemId, routeId, mode) {
+      await window.bw.queueAssign(itemId, routeId, mode).catch((e) => set({ error: message(e) }));
+    },
+    async queueRemove(itemId) {
+      await window.bw.queueRemove(itemId).catch((e) => set({ error: message(e) }));
+    },
+    async queueBoard(itemId) {
+      await window.bw.queueBoard(itemId).catch((e) => set({ error: message(e) }));
+    },
+    async queueStartNew(itemId) {
+      try {
+        const route = await window.bw.queueStartNew(itemId);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+        get().selectRoute(route.id);
       } catch (e) {
         set({ error: message(e) });
       }

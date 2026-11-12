@@ -406,6 +406,145 @@ describe("从一站开新对话（分叉）", () => {
   });
 });
 
+describe("候车区", () => {
+  const queue = () => core.snapshot(project.id).queue;
+  /** 等到某一路空下来，且上面正好有 n 站 */
+  const settled = (routeId: string, n: number) => expect.poll(() => (routeOf(routeId).status === "idle" ? stopsOf(routeId).length : -1), { timeout: 20000 }).toBe(n);
+
+  it("放进来先不派车；派给一路后按自动或手动登车；撤回、删除", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = () => new Promise(() => {}); // 这一路一直在回答
+    void core.ask(route.id, "占着");
+    await until("stop.created");
+
+    const a = core.queueAdd(project.id, "  问题 A  ");
+    expect(a).toMatchObject({ text: "问题 A", mode: "unassigned", routeId: null });
+    expect(events.at(-1)).toMatchObject({ type: "queue.updated", projectId: project.id, items: [{ id: a.id }] });
+    expect(core.queueAssign(a.id, route.id)).toMatchObject({ mode: "auto", routeId: route.id });
+    expect(core.queueAssign(a.id, route.id, "manual")).toMatchObject({ mode: "manual" });
+    expect(core.queueAssign(a.id, null)).toMatchObject({ mode: "unassigned", routeId: null });
+    const b = core.queueAdd(project.id, "问题 B", route.id);
+    expect(b.mode).toBe("auto");
+    expect(queue().map((q) => q.text)).toEqual(["问题 A", "问题 B"]);
+    await expect(core.queueBoard(b.id)).rejects.toMatchObject({ code: "ROUTE_BUSY" }); // 这一路还没到站
+    await expect(core.queueBoard(a.id)).rejects.toMatchObject({ code: "NOT_FOUND" }); // 还没派车
+    core.queueRemove(a.id);
+    core.queueRemove("nope");
+    expect(queue().map((q) => q.text)).toEqual(["问题 B"]);
+    expect(() => core.queueAdd(project.id, "   ")).toThrow();
+    boot(); // 候车的问题存在数据库里
+    expect(queue()).toMatchObject([{ text: "问题 B", mode: "auto", routeId: route.id }]);
+  });
+
+  it("自动登车：那一路正常到站后自动发出下一个，按放进来的先后一个一个来", async () => {
+    const route = await core.createRoute(project.id);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const order: string[] = [];
+    claude.script = async (t) => {
+      order.push(t.prompt);
+      if (t.prompt === "第一站") await gate;
+      write(t.cwd, `${order.length}.txt`, "x\n");
+    };
+    const first = core.ask(route.id, "第一站");
+    await until("stop.created");
+    core.queueAdd(project.id, "排队一", route.id);
+    core.queueAdd(project.id, "排队二", route.id);
+    core.queueAdd(project.id, "手动的", route.id, "manual");
+    expect(order).toEqual(["第一站"]);
+    release();
+    await first;
+    await settled(route.id, 3);
+    expect(order).toEqual(["第一站", "排队一", "排队二"]);
+    expect(stopsOf(route.id).map((s) => [s.prompt, s.syncState])).toEqual([
+      ["第一站", "synced"],
+      ["排队一", "synced"],
+      ["排队二", "synced"],
+    ]);
+    expect(queue()).toMatchObject([{ text: "手动的", mode: "manual" }]); // 手动的不会自己发
+    expect(read(lab.local, "3.txt")).toBe("x\n");
+
+    // 手动登车
+    const report = await core.queueBoard(queue()[0]!.id);
+    expect(report).toMatchObject({ kind: "answered", stop: { prompt: "手动的" } });
+    expect(queue()).toEqual([]);
+  });
+
+  it("派给一路时它正好空着：自动登车的马上发出", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => t.say("ok");
+    core.queueAdd(project.id, "马上发", route.id);
+    await settled(route.id, 1);
+    expect(stopsOf(route.id)[0]!.prompt).toBe("马上发");
+    const later = core.queueAdd(project.id, "先不派");
+    core.queueAssign(later.id, route.id);
+    await settled(route.id, 2);
+    expect(queue()).toEqual([]);
+  });
+
+  it("那一站没答完或有冲突：不自动发，问题留在候车区", async () => {
+    const [a, b] = [await core.createRoute(project.id), await core.createRoute(project.id)];
+    claude.script = async (t) => {
+      await new Promise<void>((r) => t.signal.addEventListener("abort", () => r()));
+    };
+    const asking = core.ask(a.id, "会被停掉");
+    await until("stop.created");
+    core.queueAdd(project.id, "等着", a.id);
+    core.stop(a.id);
+    await asking;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(routeOf(a.id).status).toBe("interrupted");
+    expect(queue()).toMatchObject([{ text: "等着", mode: "auto" }]);
+    expect(stopsOf(a.id)).toHaveLength(1);
+    core.queueRemove(queue()[0]!.id);
+
+    // 冲突的那一路
+    await core.deleteRoute(a.id, true);
+    const c = await core.createRoute(project.id);
+    events.length = 0;
+    const pb = bothEditSameLine(c.id, b.id);
+    await until("stop.created");
+    core.queueAdd(project.id, "冲突后不发", b.id);
+    await pb;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(routeOf(b.id).status).toBe("conflict");
+    expect(queue()).toMatchObject([{ text: "冲突后不发", routeId: b.id }]);
+    await expect(core.queueBoard(queue()[0]!.id)).rejects.toMatchObject({ code: "ROUTE_BLOCKED" });
+  });
+
+  it("登车时站前同步冲突，问题没发出去：放回候车区，不弄丢", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      write(t.cwd, "b.txt", "wt\n");
+      return "interrupted" as const;
+    };
+    await core.ask(route.id, "留下没同步的改动");
+    write(lab.local, "b.txt", "local\n");
+    const item = core.queueAdd(project.id, "会被拦下", route.id, "manual");
+    expect(await core.queueBoard(item.id)).toMatchObject({ kind: "blocked" });
+    expect(queue()).toMatchObject([{ text: "会被拦下", mode: "manual", routeId: route.id }]);
+  });
+
+  it("开新车：为这个问题新开一路并发出；归档或删除一路时，派给它的问题撤回到未派车", async () => {
+    claude.script = (t) => t.say("ok");
+    const item = core.queueAdd(project.id, "单独开一路问");
+    const route = await core.queueStartNew(item.id);
+    await settled(route.id, 1);
+    expect(routeOf(route.id).name).toBe("单独开一路问");
+    expect(queue()).toEqual([]);
+
+    claude.script = () => new Promise(() => {});
+    const other = await core.createRoute(project.id);
+    core.queueAdd(project.id, "给归档的", route.id, "manual");
+    core.archiveRoute(route.id);
+    expect(queue()).toMatchObject([{ text: "给归档的", mode: "unassigned", routeId: null }]);
+    expect(() => core.queueAssign(queue()[0]!.id, route.id)).toThrow("已归档");
+    core.queueAssign(queue()[0]!.id, other.id, "manual");
+    await core.deleteRoute(other.id);
+    expect(queue()).toMatchObject([{ mode: "unassigned", routeId: null }]);
+  });
+});
+
 describe("压缩成快线", () => {
   const threeStops = async () => {
     const route = await core.createRoute(project.id, "登录重构");

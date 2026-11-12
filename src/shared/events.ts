@@ -1,4 +1,4 @@
-import type { Project, Route, Stop, SyncLogEntry } from "./model";
+import type { Project, QueueItem, Route, Stop, SyncLogEntry } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -28,6 +28,8 @@ export type BwEvent =
       /** 能不能选“这一路以后都允许” */
       canRemember: boolean;
     }
-  | { type: "sync.result"; entry: SyncLogEntry };
+  | { type: "sync.result"; entry: SyncLogEntry }
+  /** 候车区变了：这个项目现在候车的全部问题 */
+  | { type: "queue.updated"; projectId: string; items: QueueItem[] };
 
 export type BwListener = (e: BwEvent) => void;

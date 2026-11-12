@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
-import type { Route, Stop } from "../../shared";
+import type { QueueItem, Route, Stop } from "../../shared";
 import { BusMark, IconCompress, IconCopy, IconFit, IconFork, IconMinus, IconPlus } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
@@ -10,6 +10,8 @@ import css from "./RouteMap.module.css";
 interface Props {
   routes: Route[];
   stops: Stop[];
+  /** 候车区里的问题：派给某一路的，在那一路的末尾画成虚线的站 */
+  queue?: QueueItem[];
   selectedRouteId: string | null;
   onSelectRoute(routeId: string): void;
   /** 站在界面上显示的序号（分叉出来的路接着父路往下数） */
@@ -28,7 +30,7 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress }: Props) {
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
@@ -148,9 +150,12 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNu
                     ) : (
                       <path d={lane.path} fill="none" stroke={c} strokeWidth={on ? 10 : 8} strokeLinecap="round" strokeLinejoin="round" />
                     )}
-                    {on && lane.route.status !== "answering" && lane.route.status !== "awaiting_permission" && (
-                      <path d={`M ${tailFrom + 20} ${lane.y} H ${lane.end.x - 12}`} stroke={c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" fill="none" />
-                    )}
+                    {(() => {
+                      const waiting = queue.filter((q) => q.routeId === lane.route.id).length;
+                      const idle = lane.route.status !== "answering" && lane.route.status !== "awaiting_permission";
+                      if (waiting === 0 && !(on && idle)) return null;
+                      return <path d={`M ${tailFrom + 20} ${lane.y} H ${lane.end.x + Math.max(0, waiting - 1) * 76 - 12}`} stroke={c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" fill="none" />;
+                    })()}
                   </g>
                 );
               })}
@@ -160,6 +165,7 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNu
             <LaneNodes
               key={lane.route.id}
               lane={lane}
+              waiting={queue.filter((q) => q.routeId === lane.route.id)}
               on={lane.route.id === selectedRouteId}
               onSelect={() => onSelectRoute(lane.route.id)}
               onStop={(stop) => {
@@ -221,7 +227,7 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNu
   );
 }
 
-function LaneNodes({ lane, on, onSelect, onStop }: { lane: Lane; on: boolean; onSelect(): void; onStop(stop: Stop): void }) {
+function LaneNodes({ lane, waiting, on, onSelect, onStop }: { lane: Lane; waiting: QueueItem[]; on: boolean; onSelect(): void; onStop(stop: Stop): void }) {
   const colors = routeColors(lane.route);
   const line = on ? colors.line : colors.faded;
   const tag = colors.tag;
@@ -255,7 +261,14 @@ function LaneNodes({ lane, on, onSelect, onStop }: { lane: Lane; on: boolean; on
         );
       })}
 
-      {on && !busy && (
+      {/* 候车区里派给这一路的问题：排在末尾的虚线站 */}
+      {waiting.map((q, i) => (
+        <span key={q.id} className={css.next} style={{ left: lane.end.x + i * 76, top: lane.end.y }} title={q.text}>
+          <span className={css.ghost} style={{ borderColor: line, borderStyle: q.mode === "auto" ? "solid" : "dashed" }} />
+          <span className={css.name}>{q.mode === "auto" ? "自动" : "手动"}</span>
+        </span>
+      ))}
+      {on && !busy && waiting.length === 0 && (
         <span className={css.next} style={{ left: lane.end.x, top: lane.end.y }}>
           <span className={css.ghost} style={{ borderColor: line }} />
           <span className={css.name}>下一站</span>
