@@ -16,7 +16,7 @@
     "start": "electron-vite preview",
     "dev:web": "vite -c vite.renderer.config.ts",
     "test:e2e": "vitest run -c vitest.e2e.config.ts",
-    "pack": "electron-vite build && electron-builder --dir",
+    "dist:dir": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder"
   },
   "devDependencies": {

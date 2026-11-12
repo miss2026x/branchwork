@@ -60,7 +60,7 @@ pnpm dev:web                  # 打开 http://localhost:5199 ；加 ?empty 看�
 
 ```
 pnpm dist      # 在当前系统上出安装包，放在 dist/：Windows 是 .exe 安装程序，macOS 是 .dmg
-pnpm pack      # 只出一个解压即用的目录（dist/*-unpacked），不做安装程序，快一些
+pnpm dist:dir  # 只出一个解压即用的目录（dist/*-unpacked），不做安装程序，快一些
 ```
 
 - 只能在哪个系统上打哪个系统的包：Claude Code 的程序本体是按系统分的，装依赖时只装了当前系统的那一份。
