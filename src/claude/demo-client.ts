@@ -71,6 +71,7 @@ export function createDemoClaudeClient(): ClaudeClient {
     history: async (sessionId) => sessions.get(sessionId) ?? [],
     deleteSession: async (sessionId) => void sessions.delete(sessionId),
     warm() {},
+    cool() {},
     dispose() {},
   };
 }

@@ -58,6 +58,27 @@ describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () =
     expect(seen?.options).toMatchObject({ cwd: "/wt/r1", resume: "S1", includePartialMessages: true });
   });
 
+  it("环境说明接在 Claude Code 自带的系统提示后面；提前启动的进程也带着", async () => {
+    const seen: unknown[] = [];
+    const fns = fakeSdk([init, success], {
+      onQuery: (p) => seen.push((p.options as { systemPrompt: unknown }).systemPrompt),
+      startup: async (p) => {
+        seen.push((p.options as { systemPrompt: unknown }).systemPrompt);
+        throw new Error("不用真的启动");
+      },
+    });
+    const client = createClaudeClient(fns, { appendSystemPrompt: "你在 Branchwork 里" });
+    client.warm("/wt");
+    await client.ask({ cwd: "/wt", prompt: "x" });
+    expect(seen).toEqual([
+      { type: "preset", preset: "claude_code", append: "你在 Branchwork 里" },
+      { type: "preset", preset: "claude_code", append: "你在 Branchwork 里" },
+    ]);
+    const plain: unknown[] = [];
+    await createClaudeClient(fakeSdk([init, success], { onQuery: (p) => plain.push((p.options as { systemPrompt: unknown }).systemPrompt) })).ask({ cwd: "/wt", prompt: "x" });
+    expect(plain).toEqual([{ type: "preset", preset: "claude_code" }]);
+  });
+
   it("新会话不传 resume；会话 ID 从消息里取", async () => {
     let seen: Record<string, unknown> | undefined;
     const client = createClaudeClient(fakeSdk([init, success], { onQuery: (p) => (seen = p.options) }));

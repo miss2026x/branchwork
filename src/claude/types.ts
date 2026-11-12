@@ -63,6 +63,8 @@ export interface ClaudeClient {
    * 提前做掉，问的时候就不用等。尽力而为：失败了不报错，问的时候照常现启动。
    */
   warm(cwd: string, sessionId?: string): void;
+  /** 关掉为这个目录提前启动好的 Claude（这一路归档或删除时调，否则它会占着目录和内存） */
+  cool(cwd: string): void;
   /** 关掉所有提前启动好的 Claude（应用退出时调） */
   dispose(): void;
   /** 复制会话到某条消息为止（含），返回新会话的 ID；不传就复制全部 */

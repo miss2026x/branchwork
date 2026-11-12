@@ -53,7 +53,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, onCancel, onC
         <label className={css.field}>
           <span>线路名称</span>
           <div className={css.nameRow}>
-            <input ref={nameInput} value={name} onChange={(e) => setName(e.target.value)} placeholder={`${nextNumber} 路`} maxLength={40} />
+            <input ref={nameInput} value={name} onChange={(e) => setName(e.target.value)} placeholder="新对话" maxLength={40} />
             <Plate route={next} />
           </div>
         </label>

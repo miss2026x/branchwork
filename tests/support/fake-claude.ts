@@ -67,6 +67,10 @@ export class FakeClaude implements ClaudeClient {
   warm(cwd: string, sessionId?: string): void {
     this.warmed.push([cwd, sessionId]);
   }
+  readonly cooled: string[] = [];
+  cool(cwd: string): void {
+    this.cooled.push(cwd);
+  }
   dispose(): void {
     this.disposed = true;
   }

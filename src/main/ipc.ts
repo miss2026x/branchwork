@@ -33,6 +33,9 @@ export function registerIpc(core: Core): void {
     warm: async (routeId) => core.warm(routeId),
 
     fork: (routeId, stopId, name) => core.fork(routeId, stopId, name),
+    archiveRoute: async (routeId) => core.archiveRoute(routeId),
+    unarchiveRoute: async (routeId) => core.unarchiveRoute(routeId),
+    deleteRoute: (routeId, force) => core.deleteRoute(routeId, force),
     resync: async (routeId) => void (await core.resync(routeId)),
     resolveConflict: (routeId) => fire(core.resolveConflict(routeId)),
 

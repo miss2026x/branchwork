@@ -19,7 +19,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { createClaudeClient } from "../src/claude";
 import { gitStats } from "../src/sync/git";
-import { createCore } from "../src/core";
+import { BRANCHWORK_BRIEFING, createCore } from "../src/core";
 import { openDb } from "../src/db";
 import type { Route, SyncLogEntry } from "../src/shared";
 
@@ -55,7 +55,7 @@ console.log(`\x1b[2mbw 版本 ${version} | 命令 ${cmd} | ${routeNo} 路 | 自�
 const home = process.env.BRANCHWORK_HOME ?? path.join(os.homedir(), ".branchwork-dev");
 fs.mkdirSync(home, { recursive: true });
 const db = openDb(path.join(home, "bw.sqlite"));
-const claude = createClaudeClient();
+const claude = createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING });
 // 只有 chat 是常驻的；其他命令跑完就退出，提前启动 Claude 只是白费
 const core = createCore({ db, claude, worktreesRoot: path.join(home, "worktrees"), prewarm: cmd === "chat" });
 

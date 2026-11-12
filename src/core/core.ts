@@ -73,6 +73,14 @@ export interface Core {
    * 在这一路上开一站请 Claude 改好，这一站正常结束后再同步一次。
    */
   resolveConflict(routeId: string): Promise<AskReport>;
+  /** 归档：从线路图上收起来，对话和工作区都保留，可以恢复 */
+  archiveRoute(routeId: string): Route;
+  unarchiveRoute(routeId: string): Route;
+  /**
+   * 删除一路：工作区、对话记录一起删，不能恢复。
+   * 工作区里还有没进 Local 的改动时不删，返回这些文件；force 为 true 才会连它们一起删。
+   */
+  deleteRoute(routeId: string, force?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
   /** 停车：中止这一路正在进行的回答 */
   stop(routeId: string): void;
   answerPermission(requestId: string, decision: PermissionDecision): void;
@@ -187,7 +195,7 @@ export function createCore(opts: CoreOptions): Core {
     if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined);
   };
 
-  const tempName = (prompt: string) => Array.from(prompt.replace(/\s+/g, " ").trim()).slice(0, 6).join("") || "新的一站";
+  const tempName = stopName;
 
   /** 在一路上跑一站。resolving：这一站是在解决冲突，这一路此刻已经被占住了 */
   const runStop = async (routeId: string, text: string, resolving?: { name: string }): Promise<AskReport> => {
@@ -241,6 +249,8 @@ export function createCore(opts: CoreOptions): Core {
       };
       db.stops.insert(stop);
       emit({ type: "stop.created", stop });
+      // 还没起名的路，用它自己的第一站当名字
+      if (route.name === NEW_ROUTE_NAME && !resolving) route = setRoute(routeId, { name: stop.name });
 
       const stopId = stop.id;
       const stoppedEarly: AskResult = { outcome: "interrupted", sessionId: route.sessionId, text: "", error: null, promptMessageId: null, lastMessageId: null };
@@ -342,7 +352,7 @@ export function createCore(opts: CoreOptions): Core {
         id: routeId,
         projectId,
         number,
-        name: name ?? `${number} 路`,
+        name: name?.trim() || NEW_ROUTE_NAME,
         status: "idle",
         sessionId: null,
         worktreePath,
@@ -384,7 +394,7 @@ export function createCore(opts: CoreOptions): Core {
         id: newId,
         projectId: project.id,
         number,
-        name: name?.trim() || `${number} 路`,
+        name: name?.trim() || NEW_ROUTE_NAME,
         status: "idle",
         sessionId,
         worktreePath,
@@ -397,6 +407,38 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "route.updated", route });
       warmRoute(route);
       return route;
+    },
+
+    archiveRoute(routeId) {
+      const route = mustRoute(routeId);
+      if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能归档");
+      if (route.status === "archived") return route;
+      claude.cool(route.worktreePath);
+      return setRoute(routeId, { status: "archived", archivedAt: Date.now() });
+    },
+
+    unarchiveRoute(routeId) {
+      const route = mustRoute(routeId);
+      if (route.status !== "archived") return route;
+      const stops = db.stops.listByRoute(routeId);
+      // 归档前如果有冲突或没答完，恢复后还是那个状态：下一站前要先处理
+      const status = stops.some((s) => s.syncState === "conflict") ? "conflict" : stops.at(-1)?.status === "interrupted" ? "interrupted" : "idle";
+      const restored = setRoute(routeId, { status, archivedAt: null });
+      warmRoute(restored);
+      return restored;
+    },
+
+    async deleteRoute(routeId, force = false) {
+      const route = mustRoute(routeId);
+      if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能删除");
+      const engine = await engineFor(mustProject(route.projectId));
+      claude.cool(route.worktreePath); // 提前启动好的 Claude 占着这个目录，先关掉才删得了
+      const removed = await engine.removeWorktree(routeId, { force });
+      if (removed.status === "has-unsynced") return { status: "has-unsynced", files: removed.files.map((f) => ({ path: f.path, note: f.kind })) };
+      if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
+      db.routes.delete(routeId);
+      emit({ type: "route.deleted", routeId, projectId: route.projectId });
+      return { status: "deleted" };
     },
 
     async resolveConflict(routeId) {
@@ -535,4 +577,26 @@ function toolDetail(input: Record<string, unknown>, cwd = ""): string {
     return v.replace(/\s+/g, " ").slice(0, 200);
   }
   return "";
+}
+
+/** 还没问过的路叫这个；第一站出发时改成第一站的名字 */
+export const NEW_ROUTE_NAME = "新对话";
+
+/**
+ * 站的临时名字：取提问的第一句（至少 4 个字才在标点处断开），
+ * 再按显示宽度截到 8 个汉字宽（英文字母算半个）。
+ */
+export function stopName(prompt: string): string {
+  const text = prompt.replace(/\s+/g, " ").trim();
+  // 英文的句号和逗号只有后面是空格或结尾时才算断句（b.txt、1,000 里的不算）
+  const cut = text.slice(4).search(/[，。？！；?!;]|[.,](?=\s|$)/);
+  const clause = cut < 0 ? text : text.slice(0, cut + 4);
+  let width = 0;
+  let out = "";
+  for (const ch of clause) {
+    width += /[\u0000-\u00ff]/.test(ch) ? 1 : 2;
+    if (width > 16) break;
+    out += ch;
+  }
+  return out.trim() || "新的一站";
 }

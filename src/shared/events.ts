@@ -5,6 +5,7 @@ export type PermissionDecision = "allow" | "allow-always" | "deny";
 /** 主进程推给界面的事件 */
 export type BwEvent =
   | { type: "route.updated"; route: Route }
+  | { type: "route.deleted"; routeId: string; projectId: string }
   | { type: "stop.created"; stop: Stop }
   | { type: "stop.updated"; stop: Stop }
   /** Claude 已启动，开始处理这一站（在这之前界面显示“正在启动”） */

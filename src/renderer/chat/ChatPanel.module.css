@@ -145,35 +145,51 @@
   background: var(--text-2);
   animation: pulse 900ms steps(2) infinite;
 }
-.tool {
+.tools {
+  margin: 6px 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-8);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.tool,
+.toolsMore {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
   height: 34px;
-  margin: 6px 0;
   padding: 0 12px;
-  border: 1px solid var(--divider);
-  border-radius: var(--r-8);
-  background: var(--surface-1);
   font: 12px/18px var(--mono);
+  text-align: left;
 }
-.tool + .tool {
-  margin-top: -7px;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-.tool:has(+ .tool) {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+.tool + .tool,
+.toolsMore + .tool {
+  border-top: 1px solid var(--divider);
 }
 .tool span {
   flex: none;
   width: 44px;
   color: var(--text-3);
 }
-.tool code {
+/* code 元素默认用系统的等宽字体（中文 Windows 上是新宋体），这里让它跟着外面的字体走 */
+.tool code,
+.toolsMore code {
   flex: 1;
+  font: inherit;
   color: var(--text-1);
+}
+.toolsMore {
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+.toolsMore span {
+  flex: none;
+  font-family: var(--font);
+  color: var(--route-1);
+}
+.toolsMore code {
+  color: var(--text-3);
 }
 .synced {
   margin: 8px 0 0;

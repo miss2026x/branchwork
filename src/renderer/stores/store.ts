@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { BwEvent, ChatItem, PermissionDecision, Project, Route, Stop, SyncLogEntry } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, Project, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -43,6 +43,10 @@ interface State {
   fork(routeId: string, stopId: string, name: string, firstQuestion: string): Promise<void>;
   resolveConflict(routeId: string): Promise<void>;
   resync(routeId: string): Promise<void>;
+  archiveRoute(routeId: string): Promise<void>;
+  unarchiveRoute(routeId: string): Promise<void>;
+  /** 返回 null 表示已删除；返回文件列表表示还有没进 Local 的改动，没有删 */
+  deleteRoute(routeId: string, force: boolean): Promise<SyncFile[] | null>;
   stop(routeId: string): void;
   answerPermission(routeId: string, decision: PermissionDecision): void;
   setDraft(routeId: string, text: string): void;
@@ -75,6 +79,15 @@ export const useStore = create<State>((set, get) => {
         });
         break;
       }
+      case "route.deleted":
+        set((s) => {
+          const routes = { ...s.routes };
+          delete routes[e.routeId];
+          const stops = Object.fromEntries(Object.entries(s.stops).filter(([, x]) => x.routeId !== e.routeId));
+          return { routes, stops };
+        });
+        if (get().selectedRouteId === e.routeId) get().selectProject(e.projectId);
+        break;
       case "stop.created":
         set((s) => {
           const pendingAsk = { ...s.pendingAsk };
@@ -275,6 +288,36 @@ export const useStore = create<State>((set, get) => {
         await window.bw.resync(routeId);
       } catch (e) {
         set({ error: message(e) });
+      }
+    },
+
+    async archiveRoute(routeId) {
+      try {
+        const route = await window.bw.archiveRoute(routeId);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+        if (get().selectedRouteId === routeId) get().selectProject(route.projectId);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async unarchiveRoute(routeId) {
+      try {
+        const route = await window.bw.unarchiveRoute(routeId);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+        get().selectRoute(routeId);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async deleteRoute(routeId, force) {
+      try {
+        const r = await window.bw.deleteRoute(routeId, force);
+        return r.status === "has-unsynced" ? r.files : null;
+      } catch (e) {
+        set({ error: message(e) });
+        return null;
       }
     },
 

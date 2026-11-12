@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatItem, Route, Stop } from "../../shared";
@@ -219,20 +219,54 @@ function StatusLine({ route, n, phase }: { route: Route; n: number; phase?: Live
 }
 
 function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean }) {
+  // 连着的工具调用收成一组
+  const blocks: ({ kind: "text"; text: string; last: boolean } | { kind: "tools"; tools: Extract<ChatItem, { kind: "tool" }>[] })[] = [];
+  items.forEach((it, i) => {
+    const prev = blocks.at(-1);
+    if (it.kind === "text") blocks.push({ kind: "text", text: it.text, last: i === items.length - 1 });
+    else if (prev?.kind === "tools") prev.tools.push(it);
+    else blocks.push({ kind: "tools", tools: [it] });
+  });
   return (
     <>
-      {items.map((it, i) =>
-        it.kind === "text" ? (
-          <div key={i} className={css.md} data-streaming={streaming && i === items.length - 1}>
-            <Markdown remarkPlugins={[remarkGfm]}>{it.text}</Markdown>
+      {blocks.map((b, i) =>
+        b.kind === "text" ? (
+          <div key={i} className={css.md} data-streaming={streaming && b.last}>
+            <Markdown remarkPlugins={[remarkGfm]}>{b.text}</Markdown>
           </div>
         ) : (
-          <div key={i} className={css.tool}>
-            <span>{it.tool}</span>
-            <code className="ell">{it.detail}</code>
-          </div>
+          <Tools key={i} tools={b.tools} />
         ),
       )}
     </>
+  );
+}
+
+/** 一组工具调用。超过 4 次时只显示最后 3 次，其余收起来 */
+function Tools({ tools }: { tools: Extract<ChatItem, { kind: "tool" }>[] }) {
+  const [open, setOpen] = useState(false);
+  const many = tools.length > 4;
+  const shown = many && !open ? tools.slice(-3) : tools;
+  const counts = new Map<string, number>();
+  for (const t of tools) counts.set(t.tool, (counts.get(t.tool) ?? 0) + 1);
+  return (
+    <div className={css.tools}>
+      {many && (
+        <button className={css.toolsMore} aria-expanded={open} onClick={() => setOpen(!open)}>
+          <span>{open ? "收起" : `还有 ${tools.length - 3} 次`}</span>
+          <code className="ell">
+            共 {tools.length} 次：{[...counts].map(([name, n]) => `${name} ×${n}`).join("、")}
+          </code>
+        </button>
+      )}
+      {shown.map((t, i) => (
+        <div key={i} className={css.tool}>
+          <span>{t.tool}</span>
+          <code className="ell" title={t.detail}>
+            {t.detail}
+          </code>
+        </div>
+      ))}
+    </div>
   );
 }

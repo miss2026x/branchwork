@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { Project, ProjectSnapshot, Route, StopContent, SyncLogEntry } from "./model";
+import type { Project, ProjectSnapshot, Route, StopContent, SyncFile, SyncLogEntry } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -21,6 +21,11 @@ export interface BwApi {
   resolveConflict(routeId: string): Promise<void>;
   /** 重新同步一次（手工处理了冲突之后）。结果走事件 */
   resync(routeId: string): Promise<void>;
+  /** 归档：收起来，对话和工作区都留着 */
+  archiveRoute(routeId: string): Promise<Route>;
+  unarchiveRoute(routeId: string): Promise<Route>;
+  /** 删除一路。有没进 Local 的改动时不删并返回这些文件；force 才连它们一起删 */
+  deleteRoute(routeId: string, force?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
   /** 停车 */
   stop(routeId: string): Promise<void>;
   answerPermission(requestId: string, decision: PermissionDecision): Promise<void>;

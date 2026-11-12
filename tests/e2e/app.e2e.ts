@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "ask", "createRoute", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "snapshot", "stop", "syncLog", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "createRoute", "deleteRoute", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -66,7 +66,7 @@ describe("应用", () => {
     await expect.poll(() => page.getByText("开出第一路").isVisible()).toBe(true);
     await page.getByRole("main").getByRole("button", { name: "新对话" }).click();
     await expect.poll(() => page.getByText("这一路还没有站").isVisible()).toBe(true);
-    expect(await page.getByRole("heading", { name: "1 路" }).isVisible()).toBe(true);
+    expect(await page.getByRole("heading", { name: "新对话" }).isVisible()).toBe(true);
     await shot("2-first-route");
   });
 
@@ -110,7 +110,7 @@ describe("应用", () => {
     await page.getByRole("menuitem", { name: /从这站开新对话/ }).click();
     const dialog = page.getByRole("dialog", { name: "从第 1 站开新对话" });
     await expect.poll(() => dialog.isVisible()).toBe(true);
-    await dialog.getByPlaceholder("2 路").fill("换个思路");
+    await dialog.getByPlaceholder("新对话").fill("换个思路");
     await dialog.getByPlaceholder("开好后马上问这个问题").fill("岔出去问");
     await shot("6-fork-dialog");
     await dialog.getByRole("button", { name: "开出 2路" }).click();
@@ -136,5 +136,28 @@ describe("应用", () => {
     await expect.poll(() => page.getByText("第 3 站没答完").isVisible(), { timeout: 30000 }).toBe(true);
     expect(await page.getByText("记一笔：接入 GitHub 登录").first().isVisible()).toBe(true);
     expect(await page.getByRole("complementary").getByText("my-project").isVisible()).toBe(true);
+  });
+
+  it("归档再恢复；删除一路后它的工作区也一起没了", async () => {
+    const rail = page.getByRole("complementary").first();
+    const worktrees = () => fs.readdirSync(path.join(tmp, "home", "worktrees")).flatMap((p) => fs.readdirSync(path.join(tmp, "home", "worktrees", p)));
+    expect(worktrees()).toHaveLength(2);
+
+    await page.getByLabel("换个思路 的更多操作").click({ force: true });
+    await page.getByRole("menuitem", { name: /归档/ }).click();
+    await expect.poll(() => rail.getByText("已归档 1").isVisible()).toBe(true);
+    await rail.getByText("已归档 1").click();
+    await rail.getByRole("button", { name: "恢复" }).click();
+    await expect.poll(() => page.getByRole("heading", { name: "换个思路" }).isVisible()).toBe(true);
+    expect(worktrees()).toHaveLength(2);
+
+    await page.getByLabel("换个思路 的更多操作").click({ force: true });
+    await page.getByRole("menuitem", { name: /删除/ }).click();
+    await shot("8-delete");
+    await page.getByRole("alertdialog").getByRole("button", { name: "删除", exact: true }).click();
+    await expect.poll(() => rail.getByText("换个思路").count(), { timeout: 30000 }).toBe(0);
+    await expect.poll(() => worktrees().length, { timeout: 30000 }).toBe(1);
+    // 它同步进 Local 的改动还在
+    expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toContain("岔出去问");
   });
 });

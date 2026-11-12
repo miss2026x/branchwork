@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createCore, type Core } from "../../src/core";
+import { createCore, stopName, type Core } from "../../src/core";
 import { openDb, type Db } from "../../src/db";
 import type { BwEvent, Project } from "../../src/shared";
 import { FakeClaude } from "../support/fake-claude";
@@ -48,14 +48,15 @@ afterEach(() => {
 describe("问一站", () => {
   it("在一路上连续问两站：第二站接着同一个会话，每站结束后改动进 Local", async () => {
     const route = await core.createRoute(project.id);
-    expect(route).toMatchObject({ number: 1, name: "1 路", status: "idle", sessionId: null });
+    expect(route).toMatchObject({ number: 1, name: "新对话", status: "idle", sessionId: null });
 
     claude.script = (t) => {
       t.say("改好了 b");
       write(t.cwd, "b.txt", "stop one\n");
     };
     const first = await core.ask(route.id, "把 b.txt 改成 stop one，谢谢");
-    expect(first).toMatchObject({ kind: "answered", text: "改好了 b", stop: { seq: 1, status: "done", syncState: "synced", name: "把 b.tx", nameState: "temp" } });
+    expect(first).toMatchObject({ kind: "answered", text: "改好了 b", stop: { seq: 1, status: "done", syncState: "synced", name: "把 b.txt 改成 st", nameState: "temp" } });
+    expect(routeOf(route.id).name).toBe("把 b.txt 改成 st"); // 没起名的路用第一站的名字
     expect(read(lab.local, "b.txt")).toBe("stop one\n");
 
     claude.script = (t) => {
@@ -81,7 +82,7 @@ describe("问一站", () => {
   });
 
   it("事件的先后：这一路开始回答 → 站出现 → Claude 已启动 → 文字流出 → 到站 → 同步结果 → 这一路空闲", async () => {
-    const route = await core.createRoute(project.id);
+    const route = await core.createRoute(project.id, "已起名");
     events.length = 0;
     claude.script = (t) => {
       t.say("第一");
@@ -116,7 +117,7 @@ describe("问一站", () => {
 
   it("同一路正在回答时不能再问；两路可以同时回答，各自同步", async () => {
     const [a, b] = [await core.createRoute(project.id), await core.createRoute(project.id)];
-    expect(b).toMatchObject({ number: 2, name: "2 路" });
+    expect(b).toMatchObject({ number: 2, name: "新对话" });
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     claude.script = async (t) => {
@@ -370,14 +371,15 @@ describe("从一站开新对话（分叉）", () => {
     expect(stopsOf(parent.id)).toHaveLength(4);
   });
 
-  it("不给名字就用路号；可以从分叉出来的路上再分叉", async () => {
+  it("不给名字的先叫“新对话”，第一站出发后用第一站的名字；可以从分叉出来的路上再分叉", async () => {
     const r1 = await core.createRoute(project.id);
     await core.ask(r1.id, "一");
     const r2 = await core.fork(r1.id, stopsOf(r1.id)[0]!.id);
-    expect(r2.name).toBe("2 路");
+    expect(r2.name).toBe("新对话");
     await core.ask(r2.id, "二");
+    expect(routeOf(r2.id).name).toBe("二");
     const r3 = await core.fork(r2.id, stopsOf(r2.id)[0]!.id, "  ");
-    expect(r3).toMatchObject({ name: "3 路", parentRouteId: r2.id });
+    expect(r3).toMatchObject({ name: "新对话", parentRouteId: r2.id });
     let remembered: string[] = [];
     claude.script = (t) => void (remembered = t.earlierPrompts);
     await core.ask(r3.id, "三");
@@ -469,6 +471,106 @@ describe("回答内容", () => {
     };
     await core.ask(route.id, "改");
     expect(events.filter((e) => e.type === "stop.tool")).toMatchObject([{ detail: "src/a.ts" }, { detail: path.join(lab.local, "outside.ts") }, { detail: "npm test -- auth" }]);
+  });
+});
+
+describe("起名字", () => {
+  it("站的临时名字取提问的第一句，按显示宽度截断", () => {
+    expect(stopName("当前更改都同步了吗？还有别的吗")).toBe("当前更改都同步了");
+    expect(stopName("你好，请顺序输出 1 到 10")).toBe("你好，请顺序输出"); // 太短的第一句不单独成名
+    expect(stopName("修复登录页的报错。然后跑一遍测试")).toBe("修复登录页的报错");
+    expect(stopName("把 b.txt 改成 v1.2，谢谢")).toBe("把 b.txt 改成 v1"); // 文件名里的点不算断句
+    expect(stopName("Fix the login bug. Then run tests")).toBe("Fix the login bu");
+    expect(stopName("  \n ")).toBe("新的一站");
+  });
+
+  it("自己起过名字的路不会被第一站的名字盖掉；解决冲突那一站不给路改名", async () => {
+    const named = await core.createRoute(project.id, "登录重构");
+    await core.ask(named.id, "第一个问题");
+    expect(routeOf(named.id).name).toBe("登录重构");
+  });
+});
+
+describe("归档和删除", () => {
+  it("归档：从列表里收起来，不能再问，工作区和对话都留着；恢复后接着问", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, "b.txt", "one\n");
+    await core.ask(route.id, "第一站");
+    const archived = core.archiveRoute(route.id);
+    expect(archived.status).toBe("archived");
+    expect(archived.archivedAt).toBeTruthy();
+    expect(claude.cooled).toContain(route.worktreePath);
+    await expect(core.ask(route.id, "归档了还问")).rejects.toMatchObject({ code: "ROUTE_ARCHIVED" });
+    expect(has(route.worktreePath, "b.txt")).toBe(true);
+
+    expect(core.unarchiveRoute(route.id)).toMatchObject({ status: "idle", archivedAt: null });
+    claude.script = (t) => expect(t.earlierPrompts).toEqual(["第一站"]);
+    expect((await core.ask(route.id, "第二站")).kind).toBe("answered");
+  });
+
+  it("归档前没答完或有冲突的，恢复后还是那个状态", async () => {
+    const [a, b, c] = [await core.createRoute(project.id), await core.createRoute(project.id), await core.createRoute(project.id)];
+    await bothEditSameLine(a.id, b.id);
+    core.archiveRoute(b.id);
+    expect(core.unarchiveRoute(b.id).status).toBe("conflict");
+    claude.script = () => "interrupted" as const;
+    await core.ask(c.id, "停");
+    core.archiveRoute(c.id);
+    expect(core.unarchiveRoute(c.id).status).toBe("interrupted");
+  });
+
+  it("删除：工作区、对话、记录一起删；正在回答的不能删", async () => {
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "第一站");
+    const session = routeOf(route.id).sessionId!;
+    events.length = 0;
+    expect(await core.deleteRoute(route.id)).toEqual({ status: "deleted" });
+    expect(has(route.worktreePath, ".")).toBe(false);
+    expect(core.snapshot(project.id)).toMatchObject({ routes: [], stops: [] });
+    expect(claude.sessions.has(session)).toBe(false);
+    expect(events).toEqual([{ type: "route.deleted", routeId: route.id, projectId: project.id }]);
+    await expect(core.deleteRoute(route.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    const busy = await core.createRoute(project.id);
+    claude.script = () => new Promise(() => {});
+    void core.ask(busy.id, "不结束");
+    await until("stop.created");
+    await expect(core.deleteRoute(busy.id)).rejects.toMatchObject({ code: "ROUTE_BUSY" });
+    expect(() => core.archiveRoute(busy.id)).toThrow("正在回答");
+  });
+
+  it("删除保护：工作区里有没进 Local 的改动时不删，列出文件；确认后才连它们一起删", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      write(t.cwd, "b.txt", "half\n");
+      write(t.cwd, "new.txt", "new\n");
+      return "interrupted" as const;
+    };
+    await core.ask(route.id, "改到一半");
+    const r = await core.deleteRoute(route.id);
+    expect(r).toEqual({
+      status: "has-unsynced",
+      files: [
+        { path: "b.txt", note: "modified" },
+        { path: "new.txt", note: "added" },
+      ],
+    });
+    expect(routeOf(route.id)).toBeTruthy();
+    expect(read(route.worktreePath, "b.txt")).toBe("half\n");
+    expect(await core.deleteRoute(route.id, true)).toEqual({ status: "deleted" });
+    expect(read(lab.local, "b.txt")).toBe("bee\n"); // Local 没被碰
+    expect(has(lab.local, "new.txt")).toBe(false);
+  });
+
+  it("删掉父路后，从它分叉出来的路照常可用", async () => {
+    const parent = await core.createRoute(project.id);
+    await core.ask(parent.id, "一");
+    const child = await core.fork(parent.id, stopsOf(parent.id)[0]!.id);
+    await core.deleteRoute(parent.id);
+    let remembered: string[] = [];
+    claude.script = (t) => void (remembered = t.earlierPrompts);
+    expect((await core.ask(child.id, "二")).kind).toBe("answered");
+    expect(remembered).toEqual(["一"]);
   });
 });
 

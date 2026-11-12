@@ -94,6 +94,16 @@ button:disabled {
   outline: 2px solid var(--route-1);
   outline-offset: 2px;
 }
+/* 滚动条：细的、不带箭头（Windows 默认的很粗） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+code,
+pre,
+kbd {
+  font-family: var(--mono);
+}
 .ell {
   min-width: 0;
   overflow: hidden;

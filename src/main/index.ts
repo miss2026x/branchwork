@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createClaudeClient, createDemoClaudeClient } from "../claude";
-import { createCore } from "../core";
+import { BRANCHWORK_BRIEFING, createCore } from "../core";
 import { openDb } from "../db";
 import { registerIpc } from "./ipc";
 
@@ -15,7 +15,7 @@ fs.mkdirSync(home, { recursive: true });
 const db = openDb(path.join(home, "bw.sqlite"));
 // BRANCHWORK_DEMO=1：用假的 Claude（不联网、不用登录），其余全是真的——真的建工作区、真的同步
 const demo = process.env.BRANCHWORK_DEMO === "1";
-const core = createCore({ db, claude: demo ? createDemoClaudeClient() : createClaudeClient(), worktreesRoot: path.join(home, "worktrees") });
+const core = createCore({ db, claude: demo ? createDemoClaudeClient() : createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING }), worktreesRoot: path.join(home, "worktrees") });
 
 function createWindow(): void {
   const win = new BrowserWindow({

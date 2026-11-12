@@ -125,3 +125,49 @@
 .confirm {
   color: #fff;
 }
+.warn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-8);
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-weight: 600;
+}
+.files {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-8);
+}
+.files li {
+  display: flex;
+  gap: 12px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+.files li + li {
+  border-top: 1px solid var(--divider);
+}
+.files span {
+  flex: none;
+  width: 32px;
+  color: var(--text-3);
+}
+.files code {
+  font: 12.5px/20px var(--mono);
+  overflow-wrap: anywhere;
+}
+.destroy {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-8);
+  background: var(--red);
+  color: #fff;
+  font-weight: 600;
+}

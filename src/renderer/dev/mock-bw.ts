@@ -165,7 +165,7 @@ export function installMockBw(): void {
     }),
     async createRoute(projectId, name) {
       const r = addRoute(projectId, name ?? "");
-      const named = { ...r, name: name ?? `${r.number} 路` };
+      const named = { ...r, name: name ?? "新对话" };
       routes.set(r.id, named);
       return named;
     },
@@ -178,10 +178,23 @@ export function installMockBw(): void {
     async fork(routeId, stopId, name) {
       const parent = routes.get(routeId)!;
       const r = addRoute(parent.projectId, "", { parentRouteId: routeId, forkStopId: stopId, sessionId: "fork" });
-      const named = { ...r, name: name?.trim() || `${r.number} 路` };
+      const named = { ...r, name: name?.trim() || "新对话" };
       routes.set(r.id, named);
       emit({ type: "route.updated", route: named });
       return named;
+    },
+    archiveRoute: async (routeId) => setRoute(routeId, { status: "archived", archivedAt: Date.now() }),
+    unarchiveRoute: async (routeId) => setRoute(routeId, { status: "idle", archivedAt: null }),
+    async deleteRoute(routeId, force) {
+      const mine = [...stops.values()].filter((s) => s.routeId === routeId);
+      if (!force && mine.some((s) => s.syncState === "unsynced" || s.syncState === "conflict")) {
+        return { status: "has-unsynced", files: [{ path: "src/auth/session.ts", note: "modified" }, { path: "src/auth/cookie.ts", note: "added" }] };
+      }
+      const projectId = routes.get(routeId)!.projectId;
+      routes.delete(routeId);
+      for (const s of mine) stops.delete(s.id);
+      emit({ type: "route.deleted", routeId, projectId });
+      return { status: "deleted" };
     },
     async resolveConflict(routeId) {
       void run(routeId, "解决同步冲突").then(() => {

@@ -161,8 +161,9 @@
   height: 34px;
   border-radius: 11px;
 }
+/* 换乘站的站名放到上面：正下方是分叉出去的那条线 */
 .stop[data-junction="true"] .name {
-  top: 26px;
+  top: -40px;
 }
 .stop[data-status="interrupted"] .node {
   border-style: dashed;

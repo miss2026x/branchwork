@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Stop } from "../../shared";
+import type { Stop, SyncFile } from "../../shared";
+import { DeleteDialog } from "../dialogs/DeleteDialog";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
@@ -29,6 +30,8 @@ export function App() {
   const allRoutes = useStore((s) => s.routes);
   const fork = useStore((s) => s.fork);
   const [forkFrom, setForkFrom] = useState<Stop | null>(null);
+  const deleteRoute = useStore((s) => s.deleteRoute);
+  const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
   const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + stop.seq;
 
   useEffect(() => {
@@ -63,7 +66,7 @@ export function App() {
       </header>
 
       <div className={css.body}>
-        <ProjectRail />
+        <ProjectRail onDelete={(id) => setDeleting({ routeId: id, unsynced: null })} />
 
         <main className={css.center}>
           {!ready ? null : projects.length === 0 ? (
@@ -91,6 +94,19 @@ export function App() {
 
         {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} />}
       </div>
+
+      {deleting && allRoutes[deleting.routeId] && (
+        <DeleteDialog
+          route={allRoutes[deleting.routeId]!}
+          stopCount={Object.values(allStops).filter((s) => s.routeId === deleting.routeId).length}
+          unsynced={deleting.unsynced}
+          onCancel={() => setDeleting(null)}
+          onConfirm={async (force) => {
+            const left = await deleteRoute(deleting.routeId, force);
+            setDeleting(left ? { routeId: deleting.routeId, unsynced: left } : null);
+          }}
+        />
+      )}
 
       {forkFrom && allRoutes[forkFrom.routeId] && (
         <ForkDialog
