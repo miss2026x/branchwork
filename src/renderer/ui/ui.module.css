@@ -33,3 +33,7 @@
   font-size: 13px;
   margin-left: 2px;
 }
+.plate .kuai,
+.plateL .kuai {
+  margin: 0 1px 0 0;
+}

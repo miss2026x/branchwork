@@ -60,4 +60,6 @@ export const MIGRATIONS: string[] = [
   `,
   // 2：项目的批准方式
   `ALTER TABLE project ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'ask';`,
+  // 3：快线的编号
+  `ALTER TABLE route ADD COLUMN express_no INTEGER;`,
 ];

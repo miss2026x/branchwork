@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import type { Route, Stop } from "../../shared";
-import { BusMark, IconCopy, IconFit, IconFork, IconMinus, IconPlus } from "../ui/icons";
+import { BusMark, IconCompress, IconCopy, IconFit, IconFork, IconMinus, IconPlus } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { firstStops } from "../stores/numbering";
@@ -16,6 +16,8 @@ interface Props {
   stopNumber(stop: Stop): number;
   /** 用户选了“从这站开新对话” */
   onFork(stop: Stop): void;
+  /** 用户选了“压缩成快线” */
+  onCompress(stop: Stop): void;
 }
 
 const MIN = 0.3;
@@ -26,7 +28,7 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNumber, onFork }: Props) {
+export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress }: Props) {
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
@@ -137,7 +139,15 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNu
                 const tailFrom = last ? last.x : lane.from.x;
                 return (
                   <g key={lane.route.id}>
-                    <path d={lane.path} fill="none" stroke={c} strokeWidth={on ? 10 : 8} strokeLinecap="round" strokeLinejoin="round" />
+                    {lane.route.express && lane.link ? (
+                      <>
+                        {/* 快线不是原来那段对话的延续：从来源站过来的这一段画成虚线 */}
+                        <path d={lane.link} fill="none" stroke={c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" />
+                        <path d={lane.run} fill="none" stroke={c} strokeWidth={on ? 10 : 8} strokeLinecap="round" />
+                      </>
+                    ) : (
+                      <path d={lane.path} fill="none" stroke={c} strokeWidth={on ? 10 : 8} strokeLinecap="round" strokeLinejoin="round" />
+                    )}
                     {on && lane.route.status !== "answering" && lane.route.status !== "awaiting_permission" && (
                       <path d={`M ${tailFrom + 20} ${lane.y} H ${lane.end.x - 12}`} stroke={c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" fill="none" />
                     )}
@@ -190,6 +200,20 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNu
                 <small>{menu.spot.stop.status === "answering" ? "到站后才能分叉" : !menu.spot.stop.lastMessageId ? "这一站没留下对话记录" : `新对话带着${firstStops(stopNumber(menu.spot.stop))}的历史出发`}</small>
               </span>
             </button>
+            <button
+              role="menuitem"
+              disabled={menu.spot.stop.status === "answering" || !menu.spot.stop.lastMessageId}
+              onClick={() => {
+                onCompress(menu.spot.stop);
+                setMenuStopId(null);
+              }}
+            >
+              <IconCompress />
+              <span>
+                压缩成快线
+                <small>{!menu.spot.stop.lastMessageId || menu.spot.stop.status === "answering" ? "这一站还不能压缩" : `把${firstStops(stopNumber(menu.spot.stop))}提炼成摘要，带着摘要开全新的对话`}</small>
+              </span>
+            </button>
           </div>
         )}
       </div>
@@ -213,7 +237,7 @@ function LaneNodes({ lane, on, onSelect, onStop }: { lane: Lane; on: boolean; on
         const answering = stop.status === "answering";
         const latest = i === lane.stops.length - 1;
         return (
-          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction}>
+          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind}>
             {answering && (
               <span className={css.bus}>
                 <em>{lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}</em>

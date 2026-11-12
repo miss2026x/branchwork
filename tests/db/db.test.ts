@@ -10,6 +10,7 @@ const route = (id: string, number: number): Route => ({
   id,
   projectId: "p1",
   number,
+  express: null,
   name: `${number} 路`,
   status: "idle",
   sessionId: null,

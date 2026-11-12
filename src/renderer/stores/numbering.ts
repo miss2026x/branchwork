@@ -7,7 +7,8 @@ import type { Route, Stop } from "../../shared";
 export function stopOffset(route: Route | undefined, routes: Record<string, Route>, stops: Record<string, Stop>): number {
   let offset = 0;
   const seen = new Set<string>();
-  for (let r = route; r?.forkStopId && !seen.has(r.id); ) {
+  // 快线是全新的对话，不带父路的站，序号从头数
+  for (let r = route; r?.forkStopId && !r.express && !seen.has(r.id); ) {
     seen.add(r.id);
     const origin = stops[r.forkStopId];
     if (!origin) break;

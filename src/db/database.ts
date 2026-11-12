@@ -19,6 +19,7 @@ export interface Db {
     listByProject(projectId: string): Route[];
     update(id: string, patch: Partial<Omit<Route, "id" | "projectId">>): Route;
     nextNumber(projectId: string): number;
+    nextExpress(projectId: string): number;
     delete(id: string): void;
   };
   stops: {
@@ -85,6 +86,7 @@ export function openDb(file: string): Db {
       id: "id",
       projectId: "project_id",
       number: "number",
+      express: "express_no",
       name: "name",
       status: "status",
       sessionId: "session_id",
@@ -98,6 +100,7 @@ export function openDb(file: string): Db {
       id: r.id as string,
       projectId: r.project_id as string,
       number: r.number as number,
+      express: (r.express_no as number | null) ?? null,
       name: r.name as string,
       status: r.status as Route["status"],
       sessionId: r.session_id as string | null,
@@ -174,6 +177,7 @@ export function openDb(file: string): Db {
       listByProject: (pid) => routes.where("project_id = ? ORDER BY number", pid),
       update: (id, patch) => routes.update(id, patch),
       nextNumber: (pid) => ((one("SELECT MAX(number) AS n FROM route WHERE project_id = ?", pid)?.n as number | null) ?? 0) + 1,
+      nextExpress: (pid) => ((one("SELECT MAX(express_no) AS n FROM route WHERE project_id = ?", pid)?.n as number | null) ?? 0) + 1,
       delete: (id) => run("DELETE FROM route WHERE id = ?", id),
     },
     stops: {

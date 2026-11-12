@@ -22,7 +22,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, onCancel, onC
   const [name, setName] = useState("");
   const [question, setQuestion] = useState("");
   const nameInput = useRef<HTMLInputElement>(null);
-  const next = { number: nextNumber };
+  const next = { number: nextNumber, express: null };
 
   useEffect(() => {
     nameInput.current?.focus();

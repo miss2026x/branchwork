@@ -171,3 +171,69 @@
   color: #fff;
   font-weight: 600;
 }
+.wide {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+.error {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-8);
+  background: var(--red-bg);
+  color: var(--red);
+  font-size: 13px;
+}
+.working {
+  display: flex;
+  gap: 14px;
+  padding: 18px 14px;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-8);
+  background: var(--surface-1);
+}
+.working i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  animation: pulse 1400ms ease-in-out infinite;
+}
+.working b {
+  display: block;
+}
+.working span {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-3);
+}
+.field .summary {
+  min-height: 220px;
+  font: 13px/20px var(--mono);
+  background: var(--surface-1);
+}
+.regen {
+  display: flex;
+  gap: 8px;
+  margin: -4px 0 14px;
+}
+.regen input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+}
+.regen input:focus {
+  outline: none;
+  border-color: var(--text-1);
+}
+.regen button {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  font-weight: 600;
+  white-space: nowrap;
+}

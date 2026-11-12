@@ -30,8 +30,12 @@ export interface Lane {
   y: number;
   /** 线的起点。分叉出来的路，起点在父路的分叉站上 */
   from: { x: number; y: number };
-  /** SVG 路径 */
+  /** SVG 路径：整条线 */
   path: string;
+  /** 从父路的分叉站拐过来的那一段；独立的路没有 */
+  link: string | null;
+  /** 自己这一行上横着的那一段 */
+  run: string;
   /** 路牌右边缘贴着的位置 */
   plate: { x: number; y: number };
   stops: StopSpot[];
@@ -73,18 +77,23 @@ export function layoutMap(routes: Route[], stops: Stop[]): MapLayout {
     let from: Lane["from"];
     let firstX: number;
     let path: string;
+    let link: string | null = null;
+    let runFrom: number;
     let plate: Lane["plate"];
     if (origin) {
       const down = y > origin.y;
       const r = Math.min(MAP.bend, Math.abs(y - origin.y));
       from = { x: origin.x, y: origin.y };
       firstX = origin.x + MAP.dx;
-      path = `M ${origin.x} ${origin.y} V ${y - (down ? r : -r)} Q ${origin.x} ${y} ${origin.x + r} ${y}`;
+      link = `M ${origin.x} ${origin.y} V ${y - (down ? r : -r)} Q ${origin.x} ${y} ${origin.x + r} ${y}`;
+      path = link;
+      runFrom = origin.x + r;
       plate = { x: origin.x - 28, y };
     } else {
       from = { x: MAP.left, y };
       firstX = MAP.left + MAP.lead;
       path = `M ${MAP.left} ${y}`;
+      runFrom = MAP.left;
       plate = { x: MAP.left - 12, y };
     }
 
@@ -93,8 +102,9 @@ export function layoutMap(routes: Route[], stops: Stop[]): MapLayout {
     for (const s of laneStops) spots.set(s.stop.id, s);
     const lastX = laneStops.at(-1)?.x ?? firstX - MAP.dx;
     const end = { x: lastX + MAP.dx, y };
-    path += ` H ${lastX + (laneStops.length > 0 ? MAP.tail : MAP.dx - 20)}`;
-    lanes.push({ route, y, from, path, plate, stops: laneStops, end });
+    const runTo = lastX + (laneStops.length > 0 ? MAP.tail : MAP.dx - 20);
+    path += ` H ${runTo}`;
+    lanes.push({ route, y, from, path, link, run: `M ${runFrom} ${y} H ${runTo}`, plate, stops: laneStops, end });
   }
 
   const width = Math.max(MAP.left + 400, ...lanes.map((l) => l.end.x + 160));

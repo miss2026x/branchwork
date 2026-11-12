@@ -25,7 +25,7 @@ export function installMockBw(): void {
 
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
-    const r: Route = { id: id("r"), projectId, number, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, createdAt: Date.now(), archivedAt: null, ...extra };
+    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
   };
@@ -189,6 +189,21 @@ export function installMockBw(): void {
       routes.set(r.id, named);
       emit({ type: "route.updated", route: named });
       return named;
+    },
+    async distill(_routeId, _stopId, keep) {
+      await wait(1800);
+      return ["## 目标", "把登录改成 OAuth 授权码流程，先接 GitHub。", "## 做完了", "- 梳理了认证结构和 session 读写，定下新登录接口 `LoginFlow`", "- `routes.ts` 里 4 处会话读写已经收拢到 `LoginFlow`", "## 改过的文件", "- `src/auth/session.ts`：抽出读写函数", "- `src/auth/login-flow.ts`：新增", "## 还没定 / 还没做", "- refresh token 的有效期，以及要不要滑动续期", "- 登录失败要不要限流", ...(keep ? ["## 要注意的", `- ${keep}`] : [])].join("\n");
+    },
+    cancelDistill: async () => {},
+    async createExpress(routeId, stopId, summary, name) {
+      const src = routes.get(routeId)!;
+      const express = [...routes.values()].filter((r) => r.projectId === src.projectId && r.express).length + 1;
+      const r = addRoute(src.projectId, name?.trim() || `${src.name} · 续`, { parentRouteId: routeId, forkStopId: stopId, express });
+      const head = addStop(r.id, "交接摘要", summary, [], { kind: "summary", syncState: "none", messageId: null, lastMessageId: null });
+      emit({ type: "route.updated", route: r });
+      emit({ type: "stop.created", stop: head });
+      emit({ type: "stop.updated", stop: head });
+      return r;
     },
     archiveRoute: async (routeId) => setRoute(routeId, { status: "archived", archivedAt: Date.now() }),
     unarchiveRoute: async (routeId) => setRoute(routeId, { status: "idle", archivedAt: null }),

@@ -256,15 +256,27 @@ describe("提前启动：启动 Claude 要几十秒的机器上，问的时候�
     expect(log).toEqual(["cold:x"]);
   });
 
-  it("会话对不上（比如这一路换了会话）：不用它，关掉，现启动", async () => {
+  it("同一个目录里问的是别的会话（比如提炼摘要的临时会话）：现启动，不动为这一路准备好的那个", async () => {
     const { fns, log, starts } = warmSdk();
+    const client = createClaudeClient(fns);
+    client.warm("/wt/r1", "S1");
+    starts[0]!.finish();
+    await client.ask({ cwd: "/wt/r1", prompt: "提炼", sessionId: "TEMP" });
+    expect(log).toEqual(["cold:提炼"]);
+    expect(starts[0]!.closed).toBe(false);
+    await client.ask({ cwd: "/wt/r1", prompt: "下一站", sessionId: "S1" });
+    expect(log).toEqual(["cold:提炼", "warm:下一站"]);
+  });
+
+  it("这一路换了会话后再准备：旧的关掉，换成新的", async () => {
+    const { fns, starts } = warmSdk();
     const client = createClaudeClient(fns);
     client.warm("/wt/r1", "OLD");
     starts[0]!.finish();
-    await client.ask({ cwd: "/wt/r1", prompt: "x", sessionId: "S1" });
+    client.warm("/wt/r1", "NEW");
     await new Promise((r) => setTimeout(r, 0));
-    expect(log).toEqual(["cold:x"]);
     expect(starts[0]!.closed).toBe(true);
+    expect(starts[1]!.options).toMatchObject({ resume: "NEW" });
   });
 
   it("最多同时留 3 个，最旧的被关掉；dispose 全部关掉；maxWarm 为 0 时不提前启动", async () => {

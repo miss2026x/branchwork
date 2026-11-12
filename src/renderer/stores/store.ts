@@ -41,6 +41,10 @@ interface State {
   createRoute(): Promise<void>;
   ask(routeId: string, text: string): Promise<void>;
   fork(routeId: string, stopId: string, name: string, firstQuestion: string): Promise<void>;
+  /** 提炼摘要；失败时抛出带原因的错误 */
+  distill(routeId: string, stopId: string, keep: string): Promise<string>;
+  cancelDistill(routeId: string): void;
+  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string): Promise<void>;
   resolveConflict(routeId: string): Promise<void>;
   resync(routeId: string): Promise<void>;
   archiveRoute(routeId: string): Promise<void>;
@@ -96,7 +100,9 @@ export const useStore = create<State>((set, get) => {
         set((s) => {
           const pendingAsk = { ...s.pendingAsk };
           delete pendingAsk[e.stop.routeId];
-          return { stops: { ...s.stops, [e.stop.id]: e.stop }, pendingAsk, live: { ...s.live, [e.stop.id]: { phase: "starting", items: [] } } };
+          // 摘要站一出现就是到站的，没有实时内容
+          const live = e.stop.status === "answering" ? { ...s.live, [e.stop.id]: { phase: "starting" as const, items: [] } } : s.live;
+          return { stops: { ...s.stops, [e.stop.id]: e.stop }, pendingAsk, live };
         });
         break;
       case "stop.started":
@@ -271,6 +277,29 @@ export const useStore = create<State>((set, get) => {
     async fork(routeId, stopId, name, firstQuestion) {
       try {
         const route = await window.bw.fork(routeId, stopId, name);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+        get().selectRoute(route.id);
+        if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async distill(routeId, stopId, keep) {
+      try {
+        return await window.bw.distill(routeId, stopId, keep || undefined);
+      } catch (e) {
+        throw new Error(message(e));
+      }
+    },
+
+    cancelDistill(routeId) {
+      void window.bw.cancelDistill(routeId);
+    },
+
+    async createExpress(routeId, stopId, summary, name, firstQuestion) {
+      try {
+        const route = await window.bw.createExpress(routeId, stopId, summary, name);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);

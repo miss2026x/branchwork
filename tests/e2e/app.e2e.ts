@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "createRoute", "deleteRoute", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "setPermissionMode", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "setPermissionMode", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -154,10 +154,35 @@ describe("应用", () => {
     await expect.poll(() => page.getByRole("button", { name: "发车" }).isDisabled(), { timeout: 30000 }).toBe(true); // 到站了，输入框空着
   });
 
+  it("压缩成快线：提炼出摘要，改一改，开出快1；它是全新的对话，第一站是摘要", async () => {
+    await page.getByLabel(/· 记一笔：接入/).click(); // 1 路的第 1 站
+    await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
+    const dialog = page.getByRole("dialog", { name: "压缩成快线" });
+    await dialog.getByRole("button", { name: "开始提炼" }).click();
+    await expect.poll(() => dialog.getByText("摘要好了，看一眼再发车").isVisible(), { timeout: 60000 }).toBe(true);
+    const before = fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
+    await dialog.locator("textarea").first().fill("## 做完了\n- 记了一笔 GitHub 登录");
+    await dialog.getByPlaceholder(/· 续/).fill("登录收尾");
+    await dialog.getByPlaceholder("Claude 会连同摘要一起看到它").fill("接着做");
+    await shot("10-summary");
+    await dialog.getByRole("button", { name: "开出快1" }).click();
+
+    await expect.poll(() => page.getByRole("heading", { name: "登录收尾" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByText("已到第 2 站").isVisible(), { timeout: 60000 }).toBe(true);
+    expect(await page.getByRole("heading", { name: "交接摘要" }).isVisible()).toBe(true);
+    expect(await page.getByText("记了一笔 GitHub 登录").first().isVisible()).toBe(true);
+    expect(await page.getByText("这是这一路的第 1 个问题").isVisible()).toBe(true); // 新会话，不记得原来的对话
+    // 提炼用的临时对话是只读的，没有往 Local 写任何东西；之后快线自己的第一问才写
+    const after = fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
+    expect(after.startsWith(before)).toBe(true);
+    expect(after.slice(before.length)).toMatch(/^- 第 1 站：下面是之前一段对话的交接摘要/);
+    await shot("11-express");
+  });
+
   it("归档再恢复；删除一路后它的工作区也一起没了", async () => {
     const rail = page.getByRole("complementary").first();
     const worktrees = () => fs.readdirSync(path.join(tmp, "home", "worktrees")).flatMap((p) => fs.readdirSync(path.join(tmp, "home", "worktrees", p)));
-    expect(worktrees()).toHaveLength(2);
+    expect(worktrees()).toHaveLength(3);
 
     await page.getByLabel("换个思路 的更多操作").click({ force: true });
     await page.getByRole("menuitem", { name: /归档/ }).click();
@@ -165,14 +190,14 @@ describe("应用", () => {
     await rail.getByText("已归档 1").click();
     await rail.getByRole("button", { name: "恢复" }).click();
     await expect.poll(() => page.getByRole("heading", { name: "换个思路" }).isVisible()).toBe(true);
-    expect(worktrees()).toHaveLength(2);
+    expect(worktrees()).toHaveLength(3);
 
     await page.getByLabel("换个思路 的更多操作").click({ force: true });
     await page.getByRole("menuitem", { name: /删除/ }).click();
     await shot("8-delete");
     await page.getByRole("alertdialog").getByRole("button", { name: "删除", exact: true }).click();
     await expect.poll(() => rail.getByText("换个思路").count(), { timeout: 30000 }).toBe(0);
-    await expect.poll(() => worktrees().length, { timeout: 30000 }).toBe(1);
+    await expect.poll(() => worktrees().length, { timeout: 30000 }).toBe(2);
     // 它同步进 Local 的改动还在
     expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toContain("岔出去问");
   });

@@ -126,19 +126,16 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       let turn: Turn = {};
       let stream: AsyncIterable<unknown> | null = null;
       let prewarmed = false;
+      // 会话对不上的不动它：那是给这一路自己的下一站准备的，现在问的是别的会话（比如提炼摘要用的临时会话）
       const w = warmed.get(opts.cwd);
-      if (w) {
+      if (w && w.sessionId === opts.sessionId) {
         warmed.delete(opts.cwd);
-        if (w.sessionId === opts.sessionId) {
-          const q = await w.ready; // 还在启动的话等它：已经跑了一段，比现在重新启动快
-          if (q && !w.abort.signal.aborted) {
-            abort = w.abort;
-            turn = w.turn;
-            stream = q.query(opts.prompt);
-            prewarmed = true;
-          }
-        } else {
-          discard(w);
+        const q = await w.ready; // 还在启动的话等它：已经跑了一段，比现在重新启动快
+        if (q && !w.abort.signal.aborted) {
+          abort = w.abort;
+          turn = w.turn;
+          stream = q.query(opts.prompt);
+          prewarmed = true;
         }
       }
       turn.onPermission = opts.onPermission;

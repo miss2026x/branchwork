@@ -19,6 +19,11 @@ export interface BwApi {
   ask(routeId: string, text: string): Promise<void>;
   /** 从某一站开一条新的路（新会话、新工作区，带着到这一站为止的历史） */
   fork(routeId: string, stopId: string, name?: string): Promise<Route>;
+  /** 压缩第一步：把到这一站为止的对话提炼成交接摘要。要等一会儿，写好后返回摘要；失败或取消则抛错 */
+  distill(routeId: string, stopId: string, keep?: string): Promise<string>;
+  cancelDistill(routeId: string): Promise<void>;
+  /** 压缩第二步：带着摘要开一条快线（全新的会话和工作区） */
+  createExpress(routeId: string, stopId: string, summary: string, name?: string): Promise<Route>;
   /** 让这一路的 Claude 解决同步冲突。发出即返回，过程走事件 */
   resolveConflict(routeId: string): Promise<void>;
   /** 重新同步一次（手工处理了冲突之后）。结果走事件 */

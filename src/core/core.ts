@@ -21,7 +21,7 @@ import type {
 } from "../shared";
 import { createSyncEngine, type SyncEngine } from "../sync";
 
-export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK";
+export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED";
 
 export class CoreError extends Error {
   constructor(
@@ -77,6 +77,18 @@ export interface Core {
    */
   fork(routeId: string, stopId: string, name?: string): Promise<Route>;
   /**
+   * 压缩的第一步：把这一路到某一站为止的对话提炼成一份交接摘要。
+   * 做法是复制出一个临时会话，在里面请 Claude 写摘要（它在这个临时会话里不能改任何东西），写完就把临时会话删掉。
+   * 原来那一路不受影响。可能要等一会儿；cancelDistill 可以中止。
+   */
+  distill(routeId: string, stopId: string, keep?: string): Promise<string>;
+  cancelDistill(routeId: string): void;
+  /**
+   * 压缩的第二步：带着摘要开一条快线。快线是全新的对话（新会话、新工作区，代码从 Local 的现在开始），
+   * 它的第一站是这份摘要；第一个问题会连同摘要一起交给 Claude。
+   */
+  createExpress(routeId: string, stopId: string, summary: string, name?: string): Promise<Route>;
+  /**
    * 让这一路的 Claude 解决同步冲突：把 Local 的版本带着冲突标记合进工作区，
    * 在这一路上开一站请 Claude 改好，这一站正常结束后再同步一次。
    */
@@ -110,6 +122,7 @@ export function createCore(opts: CoreOptions): Core {
   const listeners = new Set<BwListener>();
   const engines = new Map<string, Promise<SyncEngine>>();
   const running = new Map<string, AbortController>();
+  const distilling = new Map<string, AbortController>();
   const pendingPermissions = new Map<string, { routeId: string; tool: string; resolve: (d: PermissionDecision) => void }>();
 
   const emit = (e: BwEvent) => {
@@ -274,7 +287,8 @@ export function createCore(opts: CoreOptions): Core {
         : await claude
         .ask({
           cwd: route.worktreePath,
-          prompt: text,
+          // 快线的第一个问题：连同交接摘要一起交给 Claude（这是个全新的会话，它看不到原来的对话）
+          prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : text,
           sessionId: route.sessionId ?? undefined,
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
           signal: abort.signal,
@@ -382,6 +396,7 @@ export function createCore(opts: CoreOptions): Core {
         id: routeId,
         projectId,
         number,
+        express: null,
         name: name?.trim() || NEW_ROUTE_NAME,
         status: "idle",
         sessionId: null,
@@ -424,6 +439,7 @@ export function createCore(opts: CoreOptions): Core {
         id: newId,
         projectId: project.id,
         number,
+        express: null,
         name: name?.trim() || NEW_ROUTE_NAME,
         status: "idle",
         sessionId,
@@ -469,6 +485,89 @@ export function createCore(opts: CoreOptions): Core {
       db.routes.delete(routeId);
       emit({ type: "route.deleted", routeId, projectId: route.projectId });
       return { status: "deleted" };
+    },
+
+    async distill(routeId, stopId, keep) {
+      const route = mustRoute(routeId);
+      const stop = db.stops.get(stopId);
+      if (!stop || stop.routeId !== routeId) throw new CoreError("NOT_FOUND", `这一路上没有这一站：${stopId}`);
+      if (stop.status === "answering") throw new CoreError("CANNOT_FORK", "这一站还在回答，到站后才能压缩");
+      if (!route.sessionId || !stop.lastMessageId) throw new CoreError("CANNOT_FORK", "这一站没有留下对话记录，不能从它压缩");
+      if (distilling.has(routeId)) throw new CoreError("ROUTE_BUSY", "这一路正在提炼摘要");
+
+      const abort = new AbortController();
+      distilling.set(routeId, abort);
+      let temp: string | null = null;
+      try {
+        temp = await claude.fork(route.sessionId, stop.lastMessageId);
+        const result = await claude.ask({
+          cwd: route.worktreePath,
+          prompt: distillPrompt(keep),
+          sessionId: temp,
+          signal: abort.signal,
+          // 临时会话是只读的：不管项目的批准方式是什么，这里什么都不放行
+          onPermission: async () => "deny",
+        });
+        if (abort.signal.aborted) throw new CoreError("DISTILL_FAILED", "已取消");
+        if (result.outcome !== "completed" || !result.text.trim()) throw new CoreError("DISTILL_FAILED", `摘要没有写出来${result.error ? `：${result.error}` : ""}`);
+        return result.text.trim();
+      } finally {
+        distilling.delete(routeId);
+        if (temp) await claude.deleteSession(temp).catch(() => {});
+      }
+    },
+
+    cancelDistill(routeId) {
+      distilling.get(routeId)?.abort();
+    },
+
+    async createExpress(routeId, stopId, summary, name) {
+      const source = mustRoute(routeId);
+      const stop = db.stops.get(stopId);
+      if (!stop || stop.routeId !== routeId) throw new CoreError("NOT_FOUND", `这一路上没有这一站：${stopId}`);
+      const project = mustProject(source.projectId);
+      const engine = await engineFor(project);
+      const newId = id("r");
+      const { path: worktreePath } = await engine.createWorktree(newId);
+      const express = db.routes.nextExpress(project.id);
+      const route: Route = {
+        id: newId,
+        projectId: project.id,
+        number: db.routes.nextNumber(project.id),
+        express,
+        name: name?.trim() || `${source.name} · 续`,
+        status: "idle",
+        sessionId: null,
+        worktreePath,
+        parentRouteId: source.id,
+        forkStopId: stop.id,
+        createdAt: Date.now(),
+        archivedAt: null,
+      };
+      db.routes.insert(route);
+      // 第一站就是这份摘要
+      const head: Stop = {
+        id: id("s"),
+        routeId: newId,
+        seq: 1,
+        kind: "summary",
+        name: "交接摘要",
+        nameState: "final",
+        prompt: summary.trim(),
+        status: "done",
+        syncState: "none",
+        messageId: null,
+        lastMessageId: null,
+        error: null,
+        startedAt: Date.now(),
+        endedAt: Date.now(),
+      };
+      db.stops.insert(head);
+      emit({ type: "route.updated", route });
+      emit({ type: "stop.created", stop: head });
+      emit({ type: "stop.updated", stop: head });
+      warmRoute(route);
+      return route;
     },
 
     async resolveConflict(routeId) {
@@ -636,4 +735,43 @@ const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 function autoApproves(mode: PermissionMode, tool: string): boolean {
   return mode === "all" || (mode === "edits" && EDIT_TOOLS.has(tool));
+}
+
+/** 请 Claude 写交接摘要的提示。keep：用户特别要求保留的内容 */
+function distillPrompt(keep?: string): string {
+  return [
+    "请把到目前为止的整段对话提炼成一份交接摘要。读它的是一个全新的 Claude：它看不到这段对话，只能看到这份摘要和当前的代码。",
+    "",
+    "不要调用任何工具，不要改任何文件，只输出摘要本身，不要开场白和结束语。用 Markdown，按下面的小节写，没有内容的小节省略：",
+    "",
+    "## 目标",
+    "用户到底想做成什么。",
+    "## 做完了",
+    "已经完成并确认过的事，一条一行。",
+    "## 改过的文件",
+    "路径照原样写，每个文件一句话说明改了什么。",
+    "## 定下的事",
+    "做过的决定和理由，尤其是被否定掉的方案，免得再走一遍。",
+    "## 还没定 / 还没做",
+    "按该做的先后列出。",
+    "## 要注意的",
+    "约定、踩过的坑、用户的偏好。",
+    "",
+    "写具体：文件路径、函数名、命令、数字都照原样写。不要复述对话的经过。",
+    ...(keep?.trim() ? ["", `用户特别要求保留：${keep.trim()}`] : []),
+  ].join("\n");
+}
+
+/** 快线的第一个问题：摘要 + 问题 */
+function handover(summary: string, question: string): string {
+  return [
+    "下面是之前一段对话的交接摘要。那段对话你看不到，这份摘要就是它留下的全部上下文。代码以当前工作区里的为准；摘要和代码不一致时相信代码，并告诉用户。",
+    "",
+    "<交接摘要>",
+    summary,
+    "</交接摘要>",
+    "",
+    "现在的问题：",
+    question,
+  ].join("\n");
 }

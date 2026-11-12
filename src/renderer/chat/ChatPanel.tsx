@@ -97,6 +97,12 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         }}
       >
+        {parent && route.express && (
+          <button className={css.inherited} onClick={() => onGoToRoute(parent.id)} title={`去 ${parent.name} 看原来的对话`}>
+            <Plate route={parent} />
+            <span>这是一条快线：全新的对话，带着 {parent.number}路 的摘要出发。原来的对话还在 {parent.number}路</span>
+          </button>
+        )}
         {parent && offset > 0 && (
           <button className={css.inherited} onClick={() => onGoToRoute(parent.id)} title={`去 ${parent.name} 看这几站`}>
             <Plate route={parent} />
@@ -108,6 +114,17 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         {stops.map((s) => {
           const l = live[s.id];
           const items = l ? l.items : (content[s.id] ?? []);
+          if (s.kind === "summary") {
+            return (
+              <section key={s.id} className={css.summary} style={{ borderColor: colors.line }}>
+                <h3 style={{ color: colors.tag }}>交接摘要</h3>
+                <div className={css.md}>
+                  <Markdown remarkPlugins={[remarkGfm]}>{s.prompt}</Markdown>
+                </div>
+                <p>第一个问题会连同这份摘要一起交给 Claude。</p>
+              </section>
+            );
+          }
           return (
             <section key={s.id} className={css.stop}>
               <div className={css.ask} style={{ background: colors.tint }}>

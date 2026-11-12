@@ -35,6 +35,8 @@ export interface Route {
   projectId: string;
   /** 路号：1 路、2 路… */
   number: number;
+  /** 快线的编号（快1、快2…）；不是快线则为空。快线是带着交接摘要出发的全新对话 */
+  express: number | null;
   name: string;
   status: RouteStatus;
   /** Claude 会话 ID；还没问过第一站时为空 */

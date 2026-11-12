@@ -165,6 +165,10 @@
 .stop[data-junction="true"] .name {
   top: -40px;
 }
+/* 摘要站：方的 */
+.stop[data-kind="summary"] .node {
+  border-radius: 6px;
+}
 .stop[data-status="interrupted"] .node {
   border-style: dashed;
 }

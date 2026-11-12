@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Stop, SyncFile } from "../../shared";
+import { CompressDialog } from "../dialogs/CompressDialog";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { stopOffset } from "../stores/numbering";
@@ -32,6 +33,10 @@ export function App() {
   const setPermissionMode = useStore((s) => s.setPermissionMode);
   const [forkFrom, setForkFrom] = useState<Stop | null>(null);
   const deleteRoute = useStore((s) => s.deleteRoute);
+  const distill = useStore((s) => s.distill);
+  const cancelDistill = useStore((s) => s.cancelDistill);
+  const createExpress = useStore((s) => s.createExpress);
+  const [compressFrom, setCompressFrom] = useState<Stop | null>(null);
   const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
   const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + stop.seq;
 
@@ -89,7 +94,7 @@ export function App() {
               </button>
             </div>
           ) : (
-            <RouteMap routes={routes} stops={projectStops} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} />
+            <RouteMap routes={routes} stops={projectStops} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={setCompressFrom} />
           )}
         </main>
 
@@ -105,6 +110,22 @@ export function App() {
           onConfirm={async (force) => {
             const left = await deleteRoute(deleting.routeId, force);
             setDeleting(left ? { routeId: deleting.routeId, unsynced: left } : null);
+          }}
+        />
+      )}
+
+      {compressFrom && allRoutes[compressFrom.routeId] && (
+        <CompressDialog
+          source={allRoutes[compressFrom.routeId]!}
+          stop={compressFrom}
+          stopNumber={stopNumber(compressFrom)}
+          nextExpress={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[compressFrom.routeId]!.projectId).map((r) => r.express ?? 0)) + 1}
+          distill={(keep) => distill(compressFrom.routeId, compressFrom.id, keep)}
+          cancelDistill={() => cancelDistill(compressFrom.routeId)}
+          onClose={() => setCompressFrom(null)}
+          onCreate={(summary, name, question) => {
+            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question);
+            setCompressFrom(null);
           }}
         />
       )}

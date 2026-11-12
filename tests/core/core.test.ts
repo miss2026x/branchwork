@@ -406,6 +406,91 @@ describe("从一站开新对话（分叉）", () => {
   });
 });
 
+describe("压缩成快线", () => {
+  const threeStops = async () => {
+    const route = await core.createRoute(project.id, "登录重构");
+    claude.script = (t) => {
+      write(t.cwd, `${t.prompt}.txt`, "x\n");
+      t.say(`做了${t.prompt}`);
+    };
+    for (const q of ["一", "二", "三"]) await core.ask(route.id, q);
+    return route;
+  };
+
+  it("提炼：在临时会话里请 Claude 写摘要，它只看得到选中的站，什么都不能改；写完临时会话就删了，原来那一路不变", async () => {
+    core.setPermissionMode(project.id, "all"); // 即使项目设了全部不问，提炼时也不放行
+    const route = await threeStops();
+    const sessions = claude.sessions.size;
+    const before = await core.history(route.id);
+    let seen: { prompts: string[]; decision: string; cwd: string; prompt: string } | undefined;
+    claude.script = async (t) => {
+      seen = { prompts: t.earlierPrompts, decision: await t.askPermission("Write", { file_path: "x" }), cwd: t.cwd, prompt: t.prompt };
+      t.say("## 做完了\n- 一和二");
+    };
+    events.length = 0;
+    const summary = await core.distill(route.id, stopsOf(route.id)[1]!.id, "别忘了时区");
+    expect(summary).toBe("## 做完了\n- 一和二");
+    expect(seen).toMatchObject({ prompts: ["一", "二"], decision: "deny", cwd: route.worktreePath });
+    expect(seen!.prompt).toContain("交接摘要");
+    expect(seen!.prompt).toContain("用户特别要求保留：别忘了时区");
+    expect(claude.sessions.size).toBe(sessions); // 临时会话已删
+    expect(await core.history(route.id)).toEqual(before);
+    expect(stopsOf(route.id)).toHaveLength(3);
+    expect(routeOf(route.id).status).toBe("idle");
+    expect(events).toEqual([]); // 这一路在界面上没有任何变化
+  });
+
+  it("摘要没写出来或被取消：报错，临时会话照样删掉", async () => {
+    const route = await threeStops();
+    const sessions = claude.sessions.size;
+    const last = stopsOf(route.id)[2]!.id;
+    claude.script = () => "failed";
+    await expect(core.distill(route.id, last)).rejects.toMatchObject({ code: "DISTILL_FAILED" });
+    claude.script = () => {};
+    await expect(core.distill(route.id, last)).rejects.toMatchObject({ code: "DISTILL_FAILED" }); // 空的
+    claude.script = async (t) => {
+      await new Promise<void>((r) => t.signal.addEventListener("abort", () => r()));
+    };
+    const running = core.distill(route.id, last);
+    await expect(core.distill(route.id, last)).rejects.toMatchObject({ code: "ROUTE_BUSY" });
+    await new Promise((r) => setTimeout(r, 20));
+    core.cancelDistill(route.id);
+    await expect(running).rejects.toMatchObject({ code: "DISTILL_FAILED", message: "已取消" });
+    expect(claude.sessions.size).toBe(sessions);
+  });
+
+  it("开出快线：全新的会话和工作区，第一站是摘要；第一个问题连同摘要一起交给 Claude，之后的问题不再带", async () => {
+    const route = await threeStops();
+    const third = stopsOf(route.id)[2]!;
+    const express = await core.createExpress(route.id, third.id, "## 做完了\n- 一二三\n", "登录收尾");
+    expect(express).toMatchObject({ express: 1, number: 2, name: "登录收尾", sessionId: null, status: "idle", parentRouteId: route.id, forkStopId: third.id });
+    expect(express.worktreePath).not.toBe(route.worktreePath);
+    expect(has(express.worktreePath, "三.txt")).toBe(true); // 代码从 Local 的现在开始
+    expect(stopsOf(express.id)).toMatchObject([{ seq: 1, kind: "summary", name: "交接摘要", prompt: "## 做完了\n- 一二三", status: "done" }]);
+
+    const got: { prompt: string; earlier: string[] }[] = [];
+    claude.script = (t) => {
+      got.push({ prompt: t.prompt, earlier: t.earlierPrompts });
+      write(t.cwd, "express.txt", "y\n");
+    };
+    const first = await core.ask(express.id, "接着做第四件事");
+    expect(first).toMatchObject({ kind: "answered", stop: { seq: 2, prompt: "接着做第四件事", name: "接着做第四件事", syncState: "synced" } });
+    expect(got[0]!.earlier).toEqual([]); // 新会话，不记得原来的对话
+    expect(got[0]!.prompt).toContain("<交接摘要>\n## 做完了\n- 一二三\n</交接摘要>");
+    expect(got[0]!.prompt).toContain("现在的问题：\n接着做第四件事");
+    expect(routeOf(express.id).sessionId).not.toBe(routeOf(route.id).sessionId);
+    expect(routeOf(express.id).name).toBe("登录收尾");
+    expect(read(lab.local, "express.txt")).toBe("y\n");
+
+    await core.ask(express.id, "第五件");
+    expect(got[1]!.prompt).toBe("第五件");
+
+    const second = await core.createExpress(route.id, third.id, "摘要");
+    expect(second).toMatchObject({ express: 2, name: "登录重构 · 续" });
+    await expect(core.fork(express.id, stopsOf(express.id)[0]!.id)).rejects.toMatchObject({ code: "CANNOT_FORK" }); // 摘要站没有对话记录
+  });
+});
+
 describe("等你批准", () => {
   it("请求作为事件发出；这一路显示等待批准；回答后继续", async () => {
     const route = await core.createRoute(project.id);

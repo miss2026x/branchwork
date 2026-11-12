@@ -7,6 +7,7 @@ const route = (id: string, number: number, extra: Partial<Route> = {}): Route =>
   id,
   projectId: "p",
   number,
+  express: null,
   name: `${number} 路`,
   status: "idle",
   sessionId: null,
@@ -63,6 +64,9 @@ describe("线路图排版", () => {
     expect(fork.stops[0]).toMatchObject({ x: b.x + MAP.dx, y: lanes[0]!.y + MAP.row });
     expect(fork.path.startsWith(`M ${b.x} ${b.y} V`)).toBe(true);
     expect(fork.path).toContain(" Q ");
+    expect(fork.path).toBe(`${fork.link} H ${fork.stops[0]!.x + MAP.tail}`); // 整条线 = 拐过来的一段 + 横着的一段
+    expect(fork.run).toBe(`M ${b.x + MAP.bend} ${fork.y} H ${fork.stops[0]!.x + MAP.tail}`);
+    expect(lanes[0]!.link).toBeNull();
     expect(fork.plate.x).toBeLessThan(b.x); // 路牌在拐角左边
     expect(lanes[0]!.stops.map((s) => s.junction)).toEqual([false, true, false]); // 分叉站画成换乘站
   });
@@ -101,5 +105,6 @@ describe("站的显示序号", () => {
     expect(stopOffset(routes.r3, routes, stops)).toBe(4);
     expect(stopOffset(route("r9", 9, { forkStopId: "gone" }), routes, stops)).toBe(0); // 分叉站找不到了
     expect(stopOffset(undefined, routes, stops)).toBe(0);
+    expect(stopOffset(route("k1", 4, { parentRouteId: "r1", forkStopId: "c", express: 1 }), routes, stops)).toBe(0); // 快线是全新的对话，从头数
   });
 });
