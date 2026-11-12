@@ -1,0 +1,145 @@
+.stack {
+  position: absolute;
+  z-index: 4;
+  right: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.card {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 12px 40px 12px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-12);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+  animation: in var(--t-base) var(--ease);
+}
+@keyframes in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.card[data-tone="amber"] {
+  border-color: #e9c98a;
+}
+.card[data-tone="red"] {
+  border-color: #e6b3a8;
+}
+.card[data-tone="dark"] {
+  background: var(--text-1);
+  color: #fff;
+}
+.icon {
+  flex: none;
+}
+.icon i {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+}
+.green {
+  background: #dff3ea;
+  color: var(--green);
+}
+.amber {
+  background: var(--amber-bg);
+  color: var(--amber-text);
+}
+.red {
+  background: var(--red-bg);
+  color: var(--red);
+}
+.main {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  display: block;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.title > span:not([class]) {
+  font-weight: 600;
+}
+.main p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+.card[data-tone="dark"] p {
+  color: rgba(255, 255, 255, 0.72);
+}
+.actions {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.actions button {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-6);
+  background: var(--surface-0);
+  font-size: 12px;
+  color: var(--text-1);
+}
+.actions .primary {
+  border-color: var(--text-1);
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 600;
+}
+.actions .link {
+  border-color: transparent;
+  background: none;
+  color: var(--text-3);
+}
+.card[data-tone="dark"] .actions button {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: none;
+  color: #fff;
+}
+.card[data-tone="dark"] .actions .board {
+  border-color: var(--route-2);
+  background: var(--route-2);
+  font-weight: 700;
+}
+.card[data-tone="dark"] .actions .link {
+  border-color: transparent;
+  color: rgba(255, 255, 255, 0.72);
+}
+.close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+  color: var(--text-3);
+}
+.close:hover {
+  background: var(--surface-2);
+}
+.card[data-tone="dark"] .close {
+  color: rgba(255, 255, 255, 0.72);
+}
+.card[data-tone="dark"] .close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}

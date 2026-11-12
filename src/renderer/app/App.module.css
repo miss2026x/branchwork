@@ -39,6 +39,91 @@
   flex: 1;
   min-height: 0;
   display: flex;
+  position: relative;
+  overflow: clip;
+  --panel-w: 420px;
+}
+.body[data-tier="mid"],
+.body[data-tier="narrow"] {
+  --panel-w: 380px;
+}
+/* 窄窗口：对话栏滑出来盖在地图上 */
+.body[data-tier="narrow"] > aside:last-child {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  box-shadow: -12px 0 32px rgba(22, 27, 34, 0.16);
+  animation: slide var(--t-base) var(--ease);
+}
+@keyframes slide {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+.drawerBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+.drawerButton {
+  position: absolute;
+  z-index: 3;
+  top: 60px;
+  right: 136px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--text-1);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--e2);
+}
+.search {
+  margin-left: auto;
+  flex: none;
+  width: 300px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface-1);
+  color: var(--text-4);
+  text-align: left;
+}
+.search:hover {
+  border-color: var(--line-strong);
+}
+.search span {
+  flex: 1;
+  font-size: 13px;
+}
+.search kbd {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  background: var(--surface-0);
+  font: 11px/18px var(--mono);
+  color: var(--text-3);
+}
+.search[data-compact="true"] {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+  color: var(--text-3);
+}
+.search[data-compact="true"] span,
+.search[data-compact="true"] kbd {
+  display: none;
 }
 .center {
   flex: 1;

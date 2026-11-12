@@ -245,4 +245,84 @@ describe("应用", () => {
     await expect.poll(notes, { timeout: 60000 }).toContain("另起一路问");
     expect(await area.getByText("还没有候车的问题").isVisible()).toBe(true);
   });
+  it("搜索（Ctrl+K）：搜到以前的提问，回车跳到那一站；也能直接开一路新车", async () => {
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: "搜索" });
+    await palette.getByLabel("搜索").fill("排队");
+    await expect.poll(() => palette.getByRole("option").first().textContent()).toContain("排队的问题");
+    expect(await palette.getByText("提问 · 1 条").isVisible()).toBe(true);
+    await shot("14-palette");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => palette.count()).toBe(0);
+    // 跳到了那一站所在的路
+    await expect.poll(() => page.getByRole("log").getByText("排队的问题").first().isVisible()).toBe(true);
+
+    await page.keyboard.press("Control+k");
+    await palette.getByLabel("搜索").fill("> 查资料");
+    expect(await palette.getByRole("option").count()).toBe(2);
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("heading", { name: "查资料" }).isVisible(), { timeout: 30000 }).toBe(true);
+    // Esc 关闭
+    await page.keyboard.press("Control+k");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => palette.count()).toBe(0);
+  });
+
+  it("通知：到站时有手动登车的问题会提醒，点“登车”就发出", async () => {
+    const notes = () => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
+    await page.locator("textarea").fill("慢慢来，再占一会儿");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
+    // 给正在回答的这一路放一个“手动登车”的问题
+    await page.evaluate(async () => {
+      const [project] = await window.bw.listProjects();
+      const snap = await window.bw.snapshot(project!.id);
+      const busy = snap.routes.find((r) => r.status === "answering")!;
+      await window.bw.queueAdd(project!.id, "手动登车的问题", busy.id, "manual");
+    });
+    const notices = page.getByRole("region", { name: "通知" });
+    await expect.poll(() => notices.getByText("到站了，有一条等你登车").isVisible(), { timeout: 60000 }).toBe(true);
+    expect(notes()).not.toContain("手动登车的问题");
+    await shot("15-notice-board");
+    await notices.getByRole("button", { name: "登车", exact: true }).click();
+    await expect.poll(notes, { timeout: 60000 }).toContain("手动登车的问题");
+    await expect.poll(() => notices.count()).toBe(0);
+  });
+
+  it("压缩可以先收起来：提炼在后台继续，好了右下角提醒，点开就是摘要", async () => {
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+    await page.locator('[class*="node"]').last().click();
+    await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
+    const dialog = page.getByRole("dialog", { name: "压缩成快线" });
+    await dialog.getByRole("button", { name: "开始提炼" }).click();
+    await dialog.getByRole("button", { name: "先收起来" }).click();
+    await expect.poll(() => dialog.count()).toBe(0);
+    const notices = page.getByRole("region", { name: "通知" });
+    await expect.poll(() => notices.getByText("的摘要提炼好了").isVisible(), { timeout: 60000 }).toBe(true);
+    await shot("16-notice-summary");
+    await notices.getByRole("button", { name: "查看摘要" }).click();
+    expect(await dialog.getByText("摘要好了，看一眼再发车").isVisible()).toBe(true);
+    await dialog.getByRole("button", { name: "不要这条快线" }).click();
+    await dialog.getByRole("button", { name: "丢掉" }).click();
+    await expect.poll(() => dialog.count()).toBe(0);
+  });
+
+  it("窗口变窄：左栏收成图标，对话栏收起，点“对话”滑出来", async () => {
+    await page.setViewportSize({ width: 1100, height: 700 });
+    await expect.poll(() => page.getByLabel("项目和线路").isVisible()).toBe(true);
+    expect(await page.locator("textarea").isVisible()).toBe(true);
+    await shot("17-mid");
+
+    await page.setViewportSize({ width: 900, height: 620 });
+    await expect.poll(() => page.locator("textarea").count()).toBe(0);
+    await shot("18-narrow");
+    await page.getByRole("button", { name: "对话", exact: true }).click();
+    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await shot("19-narrow-drawer");
+    await page.getByRole("button", { name: "收起对话" }).click();
+    await expect.poll(() => page.locator("textarea").count()).toBe(0);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+  });
 });

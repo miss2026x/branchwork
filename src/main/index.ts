@@ -15,7 +15,24 @@ fs.mkdirSync(home, { recursive: true });
 const db = openDb(path.join(home, "bw.sqlite"));
 // BRANCHWORK_DEMO=1：用假的 Claude（不联网、不用登录），其余全是真的——真的建工作区、真的同步
 const demo = process.env.BRANCHWORK_DEMO === "1";
-const core = createCore({ db, claude: demo ? createDemoClaudeClient() : createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING }), worktreesRoot: path.join(home, "worktrees") });
+/**
+ * 打包之后 Claude Code 程序本体在哪。
+ * 它随 SDK 的平台包一起装进来，打包时被放到 app.asar.unpacked（压缩包里的程序没法直接启动）。
+ * 开发时返回空，让 SDK 自己找。
+ */
+function packagedClaude(): string | undefined {
+  if (!app.isPackaged) return undefined;
+  const exe = process.platform === "win32" ? "claude.exe" : "claude";
+  const base = path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "@anthropic-ai");
+  const names = [`claude-agent-sdk-${process.platform}-${process.arch}`, `claude-agent-sdk-${process.platform}-${process.arch}-musl`];
+  return names.map((n) => path.join(base, n, exe)).find((p) => fs.existsSync(p));
+}
+
+const core = createCore({
+  db,
+  claude: demo ? createDemoClaudeClient() : createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING, claudeExecutable: packagedClaude() }),
+  worktreesRoot: path.join(home, "worktrees"),
+});
 
 function createWindow(): void {
   const win = new BrowserWindow({

@@ -15,7 +15,9 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "dev:web": "vite -c vite.renderer.config.ts",
-    "test:e2e": "vitest run -c vitest.e2e.config.ts"
+    "test:e2e": "vitest run -c vitest.e2e.config.ts",
+    "pack": "electron-vite build && electron-builder --dir",
+    "dist": "electron-vite build && electron-builder"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -23,6 +25,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "playwright": "^1.65.0",
     "react": "^19.3.1",
@@ -38,5 +41,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.322"
   },
-  "main": "out/main/index.js"
+  "main": "out/main/index.js",
+  "description": "用公交线路图管理多条 Claude 对话的桌面应用",
+  "author": "Branchwork"
 }

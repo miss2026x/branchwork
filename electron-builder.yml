@@ -1,0 +1,27 @@
+# 打包配置。`pnpm dist` 在当前系统上出安装包（Windows 出 .exe 安装程序，macOS 出 .dmg），放在 dist/ 里。
+# 只能在哪个系统上打哪个系统的包：Claude Code 的程序本体是按系统分的，装依赖时只装了当前系统的那一份。
+appId: app.branchwork.desktop
+productName: Branchwork
+directories:
+  output: dist
+files:
+  - out/main/**
+  - out/preload/**
+  - out/renderer/**
+  - package.json
+# Claude Code 的程序本体不能留在压缩包（asar）里，否则启动不了
+asarUnpack:
+  - node_modules/@anthropic-ai/claude-agent-sdk-*/**
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+linux:
+  target: AppImage
+  category: Development
+# 没有配置代码签名：Windows 首次运行会提示“未知发布者”，macOS 要在“隐私与安全性”里放行

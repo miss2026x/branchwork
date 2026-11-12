@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Route, Stop } from "../../shared";
 import { firstStops } from "../stores/numbering";
 import { IconClose } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./Dialog.module.css";
+
+/** 这一站的提炼进行到哪了（数据在外面，弹窗关了也还在） */
+export interface DistillView {
+  status: "running" | "ready" | "failed";
+  summary: string;
+  error: string | null;
+  startedAt: number;
+}
 
 interface Props {
   source: Route;
@@ -13,78 +21,49 @@ interface Props {
   stopNumber: number;
   /** 新的快线会是快几 */
   nextExpress: number;
-  /** 请 Claude 写摘要；失败时抛出带原因的错误 */
-  distill(keep: string): Promise<string>;
-  cancelDistill(): void;
+  /** 还没开始提炼时为空 */
+  distill?: DistillView;
+  /** 开始提炼，或带着新的要求重新生成 */
+  onStart(keep: string): void;
+  /** 不等了：取消正在进行的提炼 */
+  onCancel(): void;
+  onSummaryChange(summary: string): void;
+  /** 明确不要这条快线：摘要也丢掉 */
+  onDiscard(): void;
+  /** 只是收起弹窗：提炼继续，摘要留着 */
   onClose(): void;
   onCreate(summary: string, name: string, firstQuestion: string): void;
-  /** 上次为这一站提炼好、还没用掉的摘要（不小心关掉后再打开时接着用） */
-  savedSummary?: string;
-  /** 摘要有了或被改了：让外面记住，关掉也不丢 */
-  onSummaryChange(summary: string): void;
 }
 
 /** “压缩成快线”：说明 → 提炼中 → 看一眼摘要、改一改 → 开出快线 */
-export function CompressDialog({ source, stop, stopNumber, nextExpress, distill, cancelDistill, onClose, onCreate, savedSummary, onSummaryChange }: Props) {
-  const [step, setStep] = useState<"intro" | "distilling" | "ready">(savedSummary ? "ready" : "intro");
-  const [summary, setSummaryState] = useState(savedSummary ?? "");
-  const setSummary = (text: string) => {
-    setSummaryState(text);
-    onSummaryChange(text);
-  };
-  /** 摘要已经出来了还点关闭：先问一句，别让等了半天的东西一下就没了 */
+export function CompressDialog({ source, stop, stopNumber, nextExpress, distill, onStart, onCancel, onSummaryChange, onDiscard, onClose, onCreate }: Props) {
+  const step = !distill || (distill.status === "failed" && !distill.summary) ? "intro" : distill.status === "running" ? "distilling" : "ready";
+  const summary = distill?.summary ?? "";
+  const error = distill?.error ?? null;
+  /** 摘要已经出来了还点“不要”：先问一句，别让等了半天的东西一下就没了 */
   const [askDiscard, setAskDiscard] = useState(false);
   const [keep, setKeep] = useState("");
   const [name, setName] = useState("");
   const [question, setQuestion] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [seconds, setSeconds] = useState(0);
-  const alive = useRef(true);
+  const [, tick] = useState(0);
   const express = { number: 0, express: nextExpress };
   const green = routeColors(express).tag;
+  const seconds = distill ? Math.max(0, Math.round((Date.now() - distill.startedAt) / 1000)) : 0;
 
-  /** 点关闭按钮。有摘要时只是收起来，摘要留着，下次打开还在 */
-  const close = () => {
-    if (step === "distilling") cancelDistill();
-    onClose();
-  };
-  /** 明确不要这条快线：摘要也丢掉 */
-  const discard = () => {
-    onSummaryChange("");
-    onClose();
-  };
+  const close = onClose;
+  const discard = onDiscard;
+  const run = () => onStart(keep);
   useEffect(() => {
-    alive.current = true;
     // Esc 只在还没开始提炼时关闭弹窗；提炼中和摘要出来之后不响应，免得误触
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && step === "intro" && close();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && step === "intro" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => {
-      alive.current = false;
-      window.removeEventListener("keydown", onKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [step, onClose]);
   useEffect(() => {
     if (step !== "distilling") return;
-    setSeconds(0);
-    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    const t = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [step]);
-
-  const run = async () => {
-    setError(null);
-    setStep("distilling");
-    try {
-      const text = await distill(keep);
-      if (!alive.current) return;
-      setSummary(text);
-      setStep("ready");
-    } catch (e) {
-      if (!alive.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-      setStep(summary ? "ready" : "intro");
-    }
-  };
 
   return (
     <div className={css.scrim}>
@@ -132,8 +111,12 @@ export function CompressDialog({ source, stop, stopNumber, nextExpress, distill,
               </div>
             </div>
             <footer>
-              <button type="button" className={css.ghost} onClick={close}>
+              <span className={css.ask}>可以先收起来去做别的，好了会在右下角提醒你。</span>
+              <button type="button" className={css.ghost} onClick={onCancel}>
                 不等了，取消
+              </button>
+              <button type="button" className={css.confirm} style={{ background: green }} onClick={close}>
+                先收起来
               </button>
             </footer>
           </>
@@ -143,7 +126,7 @@ export function CompressDialog({ source, stop, stopNumber, nextExpress, distill,
           <>
             <label className={css.field}>
               <span>摘要站的内容（可以直接改）</span>
-              <textarea className={css.summary} value={summary} onChange={(e) => setSummary(e.target.value)} rows={12} spellCheck={false} />
+              <textarea className={css.summary} value={summary} onChange={(e) => onSummaryChange(e.target.value)} rows={12} spellCheck={false} />
             </label>
             <div className={css.regen}>
               <input value={keep} onChange={(e) => setKeep(e.target.value)} placeholder="重新生成时特别保留…" />
@@ -182,10 +165,7 @@ export function CompressDialog({ source, stop, stopNumber, nextExpress, distill,
                     className={css.confirm}
                     style={{ background: green }}
                     disabled={!summary.trim()}
-                    onClick={() => {
-                      onSummaryChange("");
-                      onCreate(summary, name, question);
-                    }}
+                    onClick={() => onCreate(summary, name, question)}
                   >
                     开出快{nextExpress}
                   </button>

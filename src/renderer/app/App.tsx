@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
+import { Notices } from "../notices/Notices";
+import { CommandPalette } from "../palette/CommandPalette";
 import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
-import { BusMark, IconFolder } from "../ui/icons";
+import { BusMark, IconChat, IconFolder, IconSearch } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./App.module.css";
+import { useTier } from "./use-tier";
 
 const EMPTY_QUEUE: QueueItem[] = [];
 
@@ -36,12 +39,36 @@ export function App() {
   const setPermissionMode = useStore((s) => s.setPermissionMode);
   const [forkFrom, setForkFrom] = useState<Stop | null>(null);
   const deleteRoute = useStore((s) => s.deleteRoute);
-  const distill = useStore((s) => s.distill);
-  const cancelDistill = useStore((s) => s.cancelDistill);
   const createExpress = useStore((s) => s.createExpress);
-  const [compressFrom, setCompressFrom] = useState<Stop | null>(null);
-  /** 提炼好但还没用掉的摘要，按站记着：弹窗关了再打开还在 */
-  const summaries = useRef(new Map<string, string>());
+  const compressStopId = useStore((s) => s.compressStopId);
+  const openCompress = useStore((s) => s.openCompress);
+  const distills = useStore((s) => s.distills);
+  const startDistill = useStore((s) => s.startDistill);
+  const cancelDistill = useStore((s) => s.cancelDistill);
+  const setSummary = useStore((s) => s.setSummary);
+  const dropDistill = useStore((s) => s.dropDistill);
+  const compressFrom = compressStopId ? allStops[compressStopId] : undefined;
+  const notices = useStore((s) => s.notices);
+  const dismissNotice = useStore((s) => s.dismissNotice);
+  const jumpToStop = useStore((s) => s.jumpToStop);
+  const focus = useStore((s) => s.focus);
+  const allQueues = useStore((s) => s.queue);
+  const content = useStore((s) => s.content);
+  const ask = useStore((s) => s.ask);
+  const stopRoute = useStore((s) => s.stop);
+  const resync = useStore((s) => s.resync);
+  const setDraft = useStore((s) => s.setDraft);
+  const ensureHistory = useStore((s) => s.ensureHistory);
+  const [palette, setPalette] = useState(false);
+  const [waitingSignal, setWaitingSignal] = useState(0);
+  const tier = useTier();
+  /** 窄窗口里对话栏是抽屉：开着没有 */
+  const [drawer, setDrawer] = useState(false);
+  // 窗口刚变窄时对话栏先收着，把地图让出来
+  useEffect(() => {
+    if (tier === "narrow") setDrawer(false);
+  }, [tier]);
+  const searchData = useMemo(() => ({ projects, routes: allRoutes, stops: allStops, queue: allQueues }), [projects, allRoutes, allStops, allQueues]);
   const queue = useStore((s) => (projectId ? s.queue[projectId] : undefined)) ?? EMPTY_QUEUE;
   const queueAdd = useStore((s) => s.queueAdd);
   const queueAssign = useStore((s) => s.queueAssign);
@@ -54,6 +81,33 @@ export function App() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "k") {
+        e.preventDefault();
+        setPalette((v) => !v);
+      } else if (key === "n" && !document.querySelector('[aria-modal="true"]')) {
+        e.preventDefault();
+        void createRoute();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [createRoute]);
+
+  /** 去某一路 / 某一站；窄窗口里顺便把对话栏滑出来 */
+  const goToRoute = (id: string) => {
+    selectRoute(id);
+    setDrawer(true);
+  };
+  const goToStop = (id: string) => {
+    jumpToStop(id);
+    setDrawer(true);
+  };
+  const isMac = /Mac/.test(navigator.platform);
 
   const projectStops = Object.values(allStops).filter((s) => routes.some((r) => r.id === s.routeId));
 
@@ -80,10 +134,15 @@ export function App() {
             </>
           )}
         </nav>
+        <button className={css.search} data-compact={tier === "narrow"} onClick={() => setPalette(true)} aria-label="搜索" title={`搜索（${isMac ? "⌘" : "Ctrl+"}K）`}>
+          <IconSearch size={16} />
+          <span>搜索提问、候车区、命令</span>
+          <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
+        </button>
       </header>
 
-      <div className={css.body}>
-        <ProjectRail onDelete={(id) => setDeleting({ routeId: id, unsynced: null })} />
+      <div className={css.body} data-tier={tier}>
+        <ProjectRail compact={tier !== "wide"} onDelete={(id) => setDeleting({ routeId: id, unsynced: null })} />
 
         <main className={css.center}>
           {!ready ? null : projects.length === 0 ? (
@@ -106,7 +165,7 @@ export function App() {
             </div>
           ) : (
             <>
-              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={setCompressFrom} />
+              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} focus={focus} />
               <WaitingArea
                 items={queue}
                 routes={routes}
@@ -115,12 +174,44 @@ export function App() {
                 onRemove={(itemId) => void queueRemove(itemId)}
                 onBoard={(itemId) => void queueBoard(itemId)}
                 onStartNew={(itemId) => void queueStartNew(itemId)}
+                openSignal={waitingSignal}
               />
+              {tier === "narrow" && route && !drawer && (
+                <button className={css.drawerButton} onClick={() => setDrawer(true)}>
+                  <IconChat size={14} /> 对话
+                </button>
+              )}
             </>
           )}
+          {/* 窄窗口里对话栏盖在地图上：点地图收回 */}
+          {tier === "narrow" && drawer && route && <div className={css.drawerBackdrop} onPointerDown={() => setDrawer(false)} />}
+          <Notices
+            notices={notices}
+            routes={allRoutes}
+            stops={allStops}
+            projects={projects}
+            currentProjectId={projectId}
+            stopNumber={stopNumber}
+            onDismiss={dismissNotice}
+            onViewSummary={openCompress}
+            onGoToRoute={goToRoute}
+            onContinue={(id) => {
+              goToRoute(id);
+              void ask(id, "接着上一站没做完的地方继续，把它做完。");
+            }}
+            onResync={(id) => void resync(id)}
+            onJump={goToStop}
+            onStop={stopRoute}
+            onBoard={(itemId) => void queueBoard(itemId)}
+            onEditFirst={(itemId, id, text) => {
+              setDraft(id, text);
+              void queueRemove(itemId);
+              goToRoute(id);
+            }}
+          />
         </main>
 
-        {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} queued={queue.filter((q) => q.routeId === route.id).length} onQueue={(text) => void queueAdd(route.projectId, text, route.id, "auto")} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} queued={queue.filter((q) => q.routeId === route.id).length} onQueue={(text) => void queueAdd(route.projectId, text, route.id, "auto")} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -138,18 +229,23 @@ export function App() {
 
       {compressFrom && allRoutes[compressFrom.routeId] && (
         <CompressDialog
+          key={compressFrom.id}
           source={allRoutes[compressFrom.routeId]!}
           stop={compressFrom}
           stopNumber={stopNumber(compressFrom)}
           nextExpress={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[compressFrom.routeId]!.projectId).map((r) => r.express ?? 0)) + 1}
-          distill={(keep) => distill(compressFrom.routeId, compressFrom.id, keep)}
-          cancelDistill={() => cancelDistill(compressFrom.routeId)}
-          onClose={() => setCompressFrom(null)}
-          savedSummary={summaries.current.get(compressFrom.id)}
-          onSummaryChange={(text) => (text ? summaries.current.set(compressFrom.id, text) : summaries.current.delete(compressFrom.id))}
+          distill={distills[compressFrom.id]}
+          onStart={(keep) => startDistill(compressFrom.routeId, compressFrom.id, keep)}
+          onCancel={() => cancelDistill(compressFrom.id)}
+          onSummaryChange={(text) => setSummary(compressFrom.id, text)}
+          onDiscard={() => {
+            dropDistill(compressFrom.id);
+            openCompress(null);
+          }}
+          onClose={() => openCompress(null)}
           onCreate={(summary, name, question) => {
             void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question);
-            setCompressFrom(null);
+            openCompress(null);
           }}
         />
       )}
@@ -165,6 +261,32 @@ export function App() {
             void fork(forkFrom.routeId, forkFrom.id, name, question);
             setForkFrom(null);
           }}
+        />
+      )}
+
+      {palette && (
+        <CommandPalette
+          data={searchData}
+          content={content}
+          currentProject={project}
+          stopNumber={stopNumber}
+          onPreview={ensureHistory}
+          onJump={(stop) => goToStop(stop.id)}
+          onFork={setForkFrom}
+          onOpenQueue={(item) => {
+            if (item.routeId) goToRoute(item.routeId);
+            else {
+              useStore.getState().selectProject(item.projectId);
+              setWaitingSignal((n) => n + 1);
+            }
+          }}
+          onNewRoute={(name) => void createRoute(name)}
+          onQueueAdd={(text) => {
+            if (!projectId) return;
+            void queueAdd(projectId, text);
+            setWaitingSignal((n) => n + 1);
+          }}
+          onClose={() => setPalette(false)}
         />
       )}
 

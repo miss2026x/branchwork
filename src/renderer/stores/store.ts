@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
 import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
@@ -16,6 +17,15 @@ export interface PendingPermission {
   canRemember: boolean;
 }
 
+/** 一次“压缩成快线”的提炼：在后台跑，弹窗关了也继续，好了再提醒 */
+export interface Distill {
+  routeId: string;
+  status: "running" | "ready" | "failed";
+  summary: string;
+  error: string | null;
+  startedAt: number;
+}
+
 interface State {
   ready: boolean;
   projects: Project[];
@@ -31,6 +41,16 @@ interface State {
   /** 各项目候车区里的问题 */
   queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
+  /** 要你处理的事（右下角的通知） */
+  notices: Notice[];
+  /** 各路刚从候车区自动发出的问题，通知用 */
+  boarded: Record<string, string>;
+  /** 各站的摘要提炼，按站记 */
+  distills: Record<string, Distill>;
+  /** 正开着“压缩成快线”弹窗的那一站 */
+  compressStopId: string | null;
+  /** 要带到眼前的那一站（地图居中、对话滚到它）；n 每次加一，同一站也能再跳 */
+  focus: { stopId: string; n: number } | null;
   historyLoaded: Record<string, boolean>;
   error: string | null;
   selectedProjectId: string | null;
@@ -40,12 +60,22 @@ interface State {
   selectProject(projectId: string): void;
   selectRoute(routeId: string): void;
   addProject(): Promise<void>;
-  createRoute(): Promise<void>;
+  createRoute(name?: string): Promise<void>;
+  /** 跳到某一站：选中它那一路，地图和对话都带过去 */
+  jumpToStop(stopId: string): void;
+  openCompress(stopId: string | null): void;
+  /** 开始提炼（已有摘要时是重新生成）。立即返回，结果写进 distills */
+  startDistill(routeId: string, stopId: string, keep: string): void;
+  /** 取消提炼；已有的摘要留着 */
+  cancelDistill(stopId: string): void;
+  setSummary(stopId: string, summary: string): void;
+  /** 不要这份摘要了 */
+  dropDistill(stopId: string): void;
+  dismissNotice(id: string): void;
+  /** 把这一路各站的回答读回来（已经读过就不再读） */
+  ensureHistory(routeId: string): void;
   ask(routeId: string, text: string): Promise<void>;
   fork(routeId: string, stopId: string, name: string, firstQuestion: string): Promise<void>;
-  /** 提炼摘要；失败时抛出带原因的错误 */
-  distill(routeId: string, stopId: string, keep: string): Promise<string>;
-  cancelDistill(routeId: string): void;
   createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string): Promise<void>;
   resolveConflict(routeId: string): Promise<void>;
   resync(routeId: string): Promise<void>;
@@ -74,6 +104,20 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).rep
 export const useStore = create<State>((set, get) => {
   let started = false;
   const apply = (e: BwEvent) => {
+    // 通知先按“事件之前的数据”算一遍
+    set((s) => {
+      const notices = reduceNotices(s.notices, e, s);
+      let boarded = s.boarded;
+      if (e.type === "queue.updated") {
+        // 从候车区消失的自动登车的问题：多半是刚发出去了，记一下
+        const gone = (s.queue[e.projectId] ?? []).filter((q) => q.mode === "auto" && q.routeId && !e.items.some((x) => x.id === q.id));
+        if (gone.length) boarded = { ...boarded, ...Object.fromEntries(gone.map((q) => [q.routeId!, q.text])) };
+      } else if (e.type === "stop.created" && boarded[e.stop.routeId] !== undefined) {
+        boarded = { ...boarded };
+        delete boarded[e.stop.routeId];
+      }
+      return notices === s.notices && boarded === s.boarded ? {} : { notices, boarded };
+    });
     switch (e.type) {
       case "route.updated": {
         const idle = e.route.status !== "answering" && e.route.status !== "awaiting_permission";
@@ -198,6 +242,11 @@ export const useStore = create<State>((set, get) => {
     lastSync: {},
     queue: {},
     drafts: {},
+    notices: [],
+    boarded: {},
+    distills: {},
+    compressStopId: null,
+    focus: null,
     historyLoaded: {},
     error: null,
     selectedProjectId: null,
@@ -234,7 +283,7 @@ export const useStore = create<State>((set, get) => {
     selectRoute(routeId) {
       const route = get().routes[routeId];
       if (!route) return;
-      set({ selectedRouteId: routeId, selectedProjectId: route.projectId });
+      set((s) => ({ selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
       void loadHistory(routeId);
       void window.bw.warm(routeId).catch(() => {});
       // 这一路最近一次同步的结果（冲突面板要用）
@@ -259,11 +308,11 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async createRoute() {
+    async createRoute(name) {
       const projectId = get().selectedProjectId;
       if (!projectId) return;
       try {
-        const route = await window.bw.createRoute(projectId);
+        const route = await window.bw.createRoute(projectId, name?.trim() || undefined);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
       } catch (e) {
@@ -297,21 +346,77 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async distill(routeId, stopId, keep) {
-      try {
-        return await window.bw.distill(routeId, stopId, keep || undefined);
-      } catch (e) {
-        throw new Error(message(e));
-      }
+    jumpToStop(stopId) {
+      const stop = get().stops[stopId];
+      if (!stop) return;
+      get().selectRoute(stop.routeId);
+      set((s) => ({ focus: { stopId, n: (s.focus?.n ?? 0) + 1 } }));
     },
 
-    cancelDistill(routeId) {
-      void window.bw.cancelDistill(routeId);
+    openCompress(stopId) {
+      set((s) => ({ compressStopId: stopId, notices: stopId ? s.notices.filter((n) => !(n.kind === "summary" && n.stopId === stopId)) : s.notices }));
+    },
+
+    startDistill(routeId, stopId, keep) {
+      const before = get().distills[stopId];
+      if (before?.status === "running") return;
+      const startedAt = Date.now();
+      const mine = () => get().distills[stopId]?.startedAt === startedAt;
+      set((s) => ({ distills: { ...s.distills, [stopId]: { routeId, status: "running", summary: before?.summary ?? "", error: null, startedAt } } }));
+      window.bw.distill(routeId, stopId, keep.trim() || undefined).then(
+        (summary) => {
+          if (!mine()) return; // 已取消或丢掉
+          set((s) => ({
+            distills: { ...s.distills, [stopId]: { routeId, status: "ready", summary, error: null, startedAt } },
+            // 弹窗没开着：提醒一下
+            notices: s.compressStopId === stopId ? s.notices : [...s.notices.filter((n) => n.id !== `summary:${stopId}`), { id: `summary:${stopId}`, kind: "summary", routeId, stopId }],
+          }));
+        },
+        (e) => {
+          if (!mine()) return;
+          set((s) => ({ distills: { ...s.distills, [stopId]: { routeId, status: before?.summary ? "ready" : "failed", summary: before?.summary ?? "", error: message(e), startedAt } } }));
+        },
+      );
+    },
+
+    cancelDistill(stopId) {
+      const d = get().distills[stopId];
+      if (d?.status !== "running") return;
+      void window.bw.cancelDistill(d.routeId);
+      set((s) => {
+        const distills = { ...s.distills };
+        if (d.summary) distills[stopId] = { ...d, status: "ready", startedAt: 0 };
+        else delete distills[stopId];
+        return { distills };
+      });
+    },
+
+    setSummary(stopId, summary) {
+      set((s) => (s.distills[stopId] ? { distills: { ...s.distills, [stopId]: { ...s.distills[stopId]!, summary } } } : {}));
+    },
+
+    dropDistill(stopId) {
+      const d = get().distills[stopId];
+      if (d?.status === "running") void window.bw.cancelDistill(d.routeId);
+      set((s) => {
+        const distills = { ...s.distills };
+        delete distills[stopId];
+        return { distills, notices: s.notices.filter((n) => !(n.kind === "summary" && n.stopId === stopId)) };
+      });
+    },
+
+    ensureHistory(routeId) {
+      void loadHistory(routeId);
+    },
+
+    dismissNotice(id) {
+      set((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
     },
 
     async createExpress(routeId, stopId, summary, name, firstQuestion) {
       try {
         const route = await window.bw.createExpress(routeId, stopId, summary, name);
+        get().dropDistill(stopId);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);

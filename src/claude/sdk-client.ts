@@ -41,6 +41,11 @@ export interface ClaudeClientOptions {
   warmTimeoutMs?: number;
   /** 接在 Claude Code 自带的系统提示后面的说明（告诉 Claude 它所处的环境） */
   appendSystemPrompt?: string;
+  /**
+   * Claude Code 程序本体的路径。不给就用 SDK 自己找到的那个。
+   * 打包后的应用要给：程序本体被放在安装包的解压目录里，SDK 自己找到的路径在压缩包里，启动不了
+   */
+  claudeExecutable?: string;
 }
 
 /** 一次提问期间才有的东西。进程可能是提前启动的，启动时还不知道这些，所以放在一个可以后填的格子里 */
@@ -49,7 +54,8 @@ interface Turn {
 }
 
 /** 一个 Claude 进程用的配置：目录、接着哪个会话、怎么停、怎么问批准 */
-function processOptions(cwd: string, sessionId: string | undefined, abort: AbortController, turn: Turn, append?: string): Options {
+function processOptions(cwd: string, sessionId: string | undefined, abort: AbortController, turn: Turn, client: ClaudeClientOptions): Options {
+  const append = client.appendSystemPrompt;
   const canUseTool: CanUseTool = async (toolName, input, extra) => {
     const suggestions = extra.suggestions ?? [];
     const decision = turn.onPermission ? await turn.onPermission({ tool: toolName, input, canRemember: suggestions.length > 0 }) : "deny";
@@ -63,6 +69,7 @@ function processOptions(cwd: string, sessionId: string | undefined, abort: Abort
     includePartialMessages: true,
     systemPrompt: { type: "preset", preset: "claude_code", ...(append ? { append } : {}) },
     canUseTool,
+    ...(client.claudeExecutable ? { pathToClaudeCodeExecutable: client.claudeExecutable } : {}),
     ...(sessionId ? { resume: sessionId } : {}),
   };
 }
@@ -102,7 +109,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         sessionId,
         abort,
         turn,
-        ready: fns.startup({ options: processOptions(cwd, sessionId, abort, turn, clientOpts.appendSystemPrompt), initializeTimeoutMs: clientOpts.warmTimeoutMs ?? 180_000 }).catch(() => {
+        ready: fns.startup({ options: processOptions(cwd, sessionId, abort, turn, clientOpts), initializeTimeoutMs: clientOpts.warmTimeoutMs ?? 180_000 }).catch(() => {
           if (warmed.get(cwd) === w) warmed.delete(cwd);
           return null;
         }),
@@ -154,7 +161,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       };
 
       try {
-        stream ??= fns.query({ prompt: opts.prompt, options: processOptions(opts.cwd, opts.sessionId, abort, turn, clientOpts.appendSystemPrompt) });
+        stream ??= fns.query({ prompt: opts.prompt, options: processOptions(opts.cwd, opts.sessionId, abort, turn, clientOpts) });
         if (prewarmed) markStarted(); // 进程早就启动好了
         for await (const raw of stream) {
           const m = raw as SdkMessage;

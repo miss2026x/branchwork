@@ -20,6 +20,8 @@ interface Props {
   onFork(stop: Stop): void;
   /** 用户选了“压缩成快线” */
   onCompress(stop: Stop): void;
+  /** 要带到视野中间的那一站（从搜索、通知跳过来） */
+  focus?: { stopId: string; n: number } | null;
 }
 
 const MIN = 0.3;
@@ -30,7 +32,7 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, focus: jump }: Props) {
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
@@ -82,6 +84,23 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
     // 只在“选中的路或它的站数变了”时触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
+
+  // 跳到某一站：把它放到视野中间，圈一下
+  const [ringed, setRinged] = useState<string | null>(null);
+  useEffect(() => {
+    const el = viewport.current;
+    const spot = jump && layout.lanes.flatMap((l) => l.stops).find((x) => x.stop.id === jump.stopId);
+    if (!el || !spot) return;
+    const r = el.getBoundingClientRect();
+    setView((v) => {
+      const k = Math.max(v.k, 0.6);
+      return { k, x: r.width / 2 - spot.x * k, y: r.height / 2 - spot.y * k };
+    });
+    setRinged(spot.stop.id);
+    const t = setTimeout(() => setRinged(null), 1800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jump?.n]);
 
   const onWheel = (e: WheelEvent) => {
     const r = viewport.current!.getBoundingClientRect();
@@ -167,6 +186,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
               lane={lane}
               waiting={queue.filter((q) => q.routeId === lane.route.id)}
               on={lane.route.id === selectedRouteId}
+              ringed={ringed}
               onSelect={() => onSelectRoute(lane.route.id)}
               onStop={(stop) => {
                 onSelectRoute(lane.route.id);
@@ -177,7 +197,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         </div>
 
         {menu && (
-          <div className={css.menu} role="menu" style={{ left: Math.max(8, menu.spot.x * view.k + view.x - 24), top: menu.spot.y * view.k + view.y + 44 * Math.max(0.6, view.k) }}>
+          <div className={css.menu} role="menu" style={menuPlace(menu.spot.x * view.k + view.x, menu.spot.y * view.k + view.y, view.k, viewport.current)}>
             <header>
               <Plate route={menu.route} />
               <b>第 {stopNumber(menu.spot.stop)} 站</b>
@@ -227,7 +247,19 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
   );
 }
 
-function LaneNodes({ lane, waiting, on, onSelect, onStop }: { lane: Lane; waiting: QueueItem[]; on: boolean; onSelect(): void; onStop(stop: Stop): void }) {
+/** 站的菜单放哪：默认在站的下面；下面放不下就放上面，也不超出左右两边 */
+function menuPlace(x: number, y: number, k: number, box: HTMLElement | null): { left: number; top?: number; bottom?: number } {
+  const W = 280;
+  const H = 230;
+  const gap = 44 * Math.max(0.6, k);
+  const width = box?.clientWidth ?? Infinity;
+  const height = box?.clientHeight ?? Infinity;
+  const left = Math.max(8, Math.min(x - 24, width - W - 8));
+  if (y + gap + H > height && y - gap - H > 0) return { left, bottom: height - (y - gap) };
+  return { left, top: y + gap };
+}
+
+function LaneNodes({ lane, waiting, on, ringed, onSelect, onStop }: { lane: Lane; waiting: QueueItem[]; on: boolean; ringed: string | null; onSelect(): void; onStop(stop: Stop): void }) {
   const colors = routeColors(lane.route);
   const line = on ? colors.line : colors.faded;
   const tag = colors.tag;
@@ -243,7 +275,7 @@ function LaneNodes({ lane, waiting, on, onSelect, onStop }: { lane: Lane; waitin
         const answering = stop.status === "answering";
         const latest = i === lane.stops.length - 1;
         return (
-          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind}>
+          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-ringed={ringed === stop.id}>
             {answering && (
               <span className={css.bus}>
                 <em>{lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}</em>

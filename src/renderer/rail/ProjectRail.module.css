@@ -220,3 +220,97 @@
   color: #fff;
   font-weight: 600;
 }
+
+/* 窄窗口：收成一列图标 */
+.strip {
+  flex: none;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--surface-0);
+  border-right: 1px solid var(--border);
+}
+.stripList {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 10px 0;
+}
+.stripList section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-10);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-weight: 700;
+}
+.avatar[aria-current="true"] {
+  background: var(--text-1);
+  color: #fff;
+}
+.chip {
+  position: relative;
+  width: 44px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+}
+.chip:hover {
+  background: var(--surface-2);
+}
+.pip,
+.pipAmber,
+.pipRed {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--surface-0);
+}
+.pipAmber {
+  background: var(--amber);
+}
+.pipRed {
+  background: var(--red);
+}
+.stripNew {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin: 8px 0 12px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-10);
+  background: var(--text-1);
+  color: #fff;
+}
+.stripNew:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.floating {
+  position: absolute;
+  z-index: 8;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  box-shadow: 12px 0 32px rgba(22, 27, 34, 0.16);
+}
+.floatBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+}

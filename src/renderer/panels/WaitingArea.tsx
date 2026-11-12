@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { QueueItem, QueueMode, Route } from "../../shared";
 import { IconClose, IconMore } from "../ui/icons";
 import { Plate } from "../ui/Plate";
@@ -13,14 +13,19 @@ interface Props {
   onRemove(itemId: string): void;
   onBoard(itemId: string): void;
   onStartNew(itemId: string): void;
+  /** 每次变化就把浮窗打开（从搜索跳过来时用） */
+  openSignal?: number;
 }
 
 const busy = (r: Route) => r.status === "answering" || r.status === "awaiting_permission";
 const canBoard = (r: Route) => r.status === "idle" || r.status === "interrupted";
 
 /** 候车区：准备好的问题先放着。右上角一个按钮，点开是浮窗。只收数据、发出操作 */
-export function WaitingArea({ items, routes, onAdd, onAssign, onRemove, onBoard, onStartNew }: Props) {
+export function WaitingArea({ items, routes, onAdd, onAssign, onRemove, onBoard, onStartNew, openSignal = 0 }: Props) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openSignal > 0) setOpen(true);
+  }, [openSignal]);
   const [text, setText] = useState("");
   /** 哪个问题正展开着“派给谁”或“更多操作” */
   const [expanded, setExpanded] = useState<string | null>(null);

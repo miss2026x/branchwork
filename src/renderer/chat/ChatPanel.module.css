@@ -1,6 +1,6 @@
 .panel {
   flex: none;
-  width: 420px;
+  width: var(--panel-w, 420px);
   display: flex;
   flex-direction: column;
   background: var(--surface-0);
@@ -451,4 +451,31 @@
 .summary .md h2 {
   margin: 12px 0 4px;
   font-size: 13px;
+}
+
+.collapse {
+  flex: none;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  border-left: 1px solid var(--divider);
+}
+.collapse:hover {
+  background: var(--surface-2);
+}
+.stop[data-flash="true"] {
+  animation: flash 1.6s var(--ease);
+  border-radius: var(--r-8);
+}
+@keyframes flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 6px #ffe58a;
+    background: #fff8d6;
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+    background: transparent;
+  }
 }

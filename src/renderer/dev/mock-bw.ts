@@ -301,6 +301,27 @@ export function installMockBw(): void {
   };
   window.bw = api;
 
+  // ?notices：把各种通知都触发一遍
+  if (q.has("notices")) {
+    setTimeout(() => {
+      const byName = (name: string) => [...routes.values()].find((x) => x.name === name)!;
+      const r3 = byName("Cookie 方案");
+      emit({ type: "sync.result", entry: { id: id("y"), routeId: r3.id, stopId: [...stops.values()].filter((x) => x.routeId === r3.id).at(-1)!.id, direction: "push", status: "conflict", files: [{ path: "src/auth/session.ts", note: "both-modified" }], message: null, at: Date.now() } });
+      const r4 = byName("修复 CI 缓存");
+      const s4 = [...stops.values()].find((x) => x.routeId === r4.id)!;
+      setStop(s4.id, { status: "answering", error: null });
+      setStop(s4.id, { status: "interrupted", error: "网络断了" });
+      setRoute(r4.id, { status: "interrupted" });
+      const home = byName("首页改版");
+      addStop(home.id, "换首屏大图", "把首屏大图换成新的。", [{ kind: "text", text: "换好了。" }]);
+      queue.push({ id: "w9", projectId: "p2", text: "跑一遍端到端测试", routeId: home.id, mode: "manual", createdAt: 9 });
+      emitQueue("p2");
+      setRoute(home.id, { status: "answering" });
+      setRoute(home.id, { status: "idle" });
+      autoBoard(byName("GitHub 登录").id);
+    }, 600);
+  }
+
   if (q.has("live")) {
     setTimeout(() => {
       const r = [...routes.values()].find((x) => x.name === "GitHub 登录");

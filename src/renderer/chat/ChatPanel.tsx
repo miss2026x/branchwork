@@ -5,7 +5,7 @@ import type { ChatItem, PermissionMode, Route, Stop } from "../../shared";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
-import { IconSend, IconStop, IconWarn } from "../ui/icons";
+import { IconChevron, IconSend, IconStop, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./ChatPanel.module.css";
@@ -27,6 +27,10 @@ interface Props {
   queued: number;
   /** 这一路还在路上时“排队”：放进候车区，到站后自动发 */
   onQueue(text: string): void;
+  /** 要滚到眼前的那一站 */
+  focus?: { stopId: string; n: number } | null;
+  /** 窄窗口里面板是盖在地图上的抽屉：给了就显示收起按钮 */
+  onCollapse?: () => void;
 }
 
 const REASONS: Record<string, string> = {
@@ -39,7 +43,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, queued, onQueue }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, queued, onQueue, focus, onCollapse }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -70,6 +74,19 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
     stick.current = true;
   }, [route.id]);
 
+  // 从搜索或通知跳过来：滚到那一站，闪一下
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focus) return;
+    const el = log.current?.querySelector<HTMLElement>(`[data-stop="${focus.stopId}"]`);
+    if (!el) return;
+    stick.current = false;
+    el.scrollIntoView({ block: "start" });
+    setFlash(focus.stopId);
+    const t = setTimeout(() => setFlash(null), 1600);
+    return () => clearTimeout(t);
+  }, [focus?.n, focus?.stopId]);
+
   const send = () => {
     if (blocked || !draft.trim()) return;
     if (busy) {
@@ -97,6 +114,11 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <StatusLine route={route} n={offset + stops.length} phase={pending !== undefined ? "syncing" : currentLive?.phase} />
           </p>
         </div>
+        {onCollapse && (
+          <button className={css.collapse} aria-label="收起对话" title="收起对话" onClick={onCollapse}>
+            <IconChevron size={16} />
+          </button>
+        )}
       </header>
 
       <div
@@ -137,7 +159,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             );
           }
           return (
-            <section key={s.id} className={css.stop}>
+            <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id}>
               <div className={css.ask} style={{ background: colors.tint }}>
                 {s.prompt}
               </div>
