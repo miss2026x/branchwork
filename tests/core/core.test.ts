@@ -283,6 +283,127 @@ describe("冲突", () => {
   });
 });
 
+describe("让当前 Claude 解决冲突", () => {
+  it("带着冲突标记开一站；Claude 改好后改动进 Local，这一路恢复可用，之前冲突的那一站也算同步了", async () => {
+    const [a, b] = [await core.createRoute(project.id), await core.createRoute(project.id)];
+    await bothEditSameLine(a.id, b.id);
+    expect(routeOf(b.id).status).toBe("conflict");
+
+    let seenByClaude = "";
+    claude.script = (t) => {
+      seenByClaude = read(t.cwd, "b.txt");
+      expect(t.prompt).toContain("- b.txt");
+      write(t.cwd, "b.txt", "by A and B\n");
+    };
+    const r = await core.resolveConflict(b.id);
+    expect(seenByClaude).toContain("<<<<<<< ");
+    expect(seenByClaude).toContain("by A");
+    expect(seenByClaude).toContain("by B");
+    expect(r).toMatchObject({ kind: "answered", stop: { name: "解决同步冲突", nameState: "final", status: "done", syncState: "synced" } });
+    expect(read(lab.local, "b.txt")).toBe("by A and B\n");
+    expect(routeOf(b.id).status).toBe("idle");
+    expect(stopsOf(b.id).map((s) => s.syncState)).toEqual(["synced", "synced"]);
+    expect(core.syncLog(b.id).map((e) => [e.direction, e.status])).toEqual([
+      ["push", "ok"],
+      ["resolve", "conflict"],
+      ["push", "conflict"],
+    ]);
+  });
+
+  it("Claude 没把冲突标记清干净：不进 Local，这一路还是冲突", async () => {
+    const [a, b] = [await core.createRoute(project.id), await core.createRoute(project.id)];
+    await bothEditSameLine(a.id, b.id);
+    claude.script = (t) => t.say("我看了一下，但没改。");
+    const r = await core.resolveConflict(b.id);
+    expect(r).toMatchObject({ kind: "answered", stop: { syncState: "conflict" }, sync: { status: "conflict", files: [{ path: "b.txt", note: "markers-left" }] } });
+    expect(read(lab.local, "b.txt")).toBe("by A\n");
+    expect(routeOf(b.id).status).toBe("conflict");
+  });
+
+  it("Local 那边已经变得能自动合并：不问 Claude，直接同步", async () => {
+    const [a, b] = [await core.createRoute(project.id), await core.createRoute(project.id)];
+    await bothEditSameLine(a.id, b.id);
+    write(lab.local, "b.txt", "bee\n"); // 用户把 Local 里这个文件改回了原样
+    const calls = claude.asks.length;
+    const r = await core.resolveConflict(b.id);
+    expect(r.kind).toBe("synced");
+    expect(claude.asks.length).toBe(calls);
+    expect(read(lab.local, "b.txt")).toBe("by B\n");
+    expect(routeOf(b.id).status).toBe("idle");
+  });
+
+  it("没有冲突的路不能调这个操作", async () => {
+    const route = await core.createRoute(project.id);
+    await expect(core.resolveConflict(route.id)).rejects.toMatchObject({ code: "ROUTE_NOT_BLOCKED" });
+  });
+});
+
+describe("从一站开新对话（分叉）", () => {
+  it("新的一路带着到那一站为止的历史；新的会话、新的工作区；原来那一路不受影响", async () => {
+    const parent = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, `${t.prompt}.txt`, "x\n");
+    for (const q of ["一", "二", "三"]) await core.ask(parent.id, q);
+    const second = stopsOf(parent.id)[1]!;
+
+    events.length = 0;
+    const fork = await core.fork(parent.id, second.id, "试另一种做法");
+    expect(fork).toMatchObject({ number: 2, name: "试另一种做法", status: "idle", parentRouteId: parent.id, forkStopId: second.id });
+    expect(fork.sessionId).toBeTruthy();
+    expect(fork.sessionId).not.toBe(routeOf(parent.id).sessionId);
+    expect(fork.worktreePath).not.toBe(parent.worktreePath);
+    expect(types()).toContain("route.updated");
+    expect(claude.warmed.at(-1)).toEqual([fork.worktreePath, fork.sessionId]);
+    // 代码从 Local 的现在开始：三站的文件都在（它们已经同步进 Local 了）
+    expect(has(fork.worktreePath, "三.txt")).toBe(true);
+
+    let remembered: string[] = [];
+    claude.script = (t) => {
+      remembered = t.earlierPrompts;
+      write(t.cwd, "fork.txt", "from fork\n");
+    };
+    expect(await core.ask(fork.id, "岔出去的第一问")).toMatchObject({ kind: "answered", stop: { seq: 1, syncState: "synced" } });
+    expect(remembered).toEqual(["一", "二"]); // 只记得到分叉那一站
+    expect(read(lab.local, "fork.txt")).toBe("from fork\n");
+
+    await core.ask(parent.id, "四");
+    expect(remembered).toEqual(["一", "二", "三"]); // 原来那一路的历史没变
+    expect(stopsOf(parent.id)).toHaveLength(4);
+  });
+
+  it("不给名字就用路号；可以从分叉出来的路上再分叉", async () => {
+    const r1 = await core.createRoute(project.id);
+    await core.ask(r1.id, "一");
+    const r2 = await core.fork(r1.id, stopsOf(r1.id)[0]!.id);
+    expect(r2.name).toBe("2 路");
+    await core.ask(r2.id, "二");
+    const r3 = await core.fork(r2.id, stopsOf(r2.id)[0]!.id, "  ");
+    expect(r3).toMatchObject({ name: "3 路", parentRouteId: r2.id });
+    let remembered: string[] = [];
+    claude.script = (t) => void (remembered = t.earlierPrompts);
+    await core.ask(r3.id, "三");
+    expect(remembered).toEqual(["一", "二"]);
+  });
+
+  it("还在回答的站、没留下对话记录的站、别的路上的站：都不能分叉", async () => {
+    const [a, b] = [await core.createRoute(project.id), await core.createRoute(project.id)];
+    await core.ask(b.id, "别的路");
+    await expect(core.fork(a.id, stopsOf(b.id)[0]!.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    const early = core.ask(a.id, "马上停");
+    core.stop(a.id);
+    await early;
+    await expect(core.fork(a.id, stopsOf(a.id)[0]!.id)).rejects.toMatchObject({ code: "CANNOT_FORK" });
+
+    claude.script = () => new Promise(() => {});
+    events.length = 0;
+    void core.ask(b.id, "不结束");
+    await until("stop.created");
+    const answering = stopsOf(b.id).find((s) => s.status === "answering")!;
+    await expect(core.fork(b.id, answering.id)).rejects.toMatchObject({ code: "CANNOT_FORK" });
+    expect(core.snapshot(project.id).routes).toHaveLength(2);
+  });
+});
+
 describe("等你批准", () => {
   it("请求作为事件发出；这一路显示等待批准；回答后继续", async () => {
     const route = await core.createRoute(project.id);

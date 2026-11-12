@@ -1,4 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { Stop } from "../../shared";
+import { ForkDialog } from "../dialogs/ForkDialog";
+import { stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
 import { RouteMap } from "../map/RouteMap";
 import { ProjectRail } from "../rail/ProjectRail";
@@ -23,6 +26,10 @@ export function App() {
   const routes = useRoutes(projectId);
   const stops = useStops(routeId);
   const project = projects.find((p) => p.id === projectId);
+  const allRoutes = useStore((s) => s.routes);
+  const fork = useStore((s) => s.fork);
+  const [forkFrom, setForkFrom] = useState<Stop | null>(null);
+  const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + stop.seq;
 
   useEffect(() => {
     void init();
@@ -78,12 +85,26 @@ export function App() {
               </button>
             </div>
           ) : (
-            <RouteMap routes={routes} stops={projectStops} selectedRouteId={routeId} onSelectRoute={selectRoute} />
+            <RouteMap routes={routes} stops={projectStops} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} />
           )}
         </main>
 
-        {route && <ChatPanel key={route.id} route={route} stops={stops} />}
+        {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} />}
       </div>
+
+      {forkFrom && allRoutes[forkFrom.routeId] && (
+        <ForkDialog
+          parent={allRoutes[forkFrom.routeId]!}
+          stop={forkFrom}
+          stopNumber={stopNumber(forkFrom)}
+          nextNumber={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[forkFrom.routeId]!.projectId).map((r) => r.number)) + 1}
+          onCancel={() => setForkFrom(null)}
+          onConfirm={(name, question) => {
+            void fork(forkFrom.routeId, forkFrom.id, name, question);
+            setForkFrom(null);
+          }}
+        />
+      )}
 
       {error && (
         <div className={css.toast} role="alert">

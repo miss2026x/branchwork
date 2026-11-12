@@ -19,7 +19,7 @@ import type {
 } from "../shared";
 import { createSyncEngine, type SyncEngine } from "../sync";
 
-export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED";
+export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK";
 
 export class CoreError extends Error {
   constructor(
@@ -48,6 +48,8 @@ export interface CoreOptions {
 export type AskReport =
   /** 站前同步有冲突，这一站没有发出 */
   | { kind: "blocked"; sync: SyncLogEntry }
+  /** 解决冲突时发现其实能自动合并：没有问 Claude，直接同步了 */
+  | { kind: "synced"; sync: SyncLogEntry | null }
   /** 这一站已结束（正常或没答完）；sync 是站后同步的记录，没做同步时为空 */
   | { kind: "answered"; stop: Stop; text: string; sync: SyncLogEntry | null };
 
@@ -61,6 +63,16 @@ export interface Core {
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步 */
   ask(routeId: string, text: string): Promise<AskReport>;
+  /**
+   * 从某一站开一条新的路：新对话带着到这一站为止的完整历史，新的会话、新的工作区。
+   * 代码从 Local 的现在开始，不回到那一站当时的样子。原来那一路不受影响。
+   */
+  fork(routeId: string, stopId: string, name?: string): Promise<Route>;
+  /**
+   * 让这一路的 Claude 解决同步冲突：把 Local 的版本带着冲突标记合进工作区，
+   * 在这一路上开一站请 Claude 改好，这一站正常结束后再同步一次。
+   */
+  resolveConflict(routeId: string): Promise<AskReport>;
   /** 停车：中止这一路正在进行的回答 */
   stop(routeId: string): void;
   answerPermission(requestId: string, decision: PermissionDecision): void;
@@ -177,59 +189,15 @@ export function createCore(opts: CoreOptions): Core {
 
   const tempName = (prompt: string) => Array.from(prompt.replace(/\s+/g, " ").trim()).slice(0, 6).join("") || "新的一站";
 
-  return {
-    on(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-
-    async addProject(localDir, name) {
-      const dir = path.resolve(localDir);
-      const existing = db.projects.byLocalDir(dir);
-      if (existing) return existing;
-      const project: Project = { id: id("p"), name: name ?? path.basename(dir), localDir: dir, createdAt: Date.now() };
-      await makeEngine(dir, path.join(opts.worktreesRoot, project.id)); // 不是可用的仓库会在这里报错
-      db.projects.insert(project);
-      return project;
-    },
-
-    listProjects: () => db.projects.list(),
-
-    snapshot(projectId) {
-      return { project: mustProject(projectId), routes: db.routes.listByProject(projectId), stops: db.stops.listByProject(projectId) };
-    },
-
-    async createRoute(projectId, name) {
-      const project = mustProject(projectId);
-      const engine = await engineFor(project);
-      const routeId = id("r");
-      const { path: worktreePath } = await engine.createWorktree(routeId);
-      const number = db.routes.nextNumber(projectId);
-      const route: Route = {
-        id: routeId,
-        projectId,
-        number,
-        name: name ?? `${number} 路`,
-        status: "idle",
-        sessionId: null,
-        worktreePath,
-        parentRouteId: null,
-        forkStopId: null,
-        createdAt: Date.now(),
-        archivedAt: null,
-      };
-      db.routes.insert(route);
-      emit({ type: "route.updated", route });
-      warmRoute(route);
-      return route;
-    },
-
-    async ask(routeId, text) {
+  /** 在一路上跑一站。resolving：这一站是在解决冲突，这一路此刻已经被占住了 */
+  const runStop = async (routeId: string, text: string, resolving?: { name: string }): Promise<AskReport> => {
       let route = mustRoute(routeId);
-      if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，等它到站或先停车");
-      if (route.status === "conflict") throw new CoreError("ROUTE_BLOCKED", "这一路有同步冲突，解决后才能问下一站");
-      if (route.status === "archived") throw new CoreError("ROUTE_ARCHIVED", "这一路已归档");
-      const before = route.status;
+      if (!resolving) {
+        if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，等它到站或先停车");
+        if (route.status === "conflict") throw new CoreError("ROUTE_BLOCKED", "这一路有同步冲突，解决后才能问下一站");
+        if (route.status === "archived") throw new CoreError("ROUTE_ARCHIVED", "这一路已归档");
+      }
+      const before = resolving ? "conflict" : route.status;
       // 先占住这一路，再做任何要等的事，避免同一路被同时问两次。
       // 停车的开关也从这一刻起就有效：站前同步、启动 Claude 期间按停车都算数
       route = setRoute(routeId, { status: "answering" });
@@ -260,8 +228,8 @@ export function createCore(opts: CoreOptions): Core {
         routeId,
         seq: db.stops.nextSeq(routeId),
         kind: "normal",
-        name: tempName(text),
-        nameState: "temp",
+        name: resolving?.name ?? tempName(text),
+        nameState: resolving ? "final" : "temp",
         prompt: text,
         status: "answering",
         syncState: "none",
@@ -324,7 +292,7 @@ export function createCore(opts: CoreOptions): Core {
       // ── 正常结束：先让这一站显示“已到站”，再做站后同步 ──
       stop = setStop(stopId, { ...ended, status: "done" });
       const pushed = await sync(routeId, stopId, "push", () => engine.pushAfterStop(routeId));
-      const earlier = previous.filter((s) => s.syncState === "unsynced");
+      const earlier = previous.filter((s) => s.syncState === "unsynced" || s.syncState === "conflict");
       if (!pushed) {
         for (const s of earlier) setStop(s.id, { syncState: "none" });
         setRoute(routeId, { status: "idle" });
@@ -340,6 +308,138 @@ export function createCore(opts: CoreOptions): Core {
         setRoute(routeId, { status: "idle" });
       }
       return { kind: "answered", stop, text: result.text, sync: pushed };
+  };
+
+  return {
+    on(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+
+    async addProject(localDir, name) {
+      const dir = path.resolve(localDir);
+      const existing = db.projects.byLocalDir(dir);
+      if (existing) return existing;
+      const project: Project = { id: id("p"), name: name ?? path.basename(dir), localDir: dir, createdAt: Date.now() };
+      await makeEngine(dir, path.join(opts.worktreesRoot, project.id)); // 不是可用的仓库会在这里报错
+      db.projects.insert(project);
+      return project;
+    },
+
+    listProjects: () => db.projects.list(),
+
+    snapshot(projectId) {
+      return { project: mustProject(projectId), routes: db.routes.listByProject(projectId), stops: db.stops.listByProject(projectId) };
+    },
+
+    async createRoute(projectId, name) {
+      const project = mustProject(projectId);
+      const engine = await engineFor(project);
+      const routeId = id("r");
+      const { path: worktreePath } = await engine.createWorktree(routeId);
+      const number = db.routes.nextNumber(projectId);
+      const route: Route = {
+        id: routeId,
+        projectId,
+        number,
+        name: name ?? `${number} 路`,
+        status: "idle",
+        sessionId: null,
+        worktreePath,
+        parentRouteId: null,
+        forkStopId: null,
+        createdAt: Date.now(),
+        archivedAt: null,
+      };
+      db.routes.insert(route);
+      emit({ type: "route.updated", route });
+      warmRoute(route);
+      return route;
+    },
+
+    ask: (routeId, text) => runStop(routeId, text),
+
+    async fork(routeId, stopId, name) {
+      const parent = mustRoute(routeId);
+      const stop = db.stops.get(stopId);
+      if (!stop || stop.routeId !== routeId) throw new CoreError("NOT_FOUND", `这一路上没有这一站：${stopId}`);
+      if (stop.status === "answering") throw new CoreError("CANNOT_FORK", "这一站还在回答，到站后才能从它开新对话");
+      if (!parent.sessionId || !stop.lastMessageId) throw new CoreError("CANNOT_FORK", "这一站没有留下对话记录（还没开始回答就停车了），不能从它开新对话");
+      const project = mustProject(parent.projectId);
+      const engine = await engineFor(project);
+
+      // 对话：复制到这一站的最后一条消息为止，得到新的会话；原会话不变
+      const sessionId = await claude.fork(parent.sessionId, stop.lastMessageId);
+      // 代码：新的工作区，从 Local 的现在开始
+      const newId = id("r");
+      let worktreePath: string;
+      try {
+        worktreePath = (await engine.createWorktree(newId)).path;
+      } catch (e) {
+        await claude.deleteSession(sessionId).catch(() => {});
+        throw e;
+      }
+      const number = db.routes.nextNumber(project.id);
+      const route: Route = {
+        id: newId,
+        projectId: project.id,
+        number,
+        name: name?.trim() || `${number} 路`,
+        status: "idle",
+        sessionId,
+        worktreePath,
+        parentRouteId: parent.id,
+        forkStopId: stop.id,
+        createdAt: Date.now(),
+        archivedAt: null,
+      };
+      db.routes.insert(route);
+      emit({ type: "route.updated", route });
+      warmRoute(route);
+      return route;
+    },
+
+    async resolveConflict(routeId) {
+      const route = mustRoute(routeId);
+      if (route.status !== "conflict") throw new CoreError("ROUTE_NOT_BLOCKED", "这一路现在没有同步冲突");
+      const engine = await engineFor(mustProject(route.projectId));
+      setRoute(routeId, { status: "answering" }); // 占住这一路
+      const stops = db.stops.listByRoute(routeId);
+      const last = stops.at(-1);
+
+      let merged: Awaited<ReturnType<SyncEngine["mergeForResolve"]>>;
+      try {
+        merged = await engine.mergeForResolve(routeId);
+      } catch (e) {
+        const entry = log(routeId, null, "resolve", "error", [], e instanceof Error ? e.message : String(e));
+        setRoute(routeId, { status: "conflict" });
+        return { kind: "blocked", sync: entry };
+      }
+
+      if (merged.status === "ok") {
+        // Local 那边已经变得能自动合并了：不用问 Claude，直接同步
+        log(routeId, null, "resolve", "ok", merged.changed.map((c) => ({ path: c.path, note: c.kind })));
+        const pushed = last?.status === "done" ? await sync(routeId, last.id, "push", () => engine.pushAfterStop(routeId)) : null;
+        if (pushed && pushed.status !== "ok") {
+          setRoute(routeId, { status: pushed.status === "conflict" ? "conflict" : "idle" });
+          return pushed.status === "conflict" ? { kind: "blocked", sync: pushed } : { kind: "synced", sync: pushed };
+        }
+        if (last?.status === "done") for (const s of stops) if (s.syncState === "conflict" || s.syncState === "unsynced") setStop(s.id, { syncState: pushed ? "synced" : "none" });
+        setRoute(routeId, { status: last?.status === "interrupted" ? "interrupted" : "idle" });
+        return { kind: "synced", sync: pushed };
+      }
+
+      log(routeId, null, "resolve", "conflict", merged.files.map((f) => ({ path: f.path, note: f.reason })));
+      const lines = merged.files.map((f) => `- ${f.path}${f.reason === "modify-delete" ? "（一边修改、另一边删除：文件现在是修改后的版本，没有冲突标记，请判断该保留还是删除）" : ""}`);
+      const prompt = [
+        "把项目目录（Local）里的最新改动合并进这个工作区时，下面这些文件有冲突：",
+        "",
+        ...lines,
+        "",
+        "文件里已经带上了冲突标记：`<<<<<<<` 到 `=======` 之间是这个工作区里的版本，`=======` 到 `>>>>>>>` 之间是 Local 里的版本。",
+        "请逐个打开这些文件，结合两边各自想做的事，合并成正确的内容，并去掉所有冲突标记。只改这些文件，不要做别的改动。改完后简要说明每一处是怎么取舍的。",
+      ].join("\n");
+      return runStop(routeId, prompt, { name: "解决同步冲突" });
     },
 
     stop(routeId) {

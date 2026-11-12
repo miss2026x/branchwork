@@ -1,0 +1,127 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(22, 27, 34, 0.42);
+}
+.dialog {
+  width: min(540px, 100%);
+  padding: 20px;
+  border-radius: var(--r-16);
+  background: var(--surface-0);
+  box-shadow: 0 24px 60px rgba(22, 27, 34, 0.28), 0 0 0 1px rgba(22, 27, 34, 0.06);
+}
+.dialog header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dialog h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+}
+.dialog header button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  color: var(--text-3);
+}
+.dialog header button:hover {
+  background: var(--surface-2);
+}
+.sub {
+  margin: 6px 0 16px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+.field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.field input,
+.field textarea {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface-0);
+  line-height: 22px;
+  transition: border-color var(--t-fast) ease-out;
+}
+.field input {
+  height: 40px;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.field input:hover,
+.field textarea:hover {
+  border-color: var(--line-strong);
+}
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--text-1);
+}
+.field ::placeholder {
+  color: var(--text-4);
+}
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nameRow input {
+  flex: 1;
+}
+.note {
+  padding: 10px 12px;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-8);
+  background: var(--surface-1);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-3);
+}
+.note b {
+  display: block;
+  color: var(--text-1);
+}
+.dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.ghost,
+.confirm {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-8);
+  font-weight: 600;
+}
+.ghost {
+  color: var(--text-3);
+}
+.ghost:hover {
+  background: var(--surface-2);
+}
+.confirm {
+  color: #fff;
+}

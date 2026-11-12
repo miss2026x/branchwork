@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "ask", "createRoute", "history", "listProjects", "onEvent", "pickDirectory", "snapshot", "stop", "syncLog", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "ask", "createRoute", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "snapshot", "stop", "syncLog", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -103,6 +103,27 @@ describe("应用", () => {
     await expect.poll(() => page.getByText("第 3 站没答完").isVisible(), { timeout: 30000 }).toBe(true);
     expect(await page.getByText("上一站没答完，可以接着问").isVisible()).toBe(true);
     await shot("5-interrupted");
+  });
+
+  it("从第 1 站开新对话：新的一路带着第 1 站的历史，有自己的工作区，改动照样进 Local", async () => {
+    await page.locator('button[title="记一笔：接入 GitHub 登录"]').click();
+    await page.getByRole("menuitem", { name: /从这站开新对话/ }).click();
+    const dialog = page.getByRole("dialog", { name: "从第 1 站开新对话" });
+    await expect.poll(() => dialog.isVisible()).toBe(true);
+    await dialog.getByPlaceholder("2 路").fill("换个思路");
+    await dialog.getByPlaceholder("开好后马上问这个问题").fill("岔出去问");
+    await shot("6-fork-dialog");
+    await dialog.getByRole("button", { name: "开出 2路" }).click();
+
+    await expect.poll(() => page.getByRole("heading", { name: "换个思路" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByRole("alertdialog", { name: "等你批准" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await page.getByRole("button", { name: "允许", exact: true }).click();
+    await expect.poll(() => page.getByText("已到第 2 站").isVisible(), { timeout: 30000 }).toBe(true);
+    // 分叉出来的路只记得第 1 站，所以这是它的第 2 个问题
+    expect(await page.getByText("这是这一路的第 2 个问题").isVisible()).toBe(true);
+    expect(await page.getByText("第 1 站随 1路 带来").isVisible()).toBe(true);
+    await expect.poll(() => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8"), { timeout: 30000 }).toBe("- 第 1 站：记一笔：接入 GitHub 登录\n- 第 2 站：岔出去问\n");
+    await shot("7-forked");
   });
 
   it("关掉再打开：项目、路、站和回答都还在", async () => {

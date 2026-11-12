@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import type { Route, Stop } from "../../shared";
-import { BusMark, IconFit, IconMinus, IconPlus } from "../ui/icons";
+import { BusMark, IconCopy, IconFit, IconFork, IconMinus, IconPlus } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
+import { firstStops } from "../stores/numbering";
 import { layoutMap, type Lane } from "./layout";
 import css from "./RouteMap.module.css";
 
@@ -11,6 +12,10 @@ interface Props {
   stops: Stop[];
   selectedRouteId: string | null;
   onSelectRoute(routeId: string): void;
+  /** 站在界面上显示的序号（分叉出来的路接着父路往下数） */
+  stopNumber(stop: Stop): number;
+  /** 用户选了“从这站开新对话” */
+  onFork(stop: Stop): void;
 }
 
 const MIN = 0.3;
@@ -21,11 +26,20 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute }: Props) {
+export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute, stopNumber, onFork }: Props) {
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  /** 点开了哪一站的菜单 */
+  const [menuStopId, setMenuStopId] = useState<string | null>(null);
+  const menu = menuStopId ? layout.lanes.flatMap((l) => l.stops.map((spot) => ({ spot, route: l.route }))).find((m) => m.spot.stop.id === menuStopId) : undefined;
+  useEffect(() => {
+    if (!menuStopId) return;
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && setMenuStopId(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuStopId]);
 
   const zoomAt = (k: number, cx: number, cy: number) =>
     setView((v) => {
@@ -72,6 +86,7 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute }: Prop
   };
   const onDown = (e: PointerEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
+    setMenuStopId(null);
     drag.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -132,15 +147,57 @@ export function RouteMap({ routes, stops, selectedRouteId, onSelectRoute }: Prop
           </svg>
 
           {layout.lanes.map((lane) => (
-            <LaneNodes key={lane.route.id} lane={lane} on={lane.route.id === selectedRouteId} onSelect={() => onSelectRoute(lane.route.id)} />
+            <LaneNodes
+              key={lane.route.id}
+              lane={lane}
+              on={lane.route.id === selectedRouteId}
+              onSelect={() => onSelectRoute(lane.route.id)}
+              onStop={(stop) => {
+                onSelectRoute(lane.route.id);
+                setMenuStopId((cur) => (cur === stop.id ? null : stop.id));
+              }}
+            />
           ))}
         </div>
+
+        {menu && (
+          <div className={css.menu} role="menu" style={{ left: Math.max(8, menu.spot.x * view.k + view.x - 24), top: menu.spot.y * view.k + view.y + 44 * Math.max(0.6, view.k) }}>
+            <header>
+              <Plate route={menu.route} />
+              <b>第 {stopNumber(menu.spot.stop)} 站</b>
+              <span className="ell">{menu.spot.stop.name}</span>
+            </header>
+            <button
+              role="menuitem"
+              onClick={() => {
+                void navigator.clipboard?.writeText(menu.spot.stop.prompt);
+                setMenuStopId(null);
+              }}
+            >
+              <IconCopy /> 复制提问
+            </button>
+            <button
+              role="menuitem"
+              disabled={menu.spot.stop.status === "answering" || !menu.spot.stop.lastMessageId}
+              onClick={() => {
+                onFork(menu.spot.stop);
+                setMenuStopId(null);
+              }}
+            >
+              <IconFork />
+              <span>
+                从这站开新对话
+                <small>{menu.spot.stop.status === "answering" ? "到站后才能分叉" : !menu.spot.stop.lastMessageId ? "这一站没留下对话记录" : `新对话带着${firstStops(stopNumber(menu.spot.stop))}的历史出发`}</small>
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function LaneNodes({ lane, on, onSelect }: { lane: Lane; on: boolean; onSelect(): void }) {
+function LaneNodes({ lane, on, onSelect, onStop }: { lane: Lane; on: boolean; onSelect(): void; onStop(stop: Stop): void }) {
   const colors = routeColors(lane.route);
   const line = on ? colors.line : colors.faded;
   const tag = colors.tag;
@@ -156,7 +213,7 @@ function LaneNodes({ lane, on, onSelect }: { lane: Lane; on: boolean; onSelect()
         const answering = stop.status === "answering";
         const latest = i === lane.stops.length - 1;
         return (
-          <button key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} onClick={onSelect} title={stop.prompt}>
+          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction}>
             {answering && (
               <span className={css.bus}>
                 <em>{lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}</em>
@@ -164,13 +221,13 @@ function LaneNodes({ lane, on, onSelect }: { lane: Lane; on: boolean; onSelect()
               </span>
             )}
             {stop.status === "interrupted" && <em className={css.flagAmber}>没答完</em>}
-            <span className={css.node} style={{ borderColor: stop.status === "interrupted" ? "var(--amber)" : answering || junction ? "var(--text-1)" : line }}>
+            <button className={css.node} style={{ borderColor: stop.status === "interrupted" ? "var(--amber)" : answering || junction ? "var(--text-1)" : line }} onClick={() => onStop(stop)} title={stop.prompt} aria-label={`${lane.route.name} · ${stop.name}`}>
               {answering && <i style={{ background: line }} />}
-            </span>
+            </button>
             {stop.syncState === "conflict" && <b className={css.badgeRed}>!</b>}
             {stop.syncState === "unsynced" && <b className={css.badgeAmber} title="改动还没进 Local" />}
             <span className={css.name}>{stop.name}</span>
-          </button>
+          </div>
         );
       })}
 

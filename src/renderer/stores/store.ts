@@ -40,6 +40,9 @@ interface State {
   addProject(): Promise<void>;
   createRoute(): Promise<void>;
   ask(routeId: string, text: string): Promise<void>;
+  fork(routeId: string, stopId: string, name: string, firstQuestion: string): Promise<void>;
+  resolveConflict(routeId: string): Promise<void>;
+  resync(routeId: string): Promise<void>;
   stop(routeId: string): void;
   answerPermission(routeId: string, decision: PermissionDecision): void;
   setDraft(routeId: string, text: string): void;
@@ -199,6 +202,13 @@ export const useStore = create<State>((set, get) => {
       set({ selectedRouteId: routeId, selectedProjectId: route.projectId });
       void loadHistory(routeId);
       void window.bw.warm(routeId).catch(() => {});
+      // 这一路最近一次同步的结果（冲突面板要用）
+      void window.bw.syncLog(routeId).then(
+        (log) => {
+          if (log[0] && !get().lastSync[routeId]) set((s) => ({ lastSync: { ...s.lastSync, [routeId]: log[0]! } }));
+        },
+        () => {},
+      );
     },
 
     async addProject() {
@@ -238,6 +248,33 @@ export const useStore = create<State>((set, get) => {
           delete pendingAsk[routeId];
           return { pendingAsk, drafts: { ...s.drafts, [routeId]: q }, error: message(e) };
         });
+      }
+    },
+
+    async fork(routeId, stopId, name, firstQuestion) {
+      try {
+        const route = await window.bw.fork(routeId, stopId, name);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+        get().selectRoute(route.id);
+        if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async resolveConflict(routeId) {
+      try {
+        await window.bw.resolveConflict(routeId);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async resync(routeId) {
+      try {
+        await window.bw.resync(routeId);
+      } catch (e) {
+        set({ error: message(e) });
       }
     },
 

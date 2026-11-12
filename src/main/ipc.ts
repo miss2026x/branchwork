@@ -10,6 +10,16 @@ export const CALL = "bw:call";
 export const EVENT = "bw:event";
 
 /** 把 core 接到界面上：window.bw 的唯一实现 */
+/**
+ * 发出即返回，过程走事件。但“现在不能做”（正在回答、有冲突）这类错误是立刻就有的，要报给界面：
+ * 等一拍，这一拍里已经失败的就抛出去，否则放它在后台跑。
+ */
+async function fire(running: Promise<unknown>): Promise<void> {
+  const early = await Promise.race([running.then(() => null, (e: unknown) => e), new Promise<null>((r) => setImmediate(() => r(null)))]);
+  if (early) throw early;
+  running.catch((e: unknown) => console.error("[bw] 后台操作出错：", e));
+}
+
 export function registerIpc(core: Core): void {
   const calls: Calls = {
     listProjects: async () => core.listProjects(),
@@ -22,19 +32,17 @@ export function registerIpc(core: Core): void {
     answerPermission: async (requestId, decision) => core.answerPermission(requestId, decision),
     warm: async (routeId) => core.warm(routeId),
 
+    fork: (routeId, stopId, name) => core.fork(routeId, stopId, name),
+    resync: async (routeId) => void (await core.resync(routeId)),
+    resolveConflict: (routeId) => fire(core.resolveConflict(routeId)),
+
     async pickDirectory() {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
       const r = win ? await dialog.showOpenDialog(win, { title: "选择项目目录", properties: ["openDirectory"] }) : await dialog.showOpenDialog({ properties: ["openDirectory"] });
       return r.canceled ? null : (r.filePaths[0] ?? null);
     },
 
-    async ask(routeId, text) {
-      // 发出即返回，过程走事件。但“现在不能问”（正在回答、有冲突）这类错误是立刻就有的，要报给界面
-      const running = core.ask(routeId, text);
-      const early = await Promise.race([running.then(() => null, (e: unknown) => e), new Promise<null>((r) => setImmediate(() => r(null)))]);
-      if (early) throw early;
-      running.catch((e: unknown) => console.error("[bw] 问一站时出错：", e));
-    },
+    ask: (routeId, text) => fire(core.ask(routeId, text)),
   };
 
   ipcMain.handle(CALL, (_e, method: keyof Calls, args: unknown[]) => {

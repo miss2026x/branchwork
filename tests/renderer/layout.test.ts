@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layoutMap, MAP } from "../../src/renderer/map/layout";
+import { stopOffset } from "../../src/renderer/stores/numbering";
 import type { Route, Stop } from "../../src/shared";
 
 const route = (id: string, number: number, extra: Partial<Route> = {}): Route => ({
@@ -88,5 +89,17 @@ describe("线路图排版", () => {
     const routes = [route("r1", 1), route("r2", 2, { parentRouteId: "r1", forkStopId: "a" })];
     const stops = [stop("a", "r1", 1), stop("x", "r2", 1)];
     expect(layoutMap(routes, stops)).toEqual(layoutMap(routes, stops));
+  });
+});
+
+describe("站的显示序号", () => {
+  it("分叉出来的路接着父路的序号往下数；再分叉就再往下接", () => {
+    const routes = { r1: route("r1", 1), r2: route("r2", 2, { parentRouteId: "r1", forkStopId: "b" }), r3: route("r3", 3, { parentRouteId: "r2", forkStopId: "y" }) };
+    const stops = Object.fromEntries([stop("a", "r1", 1), stop("b", "r1", 2), stop("c", "r1", 3), stop("x", "r2", 1), stop("y", "r2", 2)].map((s) => [s.id, s]));
+    expect(stopOffset(routes.r1, routes, stops)).toBe(0);
+    expect(stopOffset(routes.r2, routes, stops)).toBe(2); // r2 的第 1 站显示成第 3 站
+    expect(stopOffset(routes.r3, routes, stops)).toBe(4);
+    expect(stopOffset(route("r9", 9, { forkStopId: "gone" }), routes, stops)).toBe(0); // 分叉站找不到了
+    expect(stopOffset(undefined, routes, stops)).toBe(0);
   });
 });

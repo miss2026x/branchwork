@@ -15,6 +15,12 @@ export interface BwApi {
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 问一站。发出即返回；站的出现、回答、到站、同步都走事件。不能问时（正在回答、有冲突）抛错 */
   ask(routeId: string, text: string): Promise<void>;
+  /** 从某一站开一条新的路（新会话、新工作区，带着到这一站为止的历史） */
+  fork(routeId: string, stopId: string, name?: string): Promise<Route>;
+  /** 让这一路的 Claude 解决同步冲突。发出即返回，过程走事件 */
+  resolveConflict(routeId: string): Promise<void>;
+  /** 重新同步一次（手工处理了冲突之后）。结果走事件 */
+  resync(routeId: string): Promise<void>;
   /** 停车 */
   stop(routeId: string): Promise<void>;
   answerPermission(requestId: string, decision: PermissionDecision): Promise<void>;

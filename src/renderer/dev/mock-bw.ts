@@ -82,7 +82,7 @@ export function installMockBw(): void {
     aborts.set(routeId, () => (stopped = true));
     setRoute(routeId, { status: "answering" });
     await wait(700); // 站前同步
-    if (text.includes("冲突")) {
+    if (text.includes("冲突") && text !== "解决同步冲突") {
       const entry: SyncLogEntry = { id: id("y"), routeId, stopId: null, direction: "pull", status: "conflict", files: [{ path: "src/auth/session.ts", note: "both-modified" }], message: null, at: Date.now() };
       logs.set(routeId, [entry]);
       emit({ type: "sync.result", entry });
@@ -172,8 +172,25 @@ export function installMockBw(): void {
     async ask(routeId, text) {
       const r = routes.get(routeId)!;
       if (r.status === "answering" || r.status === "awaiting_permission") throw new Error("这一路正在回答，等它到站或先停车");
-      if (r.status === "conflict") throw new Error("这一路有同步冲突，解决后才能问下一站");
+      if (r.status === "conflict" && text !== "解决同步冲突") throw new Error("这一路有同步冲突，解决后才能问下一站");
       void run(routeId, text);
+    },
+    async fork(routeId, stopId, name) {
+      const parent = routes.get(routeId)!;
+      const r = addRoute(parent.projectId, "", { parentRouteId: routeId, forkStopId: stopId, sessionId: "fork" });
+      const named = { ...r, name: name?.trim() || `${r.number} 路` };
+      routes.set(r.id, named);
+      emit({ type: "route.updated", route: named });
+      return named;
+    },
+    async resolveConflict(routeId) {
+      void run(routeId, "解决同步冲突").then(() => {
+        for (const s of stops.values()) if (s.routeId === routeId && s.syncState === "conflict") setStop(s.id, { syncState: "synced" });
+      });
+    },
+    async resync(routeId) {
+      const entry: SyncLogEntry = { id: id("y"), routeId, stopId: null, direction: "push", status: "conflict", files: [{ path: "src/auth/session.ts", note: "both-modified" }], message: null, at: Date.now() };
+      emit({ type: "sync.result", entry });
     },
     async stop(routeId) {
       aborts.get(routeId)?.();

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatItem, Route, Stop } from "../../shared";
+import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
 import { IconSend, IconStop, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
@@ -9,7 +10,29 @@ import { routeColors } from "../ui/route-color";
 import css from "./ChatPanel.module.css";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
-export function ChatPanel({ route, stops }: { route: Route; stops: Stop[] }) {
+interface Props {
+  route: Route;
+  stops: Stop[];
+  /** 这一路从父路带来了几站；这一路自己的第 1 站显示成第 offset+1 站 */
+  offset: number;
+  /** 从哪一路分叉出来的 */
+  parent?: Route;
+  onGoToRoute(routeId: string): void;
+}
+
+const REASONS: Record<string, string> = {
+  "both-modified": "这一路和 Local 改了同一处",
+  "both-added": "两边都新建了这个文件，内容不同",
+  "modify-delete": "一边修改了它，另一边删除了它",
+  rename: "两边对它做了不同的改名",
+  binary: "二进制文件，两边都改了",
+  "markers-left": "文件里还留着冲突标记",
+  "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
+};
+
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute }: Props) {
+  const resolveConflict = useStore((s) => s.resolveConflict);
+  const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
   const live = useStore((s) => s.live);
   const pending = useStore((s) => s.pendingAsk[route.id]);
@@ -55,7 +78,7 @@ export function ChatPanel({ route, stops }: { route: Route; stops: Stop[] }) {
         <div className={css.headText}>
           <h2 className="ell">{route.name}</h2>
           <p className="ell">
-            <StatusLine route={route} stops={stops} phase={pending !== undefined ? "syncing" : currentLive?.phase} />
+            <StatusLine route={route} n={offset + stops.length} phase={pending !== undefined ? "syncing" : currentLive?.phase} />
           </p>
         </div>
       </header>
@@ -69,7 +92,13 @@ export function ChatPanel({ route, stops }: { route: Route; stops: Stop[] }) {
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
         }}
       >
-        {stops.length === 0 && pending === undefined && <p className={css.hint}>这一路还没有站。在下面写第一个问题，发车。</p>}
+        {parent && offset > 0 && (
+          <button className={css.inherited} onClick={() => onGoToRoute(parent.id)} title={`去 ${parent.name} 看这几站`}>
+            <Plate route={parent} />
+            <span>{firstStops(offset)}随 {parent.number}路 带来，Claude 记得{offset > 1 ? "它们" : "它"}</span>
+          </button>
+        )}
+        {stops.length === 0 && pending === undefined && <p className={css.hint}>{offset > 0 ? "这一路还没有自己的站。在下面写第一个问题，发车。" : "这一路还没有站。在下面写第一个问题，发车。"}</p>}
 
         {stops.map((s) => {
           const l = live[s.id];
@@ -80,7 +109,7 @@ export function ChatPanel({ route, stops }: { route: Route; stops: Stop[] }) {
                 {s.prompt}
               </div>
               <div className={css.who}>
-                Claude <span>第 {s.seq} 站 · {s.name}</span>
+                Claude <span>第 {offset + s.seq} 站 · {s.name}</span>
               </div>
               <Items items={items} streaming={l?.phase === "answering"} />
               {l && items.length === 0 && <p className={css.waiting}>{l.phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>}
@@ -124,19 +153,28 @@ export function ChatPanel({ route, stops }: { route: Route; stops: Stop[] }) {
       )}
 
       {blocked && (
-        <div className={css.conflict}>
+        <div className={css.conflict} role="alert">
           <b>
-            <IconWarn size={14} /> 有同步冲突，解决后才能问下一站
+            <IconWarn size={16} /> 这一路的改动没法自动合进 Local
           </b>
-          {lastSync?.status === "conflict" && (
+          {lastSync?.status === "conflict" && lastSync.files.length > 0 && (
             <ul>
               {lastSync.files.map((f) => (
                 <li key={f.path}>
                   <code>{f.path}</code>
+                  <span>{REASONS[f.note] ?? f.note}</span>
                 </li>
               ))}
             </ul>
           )}
+          <p>Local 没有被改动，这一路的改动都留在它自己的工作区里。其他路照常。解决之前这一路不能问下一站。</p>
+          <button className={css.resolve} onClick={() => void resolveConflict(route.id)}>
+            让 {route.number}路 的 Claude 解决
+            <small>在这一路开一站“解决同步冲突”，带上两边的代码；改好后自动再同步一次</small>
+          </button>
+          <button className={css.retry} onClick={() => void resync(route.id)}>
+            我自己改好了，重新同步
+          </button>
         </div>
       )}
 
@@ -171,8 +209,7 @@ export function ChatPanel({ route, stops }: { route: Route; stops: Stop[] }) {
   );
 }
 
-function StatusLine({ route, stops, phase }: { route: Route; stops: Stop[]; phase?: LiveStop["phase"] | "syncing" }) {
-  const n = stops.length;
+function StatusLine({ route, n, phase }: { route: Route; n: number; phase?: LiveStop["phase"] | "syncing" }) {
   if (phase === "syncing") return <>第 {n + 1} 站 · 正在同步 Local</>;
   if (route.status === "awaiting_permission") return <b>第 {n} 站 · 等你批准</b>;
   if (route.status === "answering") return <b>第 {n} 站 · {phase === "starting" ? "正在启动 Claude" : phase === "finishing" ? "正在收尾" : "回答中"}</b>;

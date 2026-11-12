@@ -167,6 +167,8 @@ if (cmd === "new") {
     if (report.kind === "blocked") {
       console.log("这一站没有发出：站前同步有冲突。");
       showSync(report.sync);
+    } else if (report.kind === "synced") {
+      showSync(report.sync);
     } else {
       const s = report.stop;
       console.log(`第 ${s.seq} 站：${s.status === "done" ? "已到站" : "没答完"}${s.error ? "（" + s.error + "）" : ""}，总用时 ${((Date.now() - t0) / 1000).toFixed(1)} 秒${waited ? `（其中等你批准 ${(waited / 1000).toFixed(1)} 秒）` : ""}`);
