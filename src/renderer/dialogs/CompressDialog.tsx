@@ -18,12 +18,22 @@ interface Props {
   cancelDistill(): void;
   onClose(): void;
   onCreate(summary: string, name: string, firstQuestion: string): void;
+  /** 上次为这一站提炼好、还没用掉的摘要（不小心关掉后再打开时接着用） */
+  savedSummary?: string;
+  /** 摘要有了或被改了：让外面记住，关掉也不丢 */
+  onSummaryChange(summary: string): void;
 }
 
 /** “压缩成快线”：说明 → 提炼中 → 看一眼摘要、改一改 → 开出快线 */
-export function CompressDialog({ source, stop, stopNumber, nextExpress, distill, cancelDistill, onClose, onCreate }: Props) {
-  const [step, setStep] = useState<"intro" | "distilling" | "ready">("intro");
-  const [summary, setSummary] = useState("");
+export function CompressDialog({ source, stop, stopNumber, nextExpress, distill, cancelDistill, onClose, onCreate, savedSummary, onSummaryChange }: Props) {
+  const [step, setStep] = useState<"intro" | "distilling" | "ready">(savedSummary ? "ready" : "intro");
+  const [summary, setSummaryState] = useState(savedSummary ?? "");
+  const setSummary = (text: string) => {
+    setSummaryState(text);
+    onSummaryChange(text);
+  };
+  /** 摘要已经出来了还点关闭：先问一句，别让等了半天的东西一下就没了 */
+  const [askDiscard, setAskDiscard] = useState(false);
   const [keep, setKeep] = useState("");
   const [name, setName] = useState("");
   const [question, setQuestion] = useState("");
@@ -33,13 +43,20 @@ export function CompressDialog({ source, stop, stopNumber, nextExpress, distill,
   const express = { number: 0, express: nextExpress };
   const green = routeColors(express).tag;
 
+  /** 点关闭按钮。有摘要时只是收起来，摘要留着，下次打开还在 */
   const close = () => {
     if (step === "distilling") cancelDistill();
     onClose();
   };
+  /** 明确不要这条快线：摘要也丢掉 */
+  const discard = () => {
+    onSummaryChange("");
+    onClose();
+  };
   useEffect(() => {
     alive.current = true;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    // Esc 只在还没开始提炼时关闭弹窗；提炼中和摘要出来之后不响应，免得误触
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && step === "intro" && close();
     window.addEventListener("keydown", onKey);
     return () => {
       alive.current = false;
@@ -70,7 +87,7 @@ export function CompressDialog({ source, stop, stopNumber, nextExpress, distill,
   };
 
   return (
-    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && step !== "distilling" && close()}>
+    <div className={css.scrim}>
       <div className={`${css.dialog} ${css.wide}`} role="dialog" aria-modal aria-label="压缩成快线">
         <header>
           <Plate route={express} />
@@ -144,12 +161,36 @@ export function CompressDialog({ source, stop, stopNumber, nextExpress, distill,
               <textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={2} placeholder="Claude 会连同摘要一起看到它" />
             </label>
             <footer>
-              <button type="button" className={css.ghost} onClick={close}>
-                不要这条快线
-              </button>
-              <button type="button" className={css.confirm} style={{ background: green }} disabled={!summary.trim()} onClick={() => onCreate(summary, name, question)}>
-                开出快{nextExpress}
-              </button>
+              {askDiscard ? (
+                <>
+                  <span className={css.ask}>摘要会丢掉，要重新等一次才能再有。</span>
+                  <button type="button" className={css.ghost} onClick={() => setAskDiscard(false)}>
+                    留着
+                  </button>
+                  <button type="button" className={css.destroy} onClick={discard}>
+                    丢掉
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className={css.ask}>点右上角关掉只是先收起来，摘要会留着。</span>
+                  <button type="button" className={css.ghost} onClick={() => setAskDiscard(true)}>
+                    不要这条快线
+                  </button>
+                  <button
+                    type="button"
+                    className={css.confirm}
+                    style={{ background: green }}
+                    disabled={!summary.trim()}
+                    onClick={() => {
+                      onSummaryChange("");
+                      onCreate(summary, name, question);
+                    }}
+                  >
+                    开出快{nextExpress}
+                  </button>
+                </>
+              )}
             </footer>
           </>
         )}

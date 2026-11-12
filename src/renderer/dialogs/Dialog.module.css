@@ -237,3 +237,10 @@
   font-weight: 600;
   white-space: nowrap;
 }
+.ask {
+  flex: 1;
+  align-self: center;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-4);
+}

@@ -162,6 +162,21 @@ describe("应用", () => {
     await expect.poll(() => dialog.getByText("摘要好了，看一眼再发车").isVisible(), { timeout: 60000 }).toBe(true);
     const before = fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
     await dialog.locator("textarea").first().fill("## 做完了\n- 记了一笔 GitHub 登录");
+
+    // 点弹窗外面、按 Esc 都不会把它关掉
+    await page.mouse.click(5, 300);
+    await page.keyboard.press("Escape");
+    expect(await dialog.isVisible()).toBe(true);
+    // 点右上角关掉只是收起来：再打开，改过的摘要还在，不用重新等
+    await dialog.getByRole("button", { name: "关闭" }).click();
+    expect(await dialog.isVisible()).toBe(false);
+    await page.getByLabel(/· 记一笔：接入/).click();
+    await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
+    expect(await dialog.locator("textarea").first().inputValue()).toBe("## 做完了\n- 记了一笔 GitHub 登录");
+    // “不要这条快线”要再确认一次
+    await dialog.getByRole("button", { name: "不要这条快线" }).click();
+    await dialog.getByRole("button", { name: "留着" }).click();
+
     await dialog.getByPlaceholder(/· 续/).fill("登录收尾");
     await dialog.getByPlaceholder("Claude 会连同摘要一起看到它").fill("接着做");
     await shot("10-summary");

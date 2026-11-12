@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
@@ -37,6 +37,8 @@ export function App() {
   const cancelDistill = useStore((s) => s.cancelDistill);
   const createExpress = useStore((s) => s.createExpress);
   const [compressFrom, setCompressFrom] = useState<Stop | null>(null);
+  /** 提炼好但还没用掉的摘要，按站记着：弹窗关了再打开还在 */
+  const summaries = useRef(new Map<string, string>());
   const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
   const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + stop.seq;
 
@@ -123,6 +125,8 @@ export function App() {
           distill={(keep) => distill(compressFrom.routeId, compressFrom.id, keep)}
           cancelDistill={() => cancelDistill(compressFrom.routeId)}
           onClose={() => setCompressFrom(null)}
+          savedSummary={summaries.current.get(compressFrom.id)}
+          onSummaryChange={(text) => (text ? summaries.current.set(compressFrom.id, text) : summaries.current.delete(compressFrom.id))}
           onCreate={(summary, name, question) => {
             void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question);
             setCompressFrom(null);

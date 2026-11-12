@@ -37,7 +37,8 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, onCancel, onC
   };
 
   return (
-    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
+    // 已经填了东西时，点弹窗外面不关闭，免得误触把填的内容弄丢
+    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && !question && onCancel()}>
       <form className={css.dialog} role="dialog" aria-modal aria-label={`从第 ${stopNumber} 站开新对话`} onSubmit={submit}>
         <header>
           <Plate route={parent} />
