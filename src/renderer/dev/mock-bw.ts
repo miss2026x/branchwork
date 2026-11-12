@@ -38,8 +38,8 @@ export function installMockBw(): void {
   };
 
   if (!q.has("empty")) {
-    const p: Project = { id: "p1", name: "auth-service", localDir: "D:/work/auth-service", createdAt: 1 };
-    projects.push(p, { id: "p2", name: "web-console", localDir: "D:/work/web-console", createdAt: 2 });
+    const p: Project = { id: "p1", name: "auth-service", localDir: "D:/work/auth-service", permissionMode: "ask", createdAt: 1 };
+    projects.push(p, { id: "p2", name: "web-console", localDir: "D:/work/web-console", permissionMode: "ask", createdAt: 2 });
     const r1 = addRoute(p.id, "登录重构");
     addStop(r1.id, "梳理认证结构", "先帮我梳理一下现在的认证代码结构，不要改代码。", [
       { kind: "tool", tool: "Glob", detail: "src/auth/**/*.ts" },
@@ -124,7 +124,7 @@ export function installMockBw(): void {
 
     await say("在回调里加 state 比对。失败时清掉临时 cookie，跳回登录页并带上错误码。我先改路由，再跑一遍测试。\n\n");
     await tool("Edit", "src/auth/routes.ts");
-    if (!stopped && text.includes("批准")) {
+    if (!stopped && text.includes("批准") && projects.find((p) => p.id === routes.get(routeId)!.projectId)?.permissionMode !== "all") {
       const requestId = id("q");
       setRoute(routeId, { status: "awaiting_permission" });
       emit({ type: "permission.request", requestId, routeId, stopId: stop.id, tool: "Bash", input: { command: "npm test -- auth" }, canRemember: true });
@@ -154,7 +154,7 @@ export function installMockBw(): void {
     listProjects: async () => projects,
     pickDirectory: async () => `D:/work/demo-${projects.length + 1}`,
     async addProject(localDir) {
-      const p: Project = { id: id("p"), name: localDir.split("/").pop()!, localDir, createdAt: Date.now() };
+      const p: Project = { id: id("p"), name: localDir.split("/").pop()!, localDir, permissionMode: "ask", createdAt: Date.now() };
       projects.push(p);
       return p;
     },
@@ -163,6 +163,13 @@ export function installMockBw(): void {
       routes: [...routes.values()].filter((r) => r.projectId === projectId),
       stops: [...stops.values()].filter((s) => routes.get(s.routeId)?.projectId === projectId),
     }),
+    async setPermissionMode(projectId, mode) {
+      const i = projects.findIndex((p) => p.id === projectId);
+      projects[i] = { ...projects[i]!, permissionMode: mode };
+      emit({ type: "project.updated", project: projects[i]! });
+      if (mode === "all") for (const [k, resolve] of permissions) (permissions.delete(k), resolve("allow"));
+      return projects[i]!;
+    },
     async createRoute(projectId, name) {
       const r = addRoute(projectId, name ?? "");
       const named = { ...r, name: name ?? "新对话" };

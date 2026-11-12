@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { openDb } from "../../src/db";
 import type { Project, Route, Stop } from "../../src/shared";
 
-const project: Project = { id: "p1", name: "demo", localDir: "/tmp/demo", createdAt: 1 };
+const project: Project = { id: "p1", name: "demo", localDir: "/tmp/demo", permissionMode: "ask", createdAt: 1 };
 const route = (id: string, number: number): Route => ({
   id,
   projectId: "p1",
@@ -86,6 +86,26 @@ describe("数据库", () => {
     db.routes.delete("r1");
     expect(db.stops.get("s1")).toBeNull();
     expect(db.syncLog.listByRoute("r1")).toEqual([]);
+  });
+
+  it("旧版本建的库升级后，已有的项目批准方式是“每次都问”；可以改", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bw-db-"));
+    const file = path.join(dir, "bw.sqlite");
+    // 模拟第 1 版的库：只有最初的表，没有 permission_mode 列
+    const { DatabaseSync } = await import("node:sqlite");
+    const { MIGRATIONS } = await import("../../src/db/schema");
+    const old = new DatabaseSync(file);
+    old.exec(MIGRATIONS[0]!);
+    old.exec("PRAGMA user_version = 1");
+    old.prepare("INSERT INTO project (id, name, local_dir, created_at) VALUES (?, ?, ?, ?)").run("p0", "old", "/tmp/old", 1);
+    old.close();
+
+    const db = openDb(file);
+    expect(db.projects.get("p0")).toEqual({ id: "p0", name: "old", localDir: "/tmp/old", permissionMode: "ask", createdAt: 1 });
+    expect(db.projects.update("p0", { permissionMode: "all" }).permissionMode).toBe("all");
+    db.close();
+    expect(openDb(file).projects.get("p0")!.permissionMode).toBe("all");
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
 
   it("关掉再打开，数据还在，建表不会重复执行", () => {

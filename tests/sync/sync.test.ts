@@ -340,6 +340,19 @@ describe("删除一路", () => {
     expect(sh(lab.local, "for-each-ref", "refs/branchwork")).toBe("");
   });
 
+  it("上次删到一半失败、工作区已经残缺：再删一次能删干净，不报错", async () => {
+    await lab.engine.createWorktree("r1");
+    write(lab.wt("r1"), "b.txt", "unsynced\n");
+    fs.rmSync(path.join(lab.wt("r1"), ".git")); // 残缺：git 已经不认它了
+    fs.rmSync(path.join(lab.wt("r1"), "a.txt"));
+    expect(await lab.engine.removeWorktree("r1")).toEqual({ status: "removed" });
+    await expect.poll(() => has(lab.worktrees, "r1")).toBe(false);
+    expect(sh(lab.local, "worktree", "list").trim().split("\n")).toHaveLength(1);
+    expect(sh(lab.local, "for-each-ref", "refs/branchwork")).toBe("");
+    await lab.engine.createWorktree("r1"); // 同一个 id 还能再开
+    expect(read(lab.wt("r1"), "b.txt")).toBe("bee\n");
+  });
+
   it("已同步的路直接删；删完可以用同一个 id 再开", async () => {
     await lab.engine.createWorktree("r1");
     write(lab.wt("r1"), "b.txt", "synced\n");

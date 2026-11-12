@@ -46,6 +46,8 @@ BRANCHWORK_DEMO=1 pnpm dev              # macOS / Linux
 pnpm dev:web                  # 打开 http://localhost:5199 ；加 ?empty 看空白状态，?live 自动问一站
 ```
 
+**批准方式**：输入框左下角的“批准：每次都问”可以改成“改文件不问”或“全部不问”（相当于 `--dangerously-skip-permissions`），对整个项目里所有的路生效，随时能改回去。
+
 应用和命令行工具在开发时共用一份数据（`~/.branchwork-dev`），所以命令行里问过的项目和路在窗口里都能看到。
 
 整个应用的自动测试（真的启动 Electron，Claude 用演示实现）：

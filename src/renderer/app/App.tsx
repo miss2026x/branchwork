@@ -29,6 +29,7 @@ export function App() {
   const project = projects.find((p) => p.id === projectId);
   const allRoutes = useStore((s) => s.routes);
   const fork = useStore((s) => s.fork);
+  const setPermissionMode = useStore((s) => s.setPermissionMode);
   const [forkFrom, setForkFrom] = useState<Stop | null>(null);
   const deleteRoute = useStore((s) => s.deleteRoute);
   const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
@@ -92,7 +93,7 @@ export function App() {
           )}
         </main>
 
-        {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} />}
+        {route && <ChatPanel key={route.id} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (

@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "createRoute", "deleteRoute", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "createRoute", "deleteRoute", "fork", "history", "listProjects", "onEvent", "pickDirectory", "resolveConflict", "resync", "setPermissionMode", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -136,6 +136,22 @@ describe("应用", () => {
     await expect.poll(() => page.getByText("第 3 站没答完").isVisible(), { timeout: 30000 }).toBe(true);
     expect(await page.getByText("记一笔：接入 GitHub 登录").first().isVisible()).toBe(true);
     expect(await page.getByRole("complementary").getByText("my-project").isVisible()).toBe(true);
+  });
+
+  it("全部不问：要先确认才开启；开启后不再出现批准卡片，改动直接进 Local", async () => {
+    await page.getByRole("button", { name: /批准：每次都问/ }).click();
+    await page.getByRole("menuitemradio", { name: /全部不问/ }).click();
+    const confirm = page.getByRole("alertdialog", { name: "开启全部不问" });
+    await expect.poll(() => confirm.isVisible()).toBe(true);
+    await shot("9-skip-permissions");
+    await confirm.getByRole("button", { name: "开启全部不问" }).click();
+    await expect.poll(() => page.getByRole("button", { name: /批准：全部不问/ }).isVisible()).toBe(true);
+
+    await page.locator("textarea").fill("不用问我");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8"), { timeout: 30000 }).toContain("不用问我");
+    expect(await page.getByRole("alertdialog", { name: "等你批准" }).count()).toBe(0);
+    await expect.poll(() => page.getByRole("button", { name: "发车" }).isDisabled(), { timeout: 30000 }).toBe(true); // 到站了，输入框空着
   });
 
   it("归档再恢复；删除一路后它的工作区也一起没了", async () => {

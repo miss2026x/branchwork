@@ -1,0 +1,104 @@
+.wrap {
+  position: relative;
+}
+.trigger {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.trigger:hover {
+  background: var(--surface-2);
+}
+.trigger[data-mode="edits"] {
+  color: var(--text-1);
+}
+.trigger[data-mode="all"] {
+  border-color: var(--amber);
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-weight: 600;
+}
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+}
+.menu {
+  position: absolute;
+  z-index: 7;
+  left: 0;
+  bottom: 40px;
+  width: 320px;
+  padding: 6px;
+  border-radius: var(--r-12);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+}
+.menu header {
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  color: var(--text-4);
+}
+.menu > button {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-8);
+  text-align: left;
+  line-height: 20px;
+}
+.menu > button:hover {
+  background: var(--surface-2);
+  filter: none;
+}
+.menu i {
+  flex: none;
+  width: 12px;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-1);
+}
+.menu small {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-4);
+}
+.menu b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 0;
+  color: var(--amber-text);
+}
+.menu p {
+  margin: 8px 10px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-2);
+}
+.confirmRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 6px 6px;
+}
+.confirmRow button {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  font-weight: 600;
+  color: var(--text-3);
+}
+.confirmRow .danger {
+  background: var(--amber-text);
+  color: #fff;
+}

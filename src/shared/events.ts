@@ -1,9 +1,10 @@
-import type { Route, Stop, SyncLogEntry } from "./model";
+import type { Project, Route, Stop, SyncLogEntry } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
 /** 主进程推给界面的事件 */
 export type BwEvent =
+  | { type: "project.updated"; project: Project }
   | { type: "route.updated"; route: Route }
   | { type: "route.deleted"; routeId: string; projectId: string }
   | { type: "stop.created"; stop: Stop }

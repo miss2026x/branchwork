@@ -58,4 +58,6 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX sync_log_route ON sync_log(route_id, at);
   `,
+  // 2：项目的批准方式
+  `ALTER TABLE project ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'ask';`,
 ];

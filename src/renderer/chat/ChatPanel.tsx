@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatItem, Route, Stop } from "../../shared";
+import type { ChatItem, PermissionMode, Route, Stop } from "../../shared";
+import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
 import { IconSend, IconStop, IconWarn } from "../ui/icons";
@@ -18,6 +19,10 @@ interface Props {
   /** 从哪一路分叉出来的 */
   parent?: Route;
   onGoToRoute(routeId: string): void;
+  /** 这个项目的批准方式 */
+  permissionMode: PermissionMode;
+  projectName: string;
+  onPermissionMode(mode: PermissionMode): void;
 }
 
 const REASONS: Record<string, string> = {
@@ -30,7 +35,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -199,6 +204,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute }: Props) 
           rows={3}
         />
         <div className={css.actions}>
+          <PermissionModeControl mode={permissionMode} projectName={projectName} onChange={onPermissionMode} />
           <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : ""}</span>
           <button className={css.send} style={{ background: colors.tag }} disabled={busy || blocked || !draft.trim()} onClick={send}>
             发车 <IconSend size={14} />

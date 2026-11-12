@@ -14,11 +14,19 @@ export type StopStatus = "answering" | "done" | "interrupted";
 /** 这一站的改动有没有进 Local */
 export type StopSyncState = "none" | "synced" | "unsynced" | "conflict";
 
+/**
+ * Claude 要做需要批准的事时怎么办：
+ * ask 每次都问；edits 改文件不问、运行命令等仍然问；all 全部不问（相当于 --dangerously-skip-permissions）
+ */
+export type PermissionMode = "ask" | "edits" | "all";
+
 export interface Project {
   id: string;
   name: string;
   /** 这个项目的 Local：唯一真实运行的目录 */
   localDir: string;
+  /** 对这个项目里所有的路生效 */
+  permissionMode: PermissionMode;
   createdAt: number;
 }
 

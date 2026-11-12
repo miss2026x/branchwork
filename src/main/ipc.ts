@@ -24,6 +24,7 @@ export function registerIpc(core: Core): void {
   const calls: Calls = {
     listProjects: async () => core.listProjects(),
     snapshot: async (projectId) => core.snapshot(projectId),
+    setPermissionMode: async (projectId, mode) => core.setPermissionMode(projectId, mode),
     addProject: (localDir) => core.addProject(localDir),
     createRoute: (projectId, name) => core.createRoute(projectId, name),
     history: (routeId) => core.history(routeId),

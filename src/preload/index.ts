@@ -16,6 +16,7 @@ const api: BwApi = {
   pickDirectory: call("pickDirectory"),
   addProject: call("addProject"),
   snapshot: call("snapshot"),
+  setPermissionMode: call("setPermissionMode"),
   createRoute: call("createRoute"),
   ask: call("ask"),
   fork: call("fork"),

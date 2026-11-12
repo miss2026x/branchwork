@@ -211,16 +211,24 @@ class Engine implements SyncEngine {
     return this.serial(async () => {
       const wt = this.worktreePath(routeId);
       if (await exists(wt)) {
-        if (!opts.force) {
+        // 上一次删除如果半途失败，工作区可能已经残缺（连 .git 都没了），这时没法也不必再检查改动
+        const intact = await exists(path.join(wt, ".git"));
+        if (!opts.force && intact) {
           const base = await this.getBase(routeId);
           const work = await this.snapRoute(routeId, false);
           const unsynced = await diffTrees(this.localDir, base, work);
           if (unsynced.length > 0) return { status: "has-unsynced", files: unsynced };
         }
-        await git(this.localDir, ["worktree", "remove", "--force", wt], { okCodes: [128] });
-        await fs.rm(wt, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+        const adminDir = await this.routeGitDir(wt);
+        await git(this.localDir, ["worktree", "remove", "--force", wt], { anyCode: true });
+        if (await exists(wt)) {
+          // 目录删不掉。Windows 上常见：刚停掉的 Claude 进程还没完全退出，或安全软件正在扫描里面的文件。
+          // 先把它从 git 里注销（这一步不需要目录能删），目录本身放到后台慢慢删，不让调用方等、也不算失败。
+          if (adminDir) await fs.rm(adminDir, { recursive: true, force: true }).catch(() => {});
+          void fs.rm(wt, { recursive: true, force: true, maxRetries: 60, retryDelay: 500 }).catch(() => {});
+        }
       }
-      await Promise.all([git(this.localDir, ["worktree", "prune"]), git(this.localDir, ["update-ref", "-d", this.baseRef(routeId)])]);
+      await Promise.all([git(this.localDir, ["worktree", "prune"]), git(this.localDir, ["update-ref", "-d", this.baseRef(routeId)], { anyCode: true })]);
       this.bases.delete(routeId);
       this.snaps.forget(this.indexFile(routeId));
       await fs.rm(this.indexFile(routeId), { force: true });

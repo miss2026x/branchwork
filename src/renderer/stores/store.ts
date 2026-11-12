@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { BwEvent, ChatItem, PermissionDecision, Project, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -49,6 +49,7 @@ interface State {
   deleteRoute(routeId: string, force: boolean): Promise<SyncFile[] | null>;
   stop(routeId: string): void;
   answerPermission(routeId: string, decision: PermissionDecision): void;
+  setPermissionMode(projectId: string, mode: PermissionMode): Promise<void>;
   setDraft(routeId: string, text: string): void;
   dismissError(): void;
 }
@@ -79,6 +80,9 @@ export const useStore = create<State>((set, get) => {
         });
         break;
       }
+      case "project.updated":
+        set((s) => ({ projects: s.projects.map((p) => (p.id === e.project.id ? e.project : p)) }));
+        break;
       case "route.deleted":
         set((s) => {
           const routes = { ...s.routes };
@@ -334,6 +338,15 @@ export const useStore = create<State>((set, get) => {
         return { permissions };
       });
       void window.bw.answerPermission(p.requestId, decision);
+    },
+
+    async setPermissionMode(projectId, mode) {
+      try {
+        const project = await window.bw.setPermissionMode(projectId, mode);
+        set((s) => ({ projects: s.projects.map((p) => (p.id === project.id ? project : p)) }));
+      } catch (e) {
+        set({ error: message(e) });
+      }
     },
 
     setDraft: (routeId, text) => set((s) => ({ drafts: { ...s.drafts, [routeId]: text } })),

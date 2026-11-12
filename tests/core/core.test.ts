@@ -429,6 +429,57 @@ describe("等你批准", () => {
     expect(routeOf(route.id).status).toBe("idle");
   });
 
+  it("全部自动批准：不再发出请求，Claude 直接得到允许", async () => {
+    expect(project.permissionMode).toBe("ask");
+    expect(core.setPermissionMode(project.id, "all").permissionMode).toBe("all");
+    expect(events.at(-1)).toMatchObject({ type: "project.updated", project: { permissionMode: "all" } });
+    const route = await core.createRoute(project.id);
+    const decisions: string[] = [];
+    claude.script = async (t) => {
+      decisions.push(await t.askPermission("Bash", { command: "rm -rf dist" }), await t.askPermission("Write", { file_path: "x" }));
+    };
+    await core.ask(route.id, "随便做");
+    expect(decisions).toEqual(["allow", "allow"]);
+    expect(events.filter((e) => e.type === "permission.request")).toEqual([]);
+    expect(events.some((e) => e.type === "route.updated" && e.route.status === "awaiting_permission")).toBe(false);
+    boot(); // 设置存在数据库里，重启后还在
+    expect(core.listProjects()[0]!.permissionMode).toBe("all");
+  });
+
+  it("改文件不问：Edit、Write 直接放行，运行命令仍然问", async () => {
+    core.setPermissionMode(project.id, "edits");
+    const route = await core.createRoute(project.id);
+    const decisions: string[] = [];
+    claude.script = async (t) => {
+      decisions.push(await t.askPermission("Edit", { file_path: "a.ts" }), await t.askPermission("Bash", { command: "npm test" }));
+    };
+    core.on((e) => {
+      if (e.type === "permission.request") core.answerPermission(e.requestId, "deny");
+    });
+    await core.ask(route.id, "改一下再跑测试");
+    expect(decisions).toEqual(["allow", "deny"]);
+    expect(events.filter((e) => e.type === "permission.request")).toMatchObject([{ tool: "Bash" }]);
+  });
+
+  it("正在等批准时改成全部自动批准：等着的请求立刻放行", async () => {
+    const route = await core.createRoute(project.id);
+    let decision = "";
+    claude.script = async (t) => {
+      decision = await t.askPermission("Bash", { command: "npm test" });
+    };
+    events.length = 0;
+    const asking = core.ask(route.id, "跑测试");
+    await until("permission.request");
+    expect(routeOf(route.id).status).toBe("awaiting_permission");
+    core.setPermissionMode(project.id, "edits"); // 运行命令在这个方式下仍然要问
+    expect(routeOf(route.id).status).toBe("awaiting_permission");
+    core.setPermissionMode(project.id, "all");
+    await asking;
+    expect(decision).toBe("allow");
+    expect(routeOf(route.id).status).toBe("idle");
+    expect(() => core.setPermissionMode("nope", "all")).toThrow();
+  });
+
   it("等批准时停车：按拒绝处理，这一站算没答完", async () => {
     const route = await core.createRoute(project.id);
     let decision = "";
@@ -560,6 +611,16 @@ describe("归档和删除", () => {
     expect(await core.deleteRoute(route.id, true)).toEqual({ status: "deleted" });
     expect(read(lab.local, "b.txt")).toBe("bee\n"); // Local 没被碰
     expect(has(lab.local, "new.txt")).toBe(false);
+  });
+
+  it("启动时清掉没有主的工作区目录（上次删除时目录被占用留下的）", async () => {
+    const route = await core.createRoute(project.id);
+    const orphan = path.join(path.dirname(route.worktreePath), "rdeadbeef0000");
+    write(orphan, "left.txt", "x\n");
+    boot();
+    await core.createRoute(project.id); // 第一次用到这个项目时清理
+    await expect.poll(() => fs.existsSync(orphan)).toBe(false);
+    expect(fs.existsSync(route.worktreePath)).toBe(true); // 有主的不动
   });
 
   it("删掉父路后，从它分叉出来的路照常可用", async () => {

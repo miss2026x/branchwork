@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { Project, ProjectSnapshot, Route, StopContent, SyncFile, SyncLogEntry } from "./model";
+import type { PermissionMode, Project, ProjectSnapshot, Route, StopContent, SyncFile, SyncLogEntry } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -12,6 +12,8 @@ export interface BwApi {
   pickDirectory(): Promise<string | null>;
   addProject(localDir: string): Promise<Project>;
   snapshot(projectId: string): Promise<ProjectSnapshot>;
+  /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
+  setPermissionMode(projectId: string, mode: PermissionMode): Promise<Project>;
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 问一站。发出即返回；站的出现、回答、到站、同步都走事件。不能问时（正在回答、有冲突）抛错 */
   ask(routeId: string, text: string): Promise<void>;

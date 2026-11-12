@@ -11,6 +11,7 @@ export interface Db {
     get(id: string): Project | null;
     byLocalDir(localDir: string): Project | null;
     list(): Project[];
+    update(id: string, patch: Partial<Omit<Project, "id">>): Project;
   };
   routes: {
     insert(r: Route): void;
@@ -70,10 +71,11 @@ export function openDb(file: string): Db {
     };
   };
 
-  const projects = table<Project>("project", { id: "id", name: "name", localDir: "local_dir", createdAt: "created_at" }, (r) => ({
+  const projects = table<Project>("project", { id: "id", name: "name", localDir: "local_dir", permissionMode: "permission_mode", createdAt: "created_at" }, (r) => ({
     id: r.id as string,
     name: r.name as string,
     localDir: r.local_dir as string,
+    permissionMode: r.permission_mode as Project["permissionMode"],
     createdAt: r.created_at as number,
   }));
 
@@ -164,6 +166,7 @@ export function openDb(file: string): Db {
       get: projects.get,
       byLocalDir: (d) => projects.where("local_dir = ?", d)[0] ?? null,
       list: () => projects.where("1 = 1 ORDER BY created_at"),
+      update: (id, patch) => projects.update(id, patch),
     },
     routes: {
       insert: routes.insert,

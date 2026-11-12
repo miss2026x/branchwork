@@ -14,6 +14,8 @@ export interface GitOptions {
   input?: string;
   /** 允许的非零退出码（例如 merge-tree 有冲突时返回 1） */
   okCodes?: number[];
+  /** 不管退出码是多少都不抛错，由调用方自己看结果 */
+  anyCode?: boolean;
 }
 
 // 快照提交用固定的作者和时间：同一份文件树永远得到同一个提交号
@@ -107,7 +109,7 @@ export async function git(cwd: string, args: string[], opts: GitOptions = {}): P
   if (slow > 0) await new Promise((r) => setTimeout(r, slow));
   const r = await raw(bin, [...BASE_ARGS, ...args], withPath(env, pathPrefix), cwd, opts.input);
   gitStats.trace?.(args, performance.now() - started);
-  if (r.code === 0 || opts.okCodes?.includes(r.code)) return { stdout: r.stdout, stderr: r.stderr, code: r.code };
+  if (r.code === 0 || opts.anyCode || opts.okCodes?.includes(r.code)) return { stdout: r.stdout, stderr: r.stderr, code: r.code };
   throw new SyncError("GIT_FAILED", `git ${args.join(" ")} 失败（${r.code}）：${r.stderr.trim() || String(r.err)}`);
 }
 

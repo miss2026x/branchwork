@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { AskResult, ClaudeClient } from "../claude";
 import type { Db } from "../db";
@@ -8,6 +9,7 @@ import type {
   ChatItem,
   StopContent,
   PermissionDecision,
+  PermissionMode,
   Project,
   ProjectSnapshot,
   Route,
@@ -59,6 +61,12 @@ export interface Core {
   addProject(localDir: string, name?: string): Promise<Project>;
   listProjects(): Project[];
   snapshot(projectId: string): ProjectSnapshot;
+  /**
+   * 改这个项目的批准方式，对项目里所有的路立即生效：
+   * ask 每次都问；edits 改文件不问；all 全部不问（相当于 --dangerously-skip-permissions）。
+   * 正在等批准的请求，按新的方式能自动批准的会立刻批准。
+   */
+  setPermissionMode(projectId: string, mode: PermissionMode): Project;
   /** 新开一路（从 Local 当前状态建工作区） */
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步 */
@@ -102,7 +110,7 @@ export function createCore(opts: CoreOptions): Core {
   const listeners = new Set<BwListener>();
   const engines = new Map<string, Promise<SyncEngine>>();
   const running = new Map<string, AbortController>();
-  const pendingPermissions = new Map<string, { routeId: string; resolve: (d: PermissionDecision) => void }>();
+  const pendingPermissions = new Map<string, { routeId: string; tool: string; resolve: (d: PermissionDecision) => void }>();
 
   const emit = (e: BwEvent) => {
     for (const l of listeners) l(e);
@@ -153,6 +161,12 @@ export function createCore(opts: CoreOptions): Core {
             ...r.changed.map((c) => ({ path: c.path, note: c.kind })),
             ...(r.status === "needs-attention" ? r.skipped.map((p) => ({ path: p, note: "中断后被改过，没有覆盖" })) : []),
           ]);
+        }
+        // 清掉没有主的工作区目录：上次删除时目录被占用没删干净的
+        const dir = path.join(opts.worktreesRoot, project.id);
+        const known = new Set(db.routes.listByProject(project.id).map((r2) => r2.id));
+        for (const name of await fs.readdir(dir).catch(() => [] as string[])) {
+          if (!known.has(name)) void engine.removeWorktree(name, { force: true }).catch(() => {});
         }
         return engine;
       })();
@@ -275,7 +289,9 @@ export function createCore(opts: CoreOptions): Core {
           onPermission: (req) =>
             new Promise<PermissionDecision>((resolve) => {
               const requestId = id("q");
-              pendingPermissions.set(requestId, { routeId, resolve });
+              // 这个项目设了自动批准：不问，直接放行
+              if (autoApproves(mustProject(route.projectId).permissionMode, req.tool)) return resolve("allow");
+              pendingPermissions.set(requestId, { routeId, tool: req.tool, resolve });
               setRoute(routeId, { status: "awaiting_permission" });
               emit({ type: "permission.request", requestId, routeId, stopId, tool: req.tool, input: req.input, canRemember: req.canRemember });
             }),
@@ -330,7 +346,7 @@ export function createCore(opts: CoreOptions): Core {
       const dir = path.resolve(localDir);
       const existing = db.projects.byLocalDir(dir);
       if (existing) return existing;
-      const project: Project = { id: id("p"), name: name ?? path.basename(dir), localDir: dir, createdAt: Date.now() };
+      const project: Project = { id: id("p"), name: name ?? path.basename(dir), localDir: dir, permissionMode: "ask", createdAt: Date.now() };
       await makeEngine(dir, path.join(opts.worktreesRoot, project.id)); // 不是可用的仓库会在这里报错
       db.projects.insert(project);
       return project;
@@ -340,6 +356,20 @@ export function createCore(opts: CoreOptions): Core {
 
     snapshot(projectId) {
       return { project: mustProject(projectId), routes: db.routes.listByProject(projectId), stops: db.stops.listByProject(projectId) };
+    },
+
+    setPermissionMode(projectId, mode) {
+      mustProject(projectId);
+      const project = db.projects.update(projectId, { permissionMode: mode });
+      emit({ type: "project.updated", project });
+      // 正在等批准的：按新的方式能放行的现在就放行
+      for (const [requestId, p] of pendingPermissions) {
+        if (db.routes.get(p.routeId)?.projectId !== projectId || !autoApproves(mode, p.tool)) continue;
+        pendingPermissions.delete(requestId);
+        setRoute(p.routeId, { status: "answering" });
+        p.resolve("allow");
+      }
+      return project;
     },
 
     async createRoute(projectId, name) {
@@ -599,4 +629,11 @@ export function stopName(prompt: string): string {
     out += ch;
   }
   return out.trim() || "新的一站";
+}
+
+/** 改文件的工具。“改文件不问”时只放行这些 */
+const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+
+function autoApproves(mode: PermissionMode, tool: string): boolean {
+  return mode === "all" || (mode === "edits" && EDIT_TOOLS.has(tool));
 }

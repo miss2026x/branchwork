@@ -415,7 +415,9 @@
   gap: 12px;
   margin-top: 10px;
 }
-.actions span {
+.actions > span {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-3);
 }
