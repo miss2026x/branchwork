@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
+import { ChangesDialog } from "../dialogs/ChangesDialog";
 import { ForkDialog } from "../dialogs/ForkDialog";
+import { TerminalDialog } from "../terminal/TerminalDialog";
 import { stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
 import { Notices } from "../notices/Notices";
@@ -59,6 +61,15 @@ export function App() {
   const resync = useStore((s) => s.resync);
   const setDraft = useStore((s) => s.setDraft);
   const ensureHistory = useStore((s) => s.ensureHistory);
+  const terminals = useStore((s) => s.terminals);
+  const terminalView = useStore((s) => s.terminalView);
+  const viewTerminal = useStore((s) => s.viewTerminal);
+  const stopTerminal = useStore((s) => s.stopTerminal);
+  const changesView = useStore((s) => s.changesView);
+  const viewChanges = useStore((s) => s.viewChanges);
+  const setRouteModel = useStore((s) => s.setRouteModel);
+  const routeTerminals = useMemo(() => Object.values(terminals).filter((t) => t.routeId === routeId).sort((a, b) => a.startedAt - b.startedAt), [terminals, routeId]);
+  const viewed = terminalView ? terminals[terminalView.id] : undefined;
   const [palette, setPalette] = useState(false);
   const [waitingSignal, setWaitingSignal] = useState(0);
   const tier = useTier();
@@ -200,6 +211,7 @@ export function App() {
               void ask(id, "接着上一站没做完的地方继续，把它做完。");
             }}
             onResync={(id) => void resync(id)}
+            onViewChanges={viewChanges}
             onJump={goToStop}
             onStop={stopRoute}
             onBoard={(itemId) => void queueBoard(itemId)}
@@ -211,7 +223,7 @@ export function App() {
           />
         </main>
 
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} queued={queue.filter((q) => q.routeId === route.id).length} onQueue={(text) => void queueAdd(route.projectId, text, route.id, "auto")} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} queued={queue.filter((q) => q.routeId === route.id).length} onQueue={(text) => void queueAdd(route.projectId, text, route.id, "auto")} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -261,6 +273,19 @@ export function App() {
             void fork(forkFrom.routeId, forkFrom.id, name, question);
             setForkFrom(null);
           }}
+        />
+      )}
+
+      {changesView && allRoutes[changesView.routeId] && <ChangesDialog route={allRoutes[changesView.routeId]!} files={changesView.files} onClose={() => viewChanges(null)} />}
+
+      {viewed && terminalView && allRoutes[viewed.routeId] && (
+        <TerminalDialog
+          terminal={viewed}
+          route={allRoutes[viewed.routeId]!}
+          output={terminalView.output}
+          stopLabel={viewed.stopId && allStops[viewed.stopId] ? `第 ${stopNumber(allStops[viewed.stopId]!)} 站` : null}
+          onStop={() => void stopTerminal(viewed.id)}
+          onClose={() => viewTerminal(null)}
         />
       )}
 

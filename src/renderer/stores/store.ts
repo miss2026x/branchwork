@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, FileStat, Terminal } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -41,6 +41,12 @@ interface State {
   /** 各项目候车区里的问题 */
   queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
+  /** 后台终端，按编号记 */
+  terminals: Record<string, Terminal>;
+  /** 正在看的那个后台终端和它到现在为止的输出 */
+  terminalView: { id: string; output: string } | null;
+  /** 正在看“改了什么”的那一路和它的改动；files 为空表示还在读 */
+  changesView: { routeId: string; files: FileStat[] | null } | null;
   /** 要你处理的事（右下角的通知） */
   notices: Notice[];
   /** 各路刚从候车区自动发出的问题，通知用 */
@@ -72,6 +78,13 @@ interface State {
   /** 不要这份摘要了 */
   dropDistill(stopId: string): void;
   dismissNotice(id: string): void;
+  setRouteModel(routeId: string, model: string | null): Promise<void>;
+  /** 打开一个后台终端看输出；null 关掉 */
+  viewTerminal(terminalId: string | null): void;
+  /** 还在跑的停掉；已退出的从列表里拿掉 */
+  stopTerminal(terminalId: string): Promise<void>;
+  /** 看这一路改了什么（工作区里还没进 Local 的改动）；null 关掉 */
+  viewChanges(routeId: string | null): void;
   /** 把这一路各站的回答读回来（已经读过就不再读） */
   ensureHistory(routeId: string): void;
   ask(routeId: string, text: string): Promise<void>;
@@ -202,6 +215,19 @@ export const useStore = create<State>((set, get) => {
       case "sync.result":
         set((s) => ({ lastSync: { ...s.lastSync, [e.entry.routeId]: e.entry } }));
         break;
+      case "terminal.updated":
+        set((s) => ({ terminals: { ...s.terminals, [e.terminal.id]: e.terminal } }));
+        break;
+      case "terminal.output":
+        set((s) => (s.terminalView?.id === e.terminalId ? { terminalView: { id: e.terminalId, output: (s.terminalView.output + e.text).slice(-200_000) } } : {}));
+        break;
+      case "terminal.removed":
+        set((s) => {
+          const terminals = { ...s.terminals };
+          delete terminals[e.terminalId];
+          return { terminals, terminalView: s.terminalView?.id === e.terminalId ? null : s.terminalView };
+        });
+        break;
     }
   };
 
@@ -221,8 +247,9 @@ export const useStore = create<State>((set, get) => {
   };
 
   const loadProject = async (projectId: string) => {
-    const snap = await window.bw.snapshot(projectId);
+    const [snap, terms] = await Promise.all([window.bw.snapshot(projectId), window.bw.terminals(projectId).catch(() => [])]);
     set((s) => ({
+      terminals: { ...s.terminals, ...Object.fromEntries(terms.map((t) => [t.id, t])) },
       routes: { ...s.routes, ...Object.fromEntries(snap.routes.map((r) => [r.id, r])) },
       stops: { ...s.stops, ...Object.fromEntries(snap.stops.map((x) => [x.id, x])) },
       queue: { ...s.queue, [projectId]: snap.queue },
@@ -242,6 +269,9 @@ export const useStore = create<State>((set, get) => {
     lastSync: {},
     queue: {},
     drafts: {},
+    terminals: {},
+    terminalView: null,
+    changesView: null,
     notices: [],
     boarded: {},
     distills: {},
@@ -407,6 +437,42 @@ export const useStore = create<State>((set, get) => {
 
     ensureHistory(routeId) {
       void loadHistory(routeId);
+    },
+
+    async setRouteModel(routeId, model) {
+      try {
+        const route = await window.bw.setRouteModel(routeId, model);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    viewTerminal(terminalId) {
+      if (!terminalId) return set({ terminalView: null });
+      set({ terminalView: { id: terminalId, output: "" } });
+      // 先读到现在为止的；这之后新的输出由事件接上
+      void window.bw.terminalOutput(terminalId).then(
+        (output) => set((s) => (s.terminalView?.id === terminalId ? { terminalView: { id: terminalId, output } } : {})),
+        (e) => set({ error: message(e) }),
+      );
+    },
+
+    async stopTerminal(terminalId) {
+      try {
+        await window.bw.terminalStop(terminalId);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    viewChanges(routeId) {
+      if (!routeId) return set({ changesView: null });
+      set({ changesView: { routeId, files: null } });
+      void window.bw.changes(routeId).then(
+        (files) => set((s) => (s.changesView?.routeId === routeId ? { changesView: { routeId, files } } : {})),
+        (e) => set({ error: message(e), changesView: null }),
+      );
     },
 
     dismissNotice(id) {

@@ -7,8 +7,9 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
   shared: { modules: [], packages: [] },
   sync: { modules: ["shared"], packages: [] },
   db: { modules: ["shared"], packages: [] },
-  claude: { modules: ["shared"], packages: ["@anthropic-ai/claude-agent-sdk"] },
-  core: { modules: ["shared", "sync", "db", "claude"], packages: [] },
+  claude: { modules: ["shared"], packages: ["@anthropic-ai/claude-agent-sdk", "zod"] },
+  terminal: { modules: [], packages: [] },
+  core: { modules: ["shared", "sync", "db", "claude", "terminal"], packages: [] },
   // Electron 只进这两个模块
   main: { modules: ["shared", "core", "db", "claude"], packages: ["electron"] },
   preload: { modules: ["shared"], packages: ["electron"] },

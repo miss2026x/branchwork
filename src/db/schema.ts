@@ -62,4 +62,6 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE project ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'ask';`,
   // 3：快线的编号
   `ALTER TABLE route ADD COLUMN express_no INTEGER;`,
+  // 4：每一路用哪个模型
+  `ALTER TABLE route ADD COLUMN model TEXT;`,
 ];

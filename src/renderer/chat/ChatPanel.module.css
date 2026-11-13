@@ -169,7 +169,8 @@
 }
 .tool span {
   flex: none;
-  width: 44px;
+  min-width: 44px;
+  white-space: nowrap;
   color: var(--text-3);
 }
 /* code 元素默认用系统的等宽字体（中文 Windows 上是新宋体），这里让它跟着外面的字体走 */
@@ -412,16 +413,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-top: 10px;
 }
 .actions > span {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: var(--text-3);
 }
 .send {
+  flex: none;
+  white-space: nowrap;
   height: 40px;
   padding: 0 18px;
   display: flex;
@@ -478,4 +484,12 @@
     box-shadow: 0 0 0 6px transparent;
     background: transparent;
   }
+}
+
+.inlineLink {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

@@ -3,11 +3,12 @@ import path from "node:path";
 import { applySubset, switchTree } from "./apply";
 import { git, gitVersion } from "./git";
 import { mergeTrees } from "./merge";
-import { blobAt, diffTrees, readRef, Snapshots } from "./snapshot";
+import { blobAt, diffStat, diffTrees, readRef, Snapshots } from "./snapshot";
 import {
   SyncError,
   type ConflictFile,
   type FileChange,
+  type FileStat,
   type RecoverResult,
   type RemoveResult,
   type ResolveResult,
@@ -204,6 +205,16 @@ class Engine implements SyncEngine {
       const [work, local] = await Promise.all([this.snapRoute(routeId, true), this.snapLocal(true)]);
       const [unsynced, localAhead] = await Promise.all([diffTrees(this.localDir, base, work), diffTrees(this.localDir, base, local)]);
       return { worktreePath: wt, unsynced, localAhead, resolving: await exists(this.resolvingFile(routeId)) };
+    });
+  }
+
+  changes(routeId: string): Promise<FileStat[]> {
+    return this.serial(async () => {
+      await this.requireWorktree(routeId);
+      const base = await this.getBase(routeId);
+      const work = await this.snapRoute(routeId, true);
+      const [files, stat] = await Promise.all([diffTrees(this.localDir, base, work), diffStat(this.localDir, base, work)]);
+      return files.map((f) => ({ ...f, added: stat.get(f.path)?.added ?? null, removed: stat.get(f.path)?.removed ?? null }));
     });
   }
 

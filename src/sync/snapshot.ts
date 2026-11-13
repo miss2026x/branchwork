@@ -86,6 +86,18 @@ export async function diffTrees(dir: string, from: string, to: string): Promise<
   return out;
 }
 
+/** 两份文件树之间每个文件增删了多少行（二进制文件没有行数） */
+export async function diffStat(dir: string, from: string, to: string): Promise<Map<string, { added: number | null; removed: number | null }>> {
+  const out = new Map<string, { added: number | null; removed: number | null }>();
+  if (from === to) return out;
+  const { stdout } = await git(dir, ["diff-tree", "-r", "-z", "--no-renames", "--numstat", from, to]);
+  for (const rec of stdout.split("\0")) {
+    const m = /^(\d+|-)\t(\d+|-)\t([\s\S]+)$/.exec(rec);
+    if (m) out.set(m[3]!, { added: m[1] === "-" ? null : Number(m[1]), removed: m[2] === "-" ? null : Number(m[2]) });
+  }
+  return out;
+}
+
 /** 某份文件树里某个路径的内容编号；不存在返回 null */
 export async function blobAt(dir: string, tree: string, file: string): Promise<string | null> {
   const r = await git(dir, ["rev-parse", "--verify", "-q", `${tree}:${file}`], { okCodes: [1, 128] });

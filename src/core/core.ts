@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AskResult, ClaudeClient } from "../claude";
+import type { AskResult, ClaudeClient, ClaudeTool } from "../claude";
 import type { Db } from "../db";
 import type {
   BwEvent,
   BwListener,
   ChatItem,
+  FileStat,
   StopContent,
   PermissionDecision,
   PermissionMode,
@@ -20,8 +21,10 @@ import type {
   SyncFile,
   SyncLogEntry,
   SyncOutcomeStatus,
+  Terminal,
 } from "../shared";
 import { createSyncEngine, type SyncEngine } from "../sync";
+import { createTerminals, type TerminalInfo, type Terminals } from "../terminal";
 
 export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED";
 
@@ -45,6 +48,8 @@ export interface CoreOptions {
    * 一次性的命令行调用应关掉：进程马上就退出，提前启动只是白费。
    */
   prewarm?: boolean;
+  /** 给站起名（用小模型，只看提问）。默认开；一次性的命令行调用应关掉 */
+  naming?: boolean;
   /** 测试里换成假的同步引擎工厂；默认用真的 */
   createEngine?: (localDir: string, worktreesDir: string) => Promise<SyncEngine>;
 }
@@ -71,6 +76,15 @@ export interface Core {
   setPermissionMode(projectId: string, mode: PermissionMode): Project;
   /** 新开一路（从 Local 当前状态建工作区） */
   createRoute(projectId: string, name?: string): Promise<Route>;
+  /** 这一路以后用哪个模型（别名或完整名字）；null 用默认的。下一站起生效 */
+  setRouteModel(routeId: string, model: string | null): Route;
+  /** 这一路的工作区里还没进 Local 的改动，带增删的行数 */
+  changes(routeId: string): Promise<FileStat[]>;
+  // ── 后台终端：Claude（通过应用提供的工具）开的长时间命令，跑在那一路的工作区里，不随一站结束而停 ──
+  terminals(projectId: string): Terminal[];
+  terminalOutput(terminalId: string): string;
+  /** 还在跑的停掉；已经退出的从列表里拿掉 */
+  terminalStop(terminalId: string): Promise<void>;
   /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步 */
   ask(routeId: string, text: string): Promise<AskReport>;
   /**
@@ -123,7 +137,7 @@ export interface Core {
   history(routeId: string): Promise<StopContent[]>;
   /** 为这一路提前启动 Claude（比如用户点开这一路时） */
   warm(routeId: string): void;
-  /** 应用退出时调：关掉提前启动的 Claude */
+  /** 应用退出时调：关掉提前启动的 Claude 和所有后台终端 */
   dispose(): void;
 }
 
@@ -134,6 +148,8 @@ export function createCore(opts: CoreOptions): Core {
   const listeners = new Set<BwListener>();
   const engines = new Map<string, Promise<SyncEngine>>();
   const running = new Map<string, AbortController>();
+  /** 各路正在回答的是哪一站 */
+  const runningStop = new Map<string, string>();
   const distilling = new Map<string, AbortController>();
   const pendingPermissions = new Map<string, { routeId: string; tool: string; resolve: (d: PermissionDecision) => void }>();
 
@@ -273,7 +289,105 @@ export function createCore(opts: CoreOptions): Core {
 
   const prewarm = opts.prewarm ?? true;
   const warmRoute = (route: Route) => {
-    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined);
+    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined, route.model ?? undefined);
+  };
+
+  // ── 后台终端 ──
+  const toTerminal = (t: TerminalInfo): Terminal => ({ id: t.id, ...t.owner, name: t.name, command: t.command, cwd: t.cwd, status: t.status, exitCode: t.exitCode, port: t.port, startedAt: t.startedAt, endedAt: t.endedAt });
+  const terminals: Terminals = createTerminals({
+    onEvent: (e) => {
+      if (e.type === "updated") emit({ type: "terminal.updated", terminal: toTerminal(e.terminal) });
+      else if (e.type === "output") emit({ type: "terminal.output", terminalId: e.id, text: e.text });
+      else emit({ type: "terminal.removed", terminalId: e.terminal.id, projectId: e.terminal.owner.projectId });
+    },
+  });
+  /** 是哪一路的 Claude 在调用工具：按它所在的目录找 */
+  const routeAt = (cwd: string): Route => {
+    const at = path.resolve(cwd);
+    for (const p of db.projects.list()) {
+      const r = db.routes.listByProject(p.id).find((x) => path.resolve(x.worktreePath) === at);
+      if (r) return r;
+    }
+    throw new CoreError("NOT_FOUND", "找不到这个目录对应的路");
+  };
+  const mine = (cwd: string, terminalId: unknown): TerminalInfo => {
+    const t = terminals.get(String(terminalId ?? ""));
+    if (!t || t.owner.routeId !== routeAt(cwd).id) throw new CoreError("NOT_FOUND", `这一路没有编号是 ${String(terminalId)} 的后台终端。用 terminal_list 看看现在有哪些。`);
+    return t;
+  };
+  const describe = (t: TerminalInfo) => `${t.id}  ${t.status === "running" ? "运行中" : `已退出（退出码 ${t.exitCode ?? "未知"}）`}${t.port ? `  端口 ${t.port}` : ""}  ${t.name}：${t.command}`;
+  const lastLines = (text: string, n: number) => text.split("\n").slice(-n).join("\n").trim() || "（还没有输出）";
+  const tools: ClaudeTool[] = [
+    {
+      name: "terminal_start",
+      title: "后台终端",
+      description:
+        "在后台启动一条长时间运行的命令（开发服务器、监听构建、定时任务等）。命令在当前工作区里运行，这次回答结束后它还会继续运行，用户能在界面上看到它、看它的输出、停掉它。" +
+        "需要一直运行的命令都用这个工具启动，不要用 Bash 的后台运行（那样启动的命令在这次回答结束时会被关掉）。命令不能要求键盘输入。返回终端的编号和开头几秒的输出。",
+      params: { command: { type: "string", description: "要运行的命令，例如 npm run dev" }, name: { type: "string", description: "给用户看的短名字，例如“开发服务器”", optional: true } },
+      async run(input, { cwd }) {
+        const route = routeAt(cwd);
+        const t = terminals.start({ owner: { projectId: route.projectId, routeId: route.id, stopId: runningStop.get(route.id) ?? null }, cwd: route.worktreePath, command: String(input.command ?? ""), name: typeof input.name === "string" ? input.name : undefined });
+        // 等一小会儿，把开头的输出（或者一启动就失败的报错）带回去
+        const until = Date.now() + 3000;
+        while (Date.now() < until && terminals.get(t.id)?.status === "running" && terminals.get(t.id)?.port == null) await terminals.settle(t.id, until - Date.now());
+        const now = terminals.get(t.id)!;
+        return `${now.status === "running" ? "已在后台启动" : "启动后马上就退出了"}，编号 ${t.id}。\n${describe(now)}\n\n到目前为止的输出：\n${lastLines(terminals.output(t.id), 40)}`;
+      },
+    },
+    {
+      name: "terminal_output",
+      title: "看后台终端的输出",
+      description: "读一个后台终端最近的输出，以及它还在不在运行。",
+      params: { id: { type: "string", description: "终端的编号" }, lines: { type: "number", description: "要最后多少行，默认 60", optional: true } },
+      readonly: true,
+      async run(input, { cwd }) {
+        const t = mine(cwd, input.id);
+        return `${describe(t)}\n\n${lastLines(terminals.output(t.id), Math.min(Math.max(Number(input.lines) || 60, 1), 400))}`;
+      },
+    },
+    {
+      name: "terminal_list",
+      title: "列出后台终端",
+      description: "列出这一路现在有哪些后台终端（包括已经退出、还没清掉的）。",
+      params: {},
+      readonly: true,
+      async run(_input, { cwd }) {
+        const list = terminals.list({ routeId: routeAt(cwd).id });
+        return list.length ? list.map(describe).join("\n") : "这一路现在没有后台终端。";
+      },
+    },
+    {
+      name: "terminal_stop",
+      title: "停掉后台终端",
+      description: "停掉这一路的一个后台终端。",
+      params: { id: { type: "string", description: "终端的编号" } },
+      readonly: true,
+      async run(input, { cwd }) {
+        const t = mine(cwd, input.id);
+        await terminals.stop(t.id);
+        return `已停掉 ${t.id}（${t.name}）。`;
+      },
+    },
+  ];
+  claude.useTools(tools);
+
+  // ── 给站起名 ──
+  const naming = opts.naming ?? true;
+  /** 问小模型要一个名字；回来之前站用临时名字，回来之后换掉（你手工改过名字的不动） */
+  const nameStop = (stopId: string, routeId: string, prompt: string, tempName: string) => {
+    if (!naming) return;
+    void claude
+      .name(prompt)
+      .then((raw) => {
+        const name = raw && clampWidth(raw, 20);
+        const stop = db.stops.get(stopId);
+        if (!name || !stop || stop.nameState !== "temp") return;
+        setStop(stopId, { name, nameState: "final" });
+        // 这一路的名字如果是跟着这一站的临时名字起的，也一起换
+        if (db.routes.get(routeId)?.name === tempName) setRoute(routeId, { name });
+      })
+      .catch(() => {});
   };
 
   const tempName = stopName;
@@ -332,6 +446,8 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "stop.created", stop });
       // 还没起名的路，用它自己的第一站当名字
       if (route.name === NEW_ROUTE_NAME && !resolving) route = setRoute(routeId, { name: stop.name });
+      if (!resolving) nameStop(stop.id, routeId, text, stop.name);
+      runningStop.set(routeId, stop.id);
 
       const stopId = stop.id;
       const stoppedEarly: AskResult = { outcome: "interrupted", sessionId: route.sessionId, text: "", error: null, promptMessageId: null, lastMessageId: null };
@@ -344,6 +460,7 @@ export function createCore(opts: CoreOptions): Core {
           // 快线的第一个问题：连同交接摘要一起交给 Claude（这是个全新的会话，它看不到原来的对话）
           prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : text,
           sessionId: route.sessionId ?? undefined,
+          model: route.model ?? undefined,
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
           signal: abort.signal,
           onEvent: (e) => {
@@ -366,7 +483,9 @@ export function createCore(opts: CoreOptions): Core {
         })
         .catch((e: unknown) => ({ outcome: "failed" as const, sessionId: null, text: "", error: e instanceof Error ? e.message : String(e), promptMessageId: null, lastMessageId: null }));
       running.delete(routeId);
+      runningStop.delete(routeId);
       dropPermissions(routeId);
+      route = mustRoute(routeId); // 回答期间名字、模型可能被改过
 
       if (result.sessionId && result.sessionId !== route.sessionId) route = setRoute(routeId, { sessionId: result.sessionId });
       const ended = { endedAt: Date.now(), messageId: result.promptMessageId, lastMessageId: result.lastMessageId };
@@ -504,6 +623,7 @@ export function createCore(opts: CoreOptions): Core {
         worktreePath,
         parentRouteId: null,
         forkStopId: null,
+        model: null,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -511,6 +631,31 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "route.updated", route });
       warmRoute(route);
       return route;
+    },
+
+    setRouteModel(routeId, model) {
+      const before = mustRoute(routeId);
+      const next = model?.trim() || null;
+      if (before.model === next) return before;
+      const route = setRoute(routeId, { model: next });
+      // 提前启动好的那个用的是旧模型：换一个（正在回答时不动，这一站结束后自然会按新的准备）
+      if (route.status !== "answering" && route.status !== "awaiting_permission") warmRoute(route);
+      return route;
+    },
+
+    async changes(routeId) {
+      const route = mustRoute(routeId);
+      const engine = await engineFor(mustProject(route.projectId));
+      return engine.changes(routeId);
+    },
+
+    terminals: (projectId) => terminals.list({ projectId }).map(toTerminal),
+    terminalOutput: (terminalId) => (terminals.get(terminalId) ? terminals.output(terminalId) : ""),
+    async terminalStop(terminalId) {
+      const t = terminals.get(terminalId);
+      if (!t) return;
+      if (t.status === "running") await terminals.stop(terminalId);
+      else await terminals.remove(terminalId);
     },
 
     ask: (routeId, text) => runStop(routeId, text),
@@ -547,6 +692,7 @@ export function createCore(opts: CoreOptions): Core {
         worktreePath,
         parentRouteId: parent.id,
         forkStopId: stop.id,
+        model: parent.model,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -561,6 +707,7 @@ export function createCore(opts: CoreOptions): Core {
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能归档");
       if (route.status === "archived") return route;
       claude.cool(route.worktreePath);
+      void terminals.removeAll({ routeId });
       releaseQueue(route);
       return setRoute(routeId, { status: "archived", archivedAt: Date.now() });
     },
@@ -581,6 +728,7 @@ export function createCore(opts: CoreOptions): Core {
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能删除");
       const engine = await engineFor(mustProject(route.projectId));
       claude.cool(route.worktreePath); // 提前启动好的 Claude 占着这个目录，先关掉才删得了
+      if (force || (await engine.status(routeId).then((s) => s.unsynced.length === 0, () => false))) await terminals.removeAll({ routeId }); // 后台终端也占着目录
       const removed = await engine.removeWorktree(routeId, { force });
       if (removed.status === "has-unsynced") return { status: "has-unsynced", files: removed.files.map((f) => ({ path: f.path, note: f.kind })) };
       if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
@@ -644,6 +792,7 @@ export function createCore(opts: CoreOptions): Core {
         worktreePath,
         parentRouteId: source.id,
         forkStopId: stop.id,
+        model: source.model,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -786,7 +935,10 @@ export function createCore(opts: CoreOptions): Core {
 
     warm: (routeId) => warmRoute(mustRoute(routeId)),
 
-    dispose: () => claude.dispose(),
+    dispose() {
+      claude.dispose();
+      void terminals.dispose();
+    },
   };
 }
 
@@ -831,6 +983,18 @@ export function stopName(prompt: string): string {
     out += ch;
   }
   return out.trim() || "新的一站";
+}
+
+/** 按显示宽度截断：汉字算 2，英文字母算 1 */
+function clampWidth(text: string, max: number): string {
+  let width = 0;
+  let out = "";
+  for (const ch of text.trim()) {
+    width += /[\u0000-\u00ff]/.test(ch) ? 1 : 2;
+    if (width > max) break;
+    out += ch;
+  }
+  return out.trim();
 }
 
 /** 改文件的工具。“改文件不问”时只放行这些 */

@@ -318,3 +318,115 @@ describe("提前启动：启动 Claude 要几十秒的机器上，问的时候�
     expect(r.outcome).toBe("interrupted");
   });
 });
+
+describe("模型、应用自己的工具、起名", () => {
+  const options = async (run: (client: ReturnType<typeof createClaudeClient>) => Promise<unknown>) => {
+    let seen: Record<string, unknown> | undefined;
+    const client = createClaudeClient(fakeSdk([init, success], { onQuery: (p) => (seen = p.options) }));
+    await run(client);
+    return seen!;
+  };
+
+  it("选了模型就交给 SDK；没选不传", async () => {
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x", model: "opus" }))).toMatchObject({ model: "opus" });
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).not.toHaveProperty("model");
+  });
+
+  it("提前启动的进程用的是另一个模型：不能用，关掉后现启动", async () => {
+    const log: string[] = [];
+    let closed = false;
+    const turn = (label: string) =>
+      (async function* () {
+        log.push(label);
+        yield init;
+        yield success;
+      })();
+    const client = createClaudeClient(
+      fakeSdk([], {
+        query: (p) => turn(`cold:${String((p.options as { model?: string }).model)}`),
+        startup: async (p) => ({ query: () => turn(`warm:${String((p.options as { model?: string }).model)}`), close: () => void (closed = true) }),
+      }),
+    );
+    client.warm("/wt", undefined, "sonnet");
+    await client.ask({ cwd: "/wt", prompt: "x", model: "opus" });
+    expect(log).toEqual(["cold:opus"]);
+    await new Promise((r) => setImmediate(r));
+    expect(closed).toBe(true);
+    // 模型对得上就用提前启动的
+    client.warm("/wt", "S1", "opus");
+    await client.ask({ cwd: "/wt", prompt: "y", sessionId: "S1", model: "opus" });
+    expect(log).toEqual(["cold:opus", "warm:opus"]);
+  });
+
+  it("应用自己的工具挂到 Claude 上；只读的不问批准，别的问批准时用给人看的名字", async () => {
+    const asked: unknown[] = [];
+    const answers: unknown[] = [];
+    const calls: unknown[] = [];
+    const client = createClaudeClient(
+      fakeSdk([], {
+        query: (p) =>
+          (async function* () {
+            yield init;
+            const o = p.options as { canUseTool: (...a: unknown[]) => Promise<unknown>; mcpServers: Record<string, { type: string; name: string }> };
+            expect(Object.keys(o.mcpServers)).toEqual(["branchwork"]);
+            expect(o.mcpServers.branchwork).toMatchObject({ type: "sdk", name: "branchwork" });
+            const extra = { signal: new AbortController().signal };
+            answers.push(await o.canUseTool("mcp__branchwork__peek", { id: "t1" }, extra));
+            answers.push(await o.canUseTool("mcp__branchwork__launch", { command: "npm run dev" }, extra));
+            yield assistant({ type: "tool_use", name: "mcp__branchwork__launch", input: { command: "npm run dev" } });
+            yield success;
+          })(),
+      }),
+    );
+    client.useTools([
+      { name: "launch", title: "后台终端", description: "开", params: { command: { type: "string", description: "命令" } }, run: async (input, ctx) => (calls.push([input, ctx]), "ok") },
+      { name: "peek", title: "看输出", description: "看", params: { id: { type: "string", description: "编号" }, lines: { type: "number", description: "行数", optional: true } }, readonly: true, run: async () => "ok" },
+    ]);
+    const events: ClaudeEvent[] = [];
+    await client.ask({ cwd: "/wt", prompt: "x", onEvent: (e) => events.push(e), onPermission: async (req) => (asked.push(req), "allow") });
+    expect(answers[0]).toEqual({ behavior: "allow", updatedInput: { id: "t1" } });
+    expect(asked).toEqual([{ tool: "后台终端", input: { command: "npm run dev" }, canRemember: false }]);
+    expect(events).toContainEqual({ type: "tool", tool: "后台终端", input: { command: "npm run dev" } });
+    // 没有工具时不挂这个服务
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).not.toHaveProperty("mcpServers");
+  });
+
+  it("起名：一个进程反复用，一问一答；名字去掉引号和句号；起不出来返回 null", async () => {
+    const queries: Record<string, unknown>[] = [];
+    const replies = ["“修复登录按钮”。", "标题：加一个导出功能", "", "这是一个非常非常长的、根本不像标题的回答，它把提问从头到尾回答了一遍"];
+    const fns = fakeSdk([], {
+      query: (p) => {
+        queries.push(p.options as Record<string, unknown>);
+        return (async function* () {
+          yield init;
+          for await (const m of p.prompt as AsyncIterable<{ message: { content: string } }>) {
+            expect(m.message.content).toContain("<提问>");
+            const reply = replies.shift()!;
+            yield reply ? { type: "result", subtype: "success", is_error: false, result: reply } : { type: "result", subtype: "error_during_execution", is_error: true };
+          }
+        })();
+      },
+    });
+    const client = createClaudeClient(fns);
+    const names = await Promise.all([client.name("登录页点了没反应"), client.name("加导出"), client.name("会失败的"), client.name("太长的")]);
+    expect(names).toEqual(["修复登录按钮", "加一个导出功能", null, null]);
+    expect(queries).toHaveLength(1); // 只启动了一次
+    expect(queries[0]).toMatchObject({ model: "haiku", tools: [], persistSession: false });
+    expect(await client.name("   ")).toBeNull();
+    client.dispose();
+  });
+
+  it("起名的进程启动不了或一直不回：不卡住，返回 null", async () => {
+    const broken = createClaudeClient(
+      fakeSdk([], {
+        query: () =>
+          (async function* () {
+            throw new Error("spawn failed");
+          })(),
+      }),
+    );
+    expect(await broken.name("x")).toBeNull();
+    const silent = createClaudeClient(fakeSdk([], { query: () => (async function* () { await new Promise(() => {}); })() }), { namingTimeoutMs: 50 });
+    expect(await silent.name("x")).toBeNull();
+  });
+});

@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "resolveConflict", "resync", "setPermissionMode", "snapshot", "stop", "syncLog", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "resolveConflict", "resync", "setPermissionMode", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -324,5 +324,49 @@ describe("应用", () => {
     await expect.poll(() => page.locator("textarea").count()).toBe(0);
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+  });
+  it("模型、起名、后台终端：选模型；站名稍后换成小模型起的；Claude 开的终端在一站结束后还在，能看输出、能停", async () => {
+    await page.getByRole("button", { name: /^模型：默认/ }).click();
+    await page.getByRole("menuitemradio", { name: /Sonnet/ }).click();
+    await expect.poll(() => page.getByRole("button", { name: /^模型：Sonnet/ }).isVisible()).toBe(true);
+
+    await page.locator("textarea").fill("起名试试，再开一个终端");
+    await page.keyboard.press("Enter");
+    // 项目此时是“全部不问”：写文件、开后台终端都不用点批准
+    const strip = page.getByRole("region", { name: "后台终端" });
+    await expect.poll(() => strip.getByText("演示服务").isVisible(), { timeout: 60000 }).toBe(true);
+    // 这一站结束了，终端还在跑
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+    await expect.poll(() => strip.getByText("1 个在跑").isVisible()).toBe(true);
+    await expect.poll(() => strip.getByText(":5173", { exact: true }).isVisible()).toBe(true);
+    // 站名换成了起好的名字
+    await expect.poll(() => page.getByRole("log").getByText("演示起的名字").isVisible(), { timeout: 30000 }).toBe(true);
+    await shot("20-terminal-strip");
+
+    await strip.getByText("演示服务").click();
+    const win = page.getByRole("dialog", { name: /后台终端/ });
+    await expect.poll(() => win.getByLabel("输出").textContent(), { timeout: 30000 }).toContain("tick");
+    expect(await win.getByText(/工作区里的代码，不是 Local/).isVisible()).toBe(true);
+    await shot("21-terminal-window");
+    await win.getByRole("button", { name: "停止" }).click();
+    await expect.poll(() => win.getByRole("button", { name: "从列表里清掉" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await win.getByRole("button", { name: "从列表里清掉" }).click();
+    await expect.poll(() => win.count()).toBe(0);
+    await expect.poll(() => strip.count()).toBe(0);
+  });
+
+  it("看改了什么：没答完的一站，能列出留在工作区里的改动", async () => {
+    await page.locator("textarea").fill("写完拖一会儿");
+    await page.keyboard.press("Enter");
+    // 等它把文件写了（工具那一行出现），在它说完之前停车
+    await expect.poll(() => page.getByRole("log").locator("section").last().getByText("demo-notes.md").count(), { timeout: 60000 }).toBeGreaterThan(1);
+    await page.getByRole("button", { name: "停车" }).click();
+    await page.getByRole("button", { name: "看改了什么" }).click({ timeout: 60000 });
+    const dialog = page.getByRole("dialog", { name: /改了什么/ });
+    await expect.poll(() => dialog.getByText("demo-notes.md").isVisible(), { timeout: 30000 }).toBe(true);
+    expect(await dialog.getByText("1 个文件").isVisible()).toBe(true);
+    await shot("22-changes");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => dialog.count()).toBe(0);
   });
 });

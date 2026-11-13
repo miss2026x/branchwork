@@ -17,6 +17,7 @@ const route = (id: string, number: number): Route => ({
   worktreePath: `/tmp/wt/${id}`,
   parentRouteId: null,
   forkStopId: null,
+  model: null,
   createdAt: number,
   archivedAt: null,
 });

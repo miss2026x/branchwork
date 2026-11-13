@@ -1,0 +1,72 @@
+.empty {
+  margin: 8px 24px 28px;
+  color: var(--text-3);
+}
+.total {
+  margin: 4px 24px 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.files {
+  margin: 0 16px 20px;
+  padding: 0;
+  list-style: none;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.files li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: var(--r-6);
+}
+.files li:nth-child(odd) {
+  background: var(--surface-1);
+}
+.kind {
+  flex: none;
+  width: 36px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+li[data-kind="added"] .kind {
+  color: var(--green);
+}
+li[data-kind="deleted"] .kind {
+  color: var(--red);
+}
+.files code {
+  flex: 1;
+  min-width: 0;
+  font: 12px var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+.files code i {
+  font-style: normal;
+  color: var(--text-4);
+}
+.plus,
+.minus {
+  flex: none;
+  min-width: 36px;
+  text-align: right;
+  font: 600 12px var(--mono);
+}
+.plus {
+  color: var(--green);
+}
+.minus {
+  color: var(--red);
+}
+.binary {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-4);
+}

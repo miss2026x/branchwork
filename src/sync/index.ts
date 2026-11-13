@@ -9,6 +9,7 @@ export type {
   ConflictFile,
   ConflictReason,
   FileChange,
+  FileStat,
   RecoverResult,
   RemoveResult,
   ResolveResult,

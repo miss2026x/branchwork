@@ -57,7 +57,7 @@ fs.mkdirSync(home, { recursive: true });
 const db = openDb(path.join(home, "bw.sqlite"));
 const claude = createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING });
 // 只有 chat 是常驻的；其他命令跑完就退出，提前启动 Claude 只是白费
-const core = createCore({ db, claude, worktreesRoot: path.join(home, "worktrees"), prewarm: cmd === "chat" });
+const core = createCore({ db, claude, worktreesRoot: path.join(home, "worktrees"), prewarm: cmd === "chat", naming: cmd === "chat" });
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const showSync = (e: SyncLogEntry | null) => {

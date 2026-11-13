@@ -20,6 +20,8 @@ interface Props {
   /** 接着答完没答完的那一站 */
   onContinue(routeId: string): void;
   onResync(routeId: string): void;
+  /** 看这一路的工作区里改了什么 */
+  onViewChanges(routeId: string): void;
   onJump(stopId: string): void;
   onStop(routeId: string): void;
   onBoard(itemId: string): void;
@@ -127,7 +129,7 @@ function Card({ n, ...p }: Props & { n: Notice }) {
           <button className={css.primary} onClick={act(() => p.onContinue(route.id))}>
             接着答完
           </button>
-          <button onClick={act(() => p.onGoToRoute(route.id))}>去看看</button>
+          <button onClick={() => p.onViewChanges(route.id)}>看改了什么</button>
         </>,
       );
     }

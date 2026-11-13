@@ -22,6 +22,13 @@ export interface FileChange {
   kind: "added" | "modified" | "deleted";
 }
 
+/** 一个改动过的文件，以及增删了多少行 */
+export interface FileStat extends FileChange {
+  /** 二进制文件为空 */
+  added: number | null;
+  removed: number | null;
+}
+
 export type SyncResult =
   /** 没有需要同步的内容 */
   | { status: "noop" }
@@ -107,6 +114,8 @@ export interface SyncEngine {
   mergeForResolve(routeId: string): Promise<ResolveResult>;
   /** 这一路现在的同步情况 */
   status(routeId: string): Promise<RouteStatus>;
+  /** 工作区里还没进 Local 的改动，带每个文件增删的行数 */
+  changes(routeId: string): Promise<FileStat[]>;
   /** 删除一路的工作区；有未同步改动时默认不删 */
   removeWorktree(routeId: string, opts?: { force?: boolean }): Promise<RemoveResult>;
   /** 应用启动时调：检查上次有没有写到一半的同步 */

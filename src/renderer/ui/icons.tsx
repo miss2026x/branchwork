@@ -24,6 +24,7 @@ export const IconMore = (p: P) => <Icon {...p}><circle cx="5" cy="12" r="1" /><c
 export const IconSearch = (p: P) => <Icon {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></Icon>;
 export const IconChat = (p: P) => <Icon {...p}><path d="M4 5h16v11H9l-5 4V5z" /></Icon>;
 export const IconAlert = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v6M12 16.5v.01" /></Icon>;
+export const IconTerminal = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9l3 3-3 3M12.5 15H17" /></Icon>;
 export const IconStop = (p: P) => <Icon {...p}><rect x="6" y="6" width="12" height="12" rx="2" /></Icon>;
 
 /** 应用图标里的那辆车 */

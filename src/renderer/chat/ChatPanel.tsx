@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatItem, PermissionMode, Route, Stop } from "../../shared";
+import type { ChatItem, PermissionMode, Route, Stop, Terminal } from "../../shared";
+import { TerminalStrip } from "../terminal/TerminalStrip";
+import { ModelControl } from "./ModelControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
@@ -23,6 +25,14 @@ interface Props {
   permissionMode: PermissionMode;
   projectName: string;
   onPermissionMode(mode: PermissionMode): void;
+  /** 这一路换模型 */
+  onModel(model: string | null): void;
+  /** 这一路的后台终端 */
+  terminals: Terminal[];
+  onOpenTerminal(terminalId: string): void;
+  onStopTerminal(terminalId: string): void;
+  /** 看这一路的工作区里有哪些改动还没进 Local */
+  onViewChanges(): void;
   /** 候车区里派给这一路的问题有几个 */
   queued: number;
   /** 这一路还在路上时“排队”：放进候车区，到站后自动发 */
@@ -43,7 +53,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, queued, onQueue, focus, onCollapse }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, queued, onQueue, focus, onCollapse, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -170,7 +180,12 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               {l && items.length === 0 && <p className={css.waiting}>{l.phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>}
               {s.status === "interrupted" && (
                 <p className={css.noteAmber}>
-                  没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（已停车）"}。这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。
+                  没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（已停车）"}。这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。{" "}
+                  {s.syncState === "unsynced" && (
+                    <button className={css.inlineLink} onClick={onViewChanges}>
+                      看改了什么
+                    </button>
+                  )}
                 </p>
               )}
               {s.status === "done" && s.syncState === "synced" && <p className={css.synced}>改动已进 Local</p>}
@@ -233,6 +248,16 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         </div>
       )}
 
+      <TerminalStrip
+        terminals={terminals}
+        stopLabel={(id) => {
+          const s = id ? stops.find((x) => x.id === id) : undefined;
+          return s ? `第 ${offset + s.seq} 站` : null;
+        }}
+        onOpen={onOpenTerminal}
+        onStop={onStopTerminal}
+      />
+
       <footer className={css.composer}>
         {busy && (
           <div className={css.running}>
@@ -255,6 +280,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         />
         <div className={css.actions}>
           <PermissionModeControl mode={permissionMode} projectName={projectName} onChange={onPermissionMode} />
+          <ModelControl model={route.model} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
           <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : queued > 0 ? `候车区里有 ${queued} 个问题派给了这一路` : ""}</span>
           <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
             {busy ? "排队" : "发车"} <IconSend size={14} />

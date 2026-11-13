@@ -5,4 +5,4 @@
 export { createClaudeClient } from "./sdk-client";
 export { createDemoClaudeClient } from "./demo-client";
 export type { ClaudeClientOptions, SdkFunctions } from "./sdk-client";
-export type { AskOptions, AskOutcome, AskResult, ClaudeClient, ClaudeEvent, HistoryMessage, PermissionRequest } from "./types";
+export type { AskOptions, AskOutcome, AskResult, ClaudeClient, ClaudeEvent, ClaudeTool, HistoryMessage, PermissionRequest } from "./types";

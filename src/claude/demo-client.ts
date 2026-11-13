@@ -1,15 +1,17 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AskOptions, AskResult, ClaudeClient, HistoryMessage } from "./types";
+import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage } from "./types";
 
 /**
  * 演示用的假 Claude：不联网、不需要登录，按固定剧本回答，并真的在工作区里改一个文件。
  * 设置环境变量 BRANCHWORK_DEMO=1 启动应用时使用。用途：不等真 Claude 也能试界面；自动测试整个应用。
- * 剧本：先说两句 → 申请批准写文件 → 写 demo-notes.md → 说完。提问里带“慢”字会多等几秒。
+ * 剧本：先说两句 → 申请批准写文件 → 写 demo-notes.md → 说完。提问里带“慢”字会多等几秒，带“拖”字会在写完文件后再等几秒；
+ * 带“终端”两个字会另外开一个后台终端（每秒打印一行，并报一个端口）；带“起名”两个字会在稍后把站名换成“演示起的名字”。
  */
 export function createDemoClaudeClient(): ClaudeClient {
   const sessions = new Map<string, HistoryMessage[]>();
+  let tools: ClaudeTool[] = [];
   const sleep = (ms: number, signal?: AbortSignal) =>
     new Promise<void>((resolve) => {
       const t = setTimeout(resolve, ms);
@@ -53,8 +55,19 @@ export function createDemoClaudeClient(): ClaudeClient {
           await say("你没有批准，文件没有改。");
         } else if (!stopped()) {
           await fs.appendFile(file, `- 第 ${n} 站：${opts.prompt.replace(/\s+/g, " ")}\n`);
+          // 带“拖”字：写完文件后再磨蹭几秒，方便试“改了一半就停车”
+          if (opts.prompt.includes("拖")) await sleep(6000, opts.signal);
           await say("写好了。到站后这个改动会同步到 Local。");
         }
+      }
+      const start = tools.find((t) => t.name === "terminal_start");
+      if (!stopped() && start && opts.prompt.includes("终端")) {
+        const input = { name: "演示服务", command: `node -e "console.log('ready on http://localhost:5173');setInterval(()=>console.log('tick '+Date.now()),1000)"` };
+        blocks.push({ type: "tool_use", name: start.title, input });
+        opts.onEvent?.({ type: "tool", tool: start.title, input });
+        const decision = opts.onPermission ? await opts.onPermission({ tool: start.title, input, canRemember: false }) : "deny";
+        if (decision === "deny") await say("\n\n你没有批准，后台终端没有开。");
+        else if (!stopped()) await say("\n\n" + (await start.run(input, { cwd: opts.cwd }).catch((e: unknown) => String(e))));
       }
       if (stopped()) outcome = "interrupted";
       else opts.onEvent?.({ type: "answered" });
@@ -70,6 +83,15 @@ export function createDemoClaudeClient(): ClaudeClient {
     },
     history: async (sessionId) => sessions.get(sessionId) ?? [],
     deleteSession: async (sessionId) => void sessions.delete(sessionId),
+    useTools(list) {
+      tools = list;
+    },
+    // 提问里带“起名”两个字时演示“名字晚一点换掉”的效果；别的提问不起名
+    async name(prompt) {
+      if (!prompt.includes("起名")) return null;
+      await sleep(800);
+      return "演示起的名字";
+    },
     warm() {},
     cool() {},
     dispose() {},

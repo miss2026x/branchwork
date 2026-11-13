@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -26,7 +26,7 @@ export function installMockBw(): void {
 
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
-    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, createdAt: Date.now(), archivedAt: null, ...extra };
+    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
   };
@@ -168,6 +168,18 @@ export function installMockBw(): void {
     void run(routeId, next.text).then(() => autoBoard(routeId));
   };
 
+  // 后台终端的假数据：GitHub 登录这一路开着一个开发服务器，还有一个已经退出的测试
+  const terminals: Terminal[] = [];
+  const withTerminals = [...routes.values()].find((x) => x.name === "GitHub 登录");
+  if (withTerminals) {
+    const stopId = [...stops.values()].find((x) => x.routeId === withTerminals.id)?.id ?? null;
+    const base = { projectId: withTerminals.projectId, routeId: withTerminals.id, stopId, cwd: withTerminals.worktreePath };
+    terminals.push(
+      { ...base, id: "t1", name: "开发服务器", command: "npm run dev", status: "running", exitCode: null, port: 5173, startedAt: Date.now() - 18 * 60_000, endedAt: null },
+      { ...base, id: "t2", name: "测试（监听）", command: "npm test -- --watch", status: "exited", exitCode: 1, port: null, startedAt: Date.now() - 40 * 60_000, endedAt: Date.now() - 31 * 60_000 },
+    );
+  }
+
   const api: BwApi = {
     listProjects: async () => projects,
     pickDirectory: async () => `D:/work/demo-${projects.length + 1}`,
@@ -188,6 +200,31 @@ export function installMockBw(): void {
       emit({ type: "project.updated", project: projects[i]! });
       if (mode === "all") for (const [k, resolve] of permissions) (permissions.delete(k), resolve("allow"));
       return projects[i]!;
+    },
+    async setRouteModel(routeId, model) {
+      return setRoute(routeId, { model });
+    },
+    changes: async () => [
+      { path: "src/auth/session.ts", kind: "modified", added: 42, removed: 17 },
+      { path: "src/auth/providers/github.ts", kind: "added", added: 86, removed: 0 },
+      { path: "src/auth/legacy-cookie.ts", kind: "deleted", added: 0, removed: 120 },
+      { path: "public/logo.png", kind: "modified", added: null, removed: null },
+    ],
+    terminals: async (projectId) => terminals.filter((t) => t.projectId === projectId),
+    terminalOutput: async (terminalId) =>
+      terminalId === "t1"
+        ? "> auth-service@1.4.0 dev\n> vite --port 5173\n\n  VITE v7.1.0  ready in 412 ms\n\n  ➜  Local:   http://localhost:5173/\n  ➜  Network: use --host to expose\n\n10:42:07 [vite] hmr update /src/auth/login-flow.ts\n10:44:31 [vite] hmr update /src/auth/session.ts\n"
+        : "> auth-service@1.4.0 test\n> vitest --watch\n\n ✓ tests/auth/session.test.ts (12)\n ✗ tests/auth/github.test.ts (3)\n   × exchanges the code for a token\n\n Test Files  1 failed | 1 passed (2)\n",
+    async terminalStop(terminalId) {
+      const t = terminals.find((x) => x.id === terminalId);
+      if (!t) return;
+      if (t.status === "running") {
+        Object.assign(t, { status: "exited", exitCode: null, endedAt: Date.now() });
+        emit({ type: "terminal.updated", terminal: { ...t } });
+      } else {
+        terminals.splice(terminals.indexOf(t), 1);
+        emit({ type: "terminal.removed", terminalId, projectId: t.projectId });
+      }
     },
     async createRoute(projectId, name) {
       const r = addRoute(projectId, name ?? "");

@@ -907,3 +907,137 @@ describe("项目", () => {
     expect(has(lab.local, "b.txt")).toBe(true);
   });
 });
+
+describe("每一路用哪个模型", () => {
+  it("选了模型：下一站起用它，提前启动的也按它准备；分叉出来的路沿用", async () => {
+    const route = await core.createRoute(project.id);
+    expect(route.model).toBeNull();
+    await core.ask(route.id, "第一站");
+    expect(claude.asks[0]!.model).toBeUndefined(); // 没选就用 Claude Code 的默认
+
+    const changed = core.setRouteModel(route.id, "opus");
+    expect(changed.model).toBe("opus");
+    expect(events.some((e) => e.type === "route.updated" && e.route.model === "opus")).toBe(true);
+    expect(claude.warmedModels.at(-1)).toBe("opus");
+    await core.ask(route.id, "第二站");
+    expect(claude.asks[1]!.model).toBe("opus");
+
+    const forked = await core.fork(route.id, stopsOf(route.id)[0]!.id);
+    expect(forked.model).toBe("opus");
+    expect(core.setRouteModel(route.id, null).model).toBeNull();
+  });
+});
+
+describe("给站起名", () => {
+  it("小模型只看提问起名：名字回来后换掉临时名字，跟着这一站起名的路也一起换", async () => {
+    const asked: string[] = [];
+    let give!: (name: string | null) => void;
+    claude.namer = (prompt) => {
+      asked.push(prompt);
+      return new Promise((r) => (give = r));
+    };
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "登录页点了没反应，帮我看看是不是事件没绑上");
+    expect(asked).toEqual(["登录页点了没反应，帮我看看是不是事件没绑上"]);
+    expect(stopsOf(route.id)[0]).toMatchObject({ name: "登录页点了没反应", nameState: "temp" });
+
+    give("“修复登录按钮”。");
+    await until("stop.updated");
+    await new Promise((r) => setImmediate(r));
+    // 引号、句号这类由 claude 模块收拾；这里只管换名字
+    expect(stopsOf(route.id)[0]).toMatchObject({ nameState: "final" });
+    expect(routeOf(route.id).name).toBe(stopsOf(route.id)[0]!.name);
+    expect(routeOf(route.id).name).not.toBe("登录页点了没反应");
+  });
+
+  it("起不出名字就一直用临时名字；你自己起过名的路不动", async () => {
+    claude.namer = async () => null;
+    const route = await core.createRoute(project.id, "我起的名字");
+    await core.ask(route.id, "随便问问");
+    expect(stopsOf(route.id)[0]).toMatchObject({ name: "随便问问", nameState: "temp" });
+
+    claude.namer = async () => "新名字";
+    await core.ask(route.id, "再问一个问题");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(stopsOf(route.id)[1]).toMatchObject({ name: "新名字", nameState: "final" });
+    expect(routeOf(route.id).name).toBe("我起的名字");
+  });
+});
+
+describe("看改了什么", () => {
+  it("没答完的一站改动留在工作区：能列出改了哪些文件、各增删多少行", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      write(t.cwd, "b.txt", "one\ntwo\nthree\n");
+      write(t.cwd, "new.txt", "hello\n");
+      return "interrupted";
+    };
+    await core.ask(route.id, "改到一半");
+    const files = await core.changes(route.id);
+    expect(files.find((f) => f.path === "new.txt")).toEqual({ path: "new.txt", kind: "added", added: 1, removed: 0 });
+    expect(files.find((f) => f.path === "b.txt")).toMatchObject({ kind: "modified", added: 3 });
+    expect(has(lab.local, "new.txt")).toBe(false);
+
+    // 正常答完、进了 Local 之后就没有了
+    claude.script = () => {};
+    await core.ask(route.id, "接着做完");
+    expect(await core.changes(route.id)).toEqual([]);
+  });
+});
+
+describe("后台终端", () => {
+  const forever = `node -e "console.log('up http://localhost:4567');setInterval(()=>{},1000)"`;
+
+  it("Claude 用应用给的工具开的命令：记在这一路这一站名下，这一站结束后还在跑", async () => {
+    expect(claude.tools.map((t) => t.name)).toEqual(["terminal_start", "terminal_output", "terminal_list", "terminal_stop"]);
+    const route = await core.createRoute(project.id);
+    let reply = "";
+    claude.script = async (t) => {
+      reply = await t.callTool("terminal_start", { command: forever, name: "开发服务器" });
+    };
+    await core.ask(route.id, "把开发服务器跑起来");
+    const [term] = core.terminals(project.id);
+    expect(term).toMatchObject({ projectId: project.id, routeId: route.id, stopId: stopsOf(route.id)[0]!.id, name: "开发服务器", status: "running", port: 4567, cwd: route.worktreePath });
+    expect(reply).toContain(term!.id);
+    expect(reply).toContain("up http://localhost:4567");
+    expect(routeOf(route.id).status).toBe("idle");
+    expect(events.some((e) => e.type === "terminal.updated" && e.terminal.port === 4567)).toBe(true);
+    expect(core.terminalOutput(term!.id)).toContain("up http://localhost:4567");
+
+    // 下一站的 Claude 还能看到它、读它的输出、停掉它
+    const seen: string[] = [];
+    claude.script = async (t) => {
+      seen.push(await t.callTool("terminal_list"));
+      seen.push(await t.callTool("terminal_output", { id: term!.id }));
+      seen.push(await t.callTool("terminal_stop", { id: term!.id }));
+    };
+    await core.ask(route.id, "停掉它");
+    expect(seen[0]).toContain("运行中");
+    expect(seen[1]).toContain("up http://localhost:4567");
+    expect(core.terminals(project.id)[0]).toMatchObject({ status: "exited" });
+
+    // 已退出的：再点一次就从列表里拿掉
+    await core.terminalStop(term!.id);
+    expect(core.terminals(project.id)).toEqual([]);
+    expect(events.some((e) => e.type === "terminal.removed")).toBe(true);
+  });
+
+  it("别的路的终端碰不到；这一路删除时它的终端一起停掉", async () => {
+    const a = await core.createRoute(project.id);
+    const b = await core.createRoute(project.id);
+    claude.script = async (t) => void (await t.callTool("terminal_start", { command: forever }));
+    await core.ask(a.id, "开一个");
+    const [term] = core.terminals(project.id);
+
+    let error = "";
+    claude.script = async (t) => {
+      error = await t.callTool("terminal_stop", { id: term!.id }).catch((e: Error) => e.message);
+    };
+    await core.ask(b.id, "停掉别人的");
+    expect(error).toContain("这一路没有");
+    expect(core.terminals(project.id)[0]).toMatchObject({ status: "running" });
+
+    await core.deleteRoute(a.id, true);
+    expect(core.terminals(project.id)).toEqual([]);
+  });
+});

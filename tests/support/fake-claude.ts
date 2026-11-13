@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AskOptions, AskResult, ClaudeClient, HistoryMessage } from "../../src/claude";
+import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage } from "../../src/claude";
 import type { PermissionDecision } from "../../src/shared";
 
 export interface FakeTurn {
@@ -12,6 +12,8 @@ export interface FakeTurn {
   say(text: string): void;
   tool(name: string, input?: Record<string, unknown>): void;
   askPermission(tool: string, input?: Record<string, unknown>, canRemember?: boolean): Promise<PermissionDecision>;
+  /** 调用应用提供的工具（不经过批准），返回它给 Claude 看的文字 */
+  callTool(name: string, input?: Record<string, unknown>): Promise<string>;
 }
 
 /** 这一站里假 Claude 做什么。返回值是这一站怎么结束；不返回算正常结束 */
@@ -49,6 +51,11 @@ export class FakeClaude implements ClaudeClient {
         },
         tool: (name, input = {}) => opts.onEvent?.({ type: "tool", tool: name, input }),
         askPermission: (tool, input = {}, canRemember = true) => (opts.onPermission ? opts.onPermission({ tool, input, canRemember }) : Promise.resolve("deny")),
+        callTool: (name, input = {}) => {
+          const tool = this.tools.find((t) => t.name === name);
+          if (!tool) throw new Error(`no tool ${name}`);
+          return tool.run(input, { cwd: opts.cwd });
+        },
       });
       if (r) outcome = r;
     } catch (e) {
@@ -63,9 +70,21 @@ export class FakeClaude implements ClaudeClient {
 
   /** 记下被要求提前启动的（目录, 会话） */
   readonly warmed: [string, string | undefined][] = [];
+  /** 每次提前启动时要的模型 */
+  readonly warmedModels: (string | undefined)[] = [];
   disposed = false;
-  warm(cwd: string, sessionId?: string): void {
+  warm(cwd: string, sessionId?: string, model?: string): void {
     this.warmed.push([cwd, sessionId]);
+    this.warmedModels.push(model);
+  }
+  tools: ClaudeTool[] = [];
+  useTools(tools: ClaudeTool[]): void {
+    this.tools = tools;
+  }
+  /** 起名：默认起不出来（返回 null）。测试里换掉它 */
+  namer: (prompt: string) => Promise<string | null> = async () => null;
+  name(prompt: string): Promise<string | null> {
+    return this.namer(prompt);
   }
   readonly cooled: string[] = [];
   cool(cwd: string): void {

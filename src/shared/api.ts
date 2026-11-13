@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry } from "./model";
+import type { FileStat, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -15,6 +15,16 @@ export interface BwApi {
   /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
   setPermissionMode(projectId: string, mode: PermissionMode): Promise<Project>;
   createRoute(projectId: string, name?: string): Promise<Route>;
+  /** 这一路以后用哪个模型；null 表示用默认的。下一站起生效 */
+  setRouteModel(routeId: string, model: string | null): Promise<Route>;
+  /** 这一路的工作区里有哪些改动还没进 Local，各增删了多少行 */
+  changes(routeId: string): Promise<FileStat[]>;
+  /** 这个项目里所有的后台终端（跑着的和已退出还没清掉的） */
+  terminals(projectId: string): Promise<Terminal[]>;
+  /** 一个后台终端到现在为止的输出（太长时只留最后一段） */
+  terminalOutput(terminalId: string): Promise<string>;
+  /** 停掉一个后台终端；已经退出的则从列表里拿掉 */
+  terminalStop(terminalId: string): Promise<void>;
   /** 问一站。发出即返回；站的出现、回答、到站、同步都走事件。不能问时（正在回答、有冲突）抛错 */
   ask(routeId: string, text: string): Promise<void>;
   /** 从某一站开一条新的路（新会话、新工作区，带着到这一站为止的历史） */

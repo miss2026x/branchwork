@@ -1,4 +1,4 @@
-import type { Project, QueueItem, Route, Stop, SyncLogEntry } from "./model";
+import type { Project, QueueItem, Route, Stop, SyncLogEntry, Terminal } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -29,6 +29,12 @@ export type BwEvent =
       canRemember: boolean;
     }
   | { type: "sync.result"; entry: SyncLogEntry }
+  /** 后台终端开了、退出了、认出了端口 */
+  | { type: "terminal.updated"; terminal: Terminal }
+  /** 后台终端新吐出来的一段输出 */
+  | { type: "terminal.output"; terminalId: string; text: string }
+  /** 后台终端从列表里拿掉了 */
+  | { type: "terminal.removed"; terminalId: string; projectId: string }
   /** 候车区变了：这个项目现在候车的全部问题 */
   | { type: "queue.updated"; projectId: string; items: QueueItem[] };
 

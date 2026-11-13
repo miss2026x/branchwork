@@ -45,6 +45,8 @@ export interface Route {
   /** 从哪一路的哪一站分叉出来的 */
   parentRouteId: string | null;
   forkStopId: string | null;
+  /** 这一路用哪个模型：模型的别名（opus、sonnet、haiku）或完整名字；空表示用 Claude Code 的默认 */
+  model: string | null;
   createdAt: number;
   archivedAt: number | null;
 }
@@ -111,6 +113,37 @@ export interface ProjectSnapshot {
   routes: Route[];
   stops: Stop[];
   queue: QueueItem[];
+}
+
+/** 工作区里一个还没进 Local 的文件，以及它增删了多少行 */
+export interface FileStat {
+  path: string;
+  kind: "added" | "modified" | "deleted";
+  /** 增加、删除的行数；二进制文件为空 */
+  added: number | null;
+  removed: number | null;
+}
+
+/**
+ * 后台终端：一条由 Branchwork 启动、在某一路的工作区里跑着的命令（开发服务器、监听构建等）。
+ * 它不随某一站结束而停：一直跑到你停掉它、这一路归档或删除、或者退出应用。
+ */
+export interface Terminal {
+  id: string;
+  projectId: string;
+  routeId: string;
+  /** 是哪一站开的；你自己开的为空 */
+  stopId: string | null;
+  name: string;
+  command: string;
+  /** 在哪个目录里跑（这一路的工作区） */
+  cwd: string;
+  status: "running" | "exited";
+  exitCode: number | null;
+  /** 从输出里认出来的端口号；没认出来为空 */
+  port: number | null;
+  startedAt: number;
+  endedAt: number | null;
 }
 
 /** 一站回答里的一段：一段文字，或一次工具调用 */
