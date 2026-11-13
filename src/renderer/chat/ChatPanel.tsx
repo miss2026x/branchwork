@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatItem, PermissionMode, Route, Stop, Terminal } from "../../shared";
+import type { ChatItem, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal } from "../../shared";
 import { TerminalStrip } from "../terminal/TerminalStrip";
 import { ModelControl } from "./ModelControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
-import { IconChevron, IconSend, IconStop, IconWarn } from "../ui/icons";
+import { IconChevron, IconSend, IconStop, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./ChatPanel.module.css";
@@ -34,9 +34,12 @@ interface Props {
   /** 看这一路的工作区里有哪些改动还没进 Local */
   onViewChanges(): void;
   /** 候车区里派给这一路的问题有几个 */
-  queued: number;
+  waiting: QueueItem[];
+  /** 打开候车区 */
+  onOpenWaiting(): void;
   /** 这一路还在路上时“排队”：放进候车区，到站后自动发 */
-  onQueue(text: string): void;
+  /** 这一站还在回答时写的问题：自动登车、手动登车，或者只放进候车区不派车 */
+  onQueue(text: string, mode: QueueMode): void;
   /** 要滚到眼前的那一站 */
   focus?: { stopId: string; n: number } | null;
   /** 窄窗口里面板是盖在地图上的抽屉：给了就显示收起按钮 */
@@ -53,7 +56,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, queued, onQueue, focus, onCollapse, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -97,11 +100,15 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
     return () => clearTimeout(t);
   }, [focus?.n, focus?.stopId]);
 
+  /** 回答中写的问题怎么排：到站自动发、到站等你点、只放着 */
+  const [queueMode, setQueueMode] = useState<QueueMode>("auto");
+  const queued = waiting.length;
+  const total = offset + stops.length;
   const send = () => {
     if (blocked || !draft.trim()) return;
     if (busy) {
-      // 这一站还在路上：排队，到站后自动发
-      onQueue(draft);
+      // 这一站还在路上：进候车区
+      onQueue(draft, queueMode);
       setDraft(route.id, "");
     } else {
       void ask(route.id, draft);
@@ -121,7 +128,9 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         <div className={css.headText}>
           <h2 className="ell">{route.name}</h2>
           <p className="ell">
+            {busy && <i className={css.statusDot} style={{ background: colors.line }} />}
             <StatusLine route={route} n={offset + stops.length} phase={pending !== undefined ? "syncing" : currentLive?.phase} />
+            {busy && waiting[0] && <span className={css.next}>下一站{waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
           </p>
         </div>
         {onCollapse && (
@@ -130,6 +139,59 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           </button>
         )}
       </header>
+
+      <div className={css.meta}>
+        {/* 缩略线路：带来的站、自己的站、候车的问题 */}
+        <div className={css.strip} aria-hidden style={{ ["--c" as string]: colors.line, ["--p" as string]: parent ? routeColors(parent).line : colors.line }}>
+          {Array.from({ length: Math.min(offset, 6) }, (_, i) => (
+            <i key={`p${i}`} data-kind="inherited" />
+          ))}
+          {stops.slice(-12).map((s) => (
+            <i key={s.id} data-kind={s.status === "answering" ? "current" : s.kind === "minor" ? "minor" : "own"} />
+          ))}
+          {waiting.slice(0, 4).map((q) => (
+            <i key={q.id} data-kind="waiting" />
+          ))}
+        </div>
+        <div className={css.stripLabels}>
+          {offset > 0 && parent && <span>{offset > 1 ? `1–${offset}` : "1"} 随 {parent.express ? `快${parent.express}` : `${parent.number}路`} 带来</span>}
+          {(() => {
+            const done = busy ? stops.length - 1 : stops.length;
+            const range = (from: number, to: number) => (to > from ? `${from}–${to}` : String(from));
+            return (
+              <>
+                {stops.length === 0 && <span>还没有自己的站</span>}
+                {done > 0 && <span>{range(offset + 1, offset + done)} {offset > 0 ? "本对话" : "已到站"}</span>}
+                {busy && stops.length > 0 && <span>{total} 回答中</span>}
+              </>
+            );
+          })()}
+          {queued > 0 && <span>{queued > 1 ? `${total + 1}–${total + queued}` : total + 1} 候车</span>}
+        </div>
+        <div className={css.metaRow}>
+          <span className="ell">
+            {parent && !route.express && offset > 0 ? `从 ${parent.number}路第 ${offset} 站分出` : parent && route.express ? `从 ${parent.number}路 提炼开出` : "自己的工作区"}
+            {route.sessionId ? `，会话 ${route.sessionId.slice(0, 8)}` : ""}
+          </span>
+          {route.contextTokens !== null && (
+            <span>
+              上下文 <b>{route.contextTokens >= 1000 ? `${(route.contextTokens / 1000).toFixed(1)}k` : route.contextTokens}</b> / 200k
+            </span>
+          )}
+        </div>
+        <button className={css.waitBar} onClick={onOpenWaiting}>
+          <IconWait size={16} />
+          <b>本路候车 {queued} 条</b>
+          <span>
+            {waiting.slice(0, 2).map((q, i) => (
+              <em key={q.id} data-mode={q.mode}>
+                第 {total + i + 1} 站{q.mode === "auto" ? "自动" : "手动"}
+              </em>
+            ))}
+          </span>
+          <IconChevron size={14} />
+        </button>
+      </div>
 
       <div
         ref={log}
@@ -270,6 +332,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             </button>
           </div>
         )}
+        {busy && current && <p className={css.queueHint}>第 {offset + current.seq} 站还在回答，现在写的会进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${route.express ? `快${route.express}` : `${route.number}路`} 候车`}</p>}
         <textarea
           value={draft}
           onChange={(e) => setDraft(route.id, e.target.value)}
@@ -278,10 +341,19 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           disabled={blocked}
           rows={3}
         />
+        {busy && (
+          <div className={css.seg} role="radiogroup" aria-label="排队方式">
+            {(["auto", "manual", "unassigned"] as const).map((m) => (
+              <button key={m} role="radio" aria-checked={queueMode === m} onClick={() => setQueueMode(m)} title={m === "auto" ? "这一站正常答完就自动发出" : m === "manual" ? "到站后等你点“登车”再发" : "放进候车区，先不派给哪一路"}>
+                {m === "auto" ? "自动登车" : m === "manual" ? "手动登车" : "只放着"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className={css.actions}>
           <PermissionModeControl mode={permissionMode} projectName={projectName} onChange={onPermissionMode} />
           <ModelControl model={route.model} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
-          <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : queued > 0 ? `候车区里有 ${queued} 个问题派给了这一路` : ""}</span>
+          <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : ""}</span>
           <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
             {busy ? "排队" : "发车"} <IconSend size={14} />
           </button>
@@ -347,6 +419,12 @@ function Tools({ tools }: { tools: Extract<ChatItem, { kind: "tool" }>[] }) {
           <code className="ell" title={t.detail}>
             {t.detail}
           </code>
+          {t.added !== undefined && (
+            <em>
+              {t.added > 0 && <b>+{t.added}</b>}
+              {(t.removed ?? 0) > 0 && <i>−{t.removed}</i>}
+            </em>
+          )}
         </div>
       ))}
     </div>

@@ -79,6 +79,9 @@ interface State {
   dropDistill(stopId: string): void;
   dismissNotice(id: string): void;
   setRouteModel(routeId: string, model: string | null): Promise<void>;
+  renameRoute(routeId: string, name: string): Promise<void>;
+  setRouteColor(routeId: string, color: number | null): Promise<void>;
+  renameStop(stopId: string, name: string): Promise<void>;
   /** 打开一个后台终端看输出；null 关掉 */
   viewTerminal(terminalId: string | null): void;
   /** 还在跑的停掉；已退出的从列表里拿掉 */
@@ -188,7 +191,7 @@ export const useStore = create<State>((set, get) => {
       case "stop.tool":
         set((s) => {
           const cur = s.live[e.stopId] ?? { phase: "answering" as const, items: [] };
-          return { live: { ...s.live, [e.stopId]: { ...cur, items: [...cur.items, { kind: "tool", tool: e.tool, detail: e.detail }] } } };
+          return { live: { ...s.live, [e.stopId]: { ...cur, items: [...cur.items, { kind: "tool", tool: e.tool, detail: e.detail, added: e.added, removed: e.removed }] } } };
         });
         break;
       case "stop.updated":
@@ -439,6 +442,21 @@ export const useStore = create<State>((set, get) => {
       void loadHistory(routeId);
     },
 
+    async renameRoute(routeId, name) {
+      await window.bw.renameRoute(routeId, name).then(
+        (route) => set((s) => ({ routes: { ...s.routes, [route.id]: route } })),
+        (e) => set({ error: message(e) }),
+      );
+    },
+    async setRouteColor(routeId, color) {
+      await window.bw.setRouteColor(routeId, color).then(
+        (route) => set((s) => ({ routes: { ...s.routes, [route.id]: route } })),
+        (e) => set({ error: message(e) }),
+      );
+    },
+    async renameStop(stopId, name) {
+      await window.bw.renameStop(stopId, name).catch((e) => set({ error: message(e) }));
+    },
     async setRouteModel(routeId, model) {
       try {
         const route = await window.bw.setRouteModel(routeId, model);

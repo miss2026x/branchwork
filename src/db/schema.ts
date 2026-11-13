@@ -64,4 +64,6 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE route ADD COLUMN express_no INTEGER;`,
   // 4：每一路用哪个模型
   `ALTER TABLE route ADD COLUMN model TEXT;`,
+  // 5：线路颜色、会话占用的上下文
+  `ALTER TABLE route ADD COLUMN color INTEGER; ALTER TABLE route ADD COLUMN context_tokens INTEGER;`,
 ];

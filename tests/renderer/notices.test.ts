@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BwEvent, QueueItem, Route, Stop, SyncLogEntry } from "../../src/shared";
 import { noticesAfterSelecting, reduceNotices, type Notice, type NoticeContext } from "../../src/renderer/stores/notices";
 
-const route = (id: string, patch: Partial<Route> = {}): Route => ({ id, projectId: "p1", number: 1, express: null, name: id, status: "idle", sessionId: null, worktreePath: "", parentRouteId: null, forkStopId: null, model: null, createdAt: 0, archivedAt: null, ...patch });
+const route = (id: string, patch: Partial<Route> = {}): Route => ({ id, projectId: "p1", number: 1, express: null, name: id, status: "idle", sessionId: null, worktreePath: "", parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, createdAt: 0, archivedAt: null, ...patch });
 const stop = (id: string, routeId: string, seq: number, patch: Partial<Stop> = {}): Stop => ({ id, routeId, seq, kind: "normal", name: id, nameState: "final", prompt: id, status: "done", syncState: "synced", messageId: null, lastMessageId: null, error: null, startedAt: 0, endedAt: 0, ...patch });
 const item = (id: string, routeId: string | null, mode: QueueItem["mode"], text = id, projectId = "p1"): QueueItem => ({ id, projectId, text, mode, routeId, createdAt: 0 });
 const sync = (routeId: string, status: SyncLogEntry["status"], patch: Partial<SyncLogEntry> = {}): BwEvent => ({ type: "sync.result", entry: { id: "y", routeId, stopId: null, direction: "push", status, files: [{ path: "a.ts", note: "both-modified" }], message: null, at: 0, ...patch } });

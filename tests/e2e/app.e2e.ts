@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "resolveConflict", "resync", "setPermissionMode", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -226,15 +226,15 @@ describe("应用", () => {
     await page.locator("textarea").fill("排队的问题");
     expect(await page.getByRole("button", { name: "排队" }).isVisible()).toBe(true);
     await page.keyboard.press("Enter");
-    await expect.poll(() => page.getByRole("button", { name: "候车 1" }).isVisible()).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: /^候车 1/ }).isVisible()).toBe(true);
     expect(notes()).not.toContain("排队的问题");
     await shot("12-queued");
     // 前一站到站后，它自己发出去了
     await expect.poll(notes, { timeout: 60000 }).toContain("排队的问题");
-    await expect.poll(() => page.getByRole("button", { name: "候车 0" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: /^候车 0/ }).isVisible(), { timeout: 30000 }).toBe(true);
 
     // 先放着，再开新车
-    await page.getByRole("button", { name: "候车 0" }).click();
+    await page.getByRole("button", { name: /^候车 0/ }).click();
     await page.getByLabel("放一个问题进候车区").fill("另起一路问");
     await page.getByRole("button", { name: "放进来" }).click();
     const area = page.getByRole("region", { name: "候车区" });
@@ -368,5 +368,42 @@ describe("应用", () => {
     await shot("22-changes");
     await page.keyboard.press("Escape");
     await expect.poll(() => dialog.count()).toBe(0);
+  });
+  it("改名和换色：路的菜单里改线路名称、换颜色；站的菜单里改站名", async () => {
+    const rail = page.getByRole("complementary").first();
+    await page.getByRole("button", { name: /查资料 的更多操作/ }).click();
+    const menu = page.getByRole("dialog", { name: /查资料 的设置/ });
+    expect(await menu.getByText(/会话 .+，\d+ 站/).isVisible()).toBe(true);
+    expect(await menu.getByText("claude --resume").isVisible()).toBe(true);
+    await menu.getByRole("radio", { name: "颜色 3" }).click();
+    await menu.getByLabel("线路名称").fill("查资料（改过名）");
+    await shot("23-route-menu");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => rail.getByText("查资料（改过名）").isVisible()).toBe(true);
+    await expect.poll(() => page.getByRole("heading", { name: "查资料（改过名）" }).isVisible()).toBe(true);
+
+    await page.locator('[class*="node"]').last().click();
+    await page.getByRole("menuitem", { name: /重命名站点/ }).click();
+    await page.getByLabel("站名").fill("我起的站名");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("log").getByText("我起的站名").isVisible()).toBe(true);
+  });
+
+  it("对话栏头部和排队方式：回答中可以选手动登车，头部显示本路候车", async () => {
+    await page.locator("textarea").fill("慢慢答这一站");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("radio", { name: "手动登车" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await page.getByRole("radio", { name: "手动登车" }).click();
+    await page.locator("textarea").fill("这一条要我点了才发");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("button", { name: /本路候车 1 条/ }).isVisible()).toBe(true);
+    expect(await page.getByText(/下一站等你登车/).isVisible()).toBe(true);
+    await shot("24-header");
+    // 到站后不会自己发，等通知里点登车
+    const notices = page.getByRole("region", { name: "通知" });
+    await expect.poll(() => notices.getByRole("button", { name: "登车", exact: true }).isVisible(), { timeout: 60000 }).toBe(true);
+    await notices.getByRole("button", { name: "登车", exact: true }).click();
+    await expect.poll(() => page.getByRole("log").getByText("这一条要我点了才发").first().isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
   });
 });

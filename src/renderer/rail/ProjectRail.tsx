@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Route } from "../../shared";
 import { useStore } from "../stores/store";
 import { IconChevron, IconMore, IconPlus, IconWarn } from "../ui/icons";
+import { RouteMenu } from "./RouteMenu";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./ProjectRail.module.css";
@@ -16,8 +17,12 @@ export function ProjectRail({
 }) {
   const [floating, setFloating] = useState(false);
   const archiveRoute = useStore((s) => s.archiveRoute);
+  const renameRoute = useStore((s) => s.renameRoute);
+  const setRouteColor = useStore((s) => s.setRouteColor);
+  const stops = useStore((s) => s.stops);
   const unarchiveRoute = useStore((s) => s.unarchiveRoute);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [menuAt, setMenuAt] = useState({ top: 0, left: 0 });
   const [showArchived, setShowArchived] = useState<Record<string, boolean>>({});
   const projects = useStore((s) => s.projects);
   const routes = useStore((s) => s.routes);
@@ -160,42 +165,27 @@ export function ProjectRail({
                         className={css.more}
                         aria-label={`${r.name} 的更多操作`}
                         aria-expanded={menuFor === r.id}
-                        onClick={() =>
-                          setMenuFor(menuFor === r.id ? null : r.id)
-                        }
+                        onClick={(e) => {
+                          const box = e.currentTarget.getBoundingClientRect();
+                          setMenuAt({ top: box.bottom + 4, left: Math.max(8, box.right - 240) });
+                          setMenuFor(menuFor === r.id ? null : r.id);
+                        }}
                       >
                         <IconMore />
                       </button>
                       {menuFor === r.id && (
-                        <>
-                          <div
-                            className={css.backdrop}
-                            onClick={() => setMenuFor(null)}
-                          />
-                          <div className={css.menu} role="menu">
-                            <button
-                              role="menuitem"
-                              onClick={() => {
-                                setMenuFor(null);
-                                void archiveRoute(r.id);
-                              }}
-                            >
-                              归档
-                              <small>收起来，对话和改动都留着，随时恢复</small>
-                            </button>
-                            <button
-                              role="menuitem"
-                              className={css.danger}
-                              onClick={() => {
-                                setMenuFor(null);
-                                onDelete(r.id);
-                              }}
-                            >
-                              删除…
-                              <small>对话记录和工作区一起删，不能恢复</small>
-                            </button>
-                          </div>
-                        </>
+                        <RouteMenu
+                          route={r}
+                          stopCount={Object.values(stops).filter((x) => x.routeId === r.id && x.kind !== "summary").length}
+                          syncNote={r.status === "conflict" ? "有改动没法自动合进 Local，等你处理" : r.status === "interrupted" ? "上一站没答完，改动留在工作区，没进 Local" : r.status === "answering" || r.status === "awaiting_permission" ? "正在回答，答完后改动同步进 Local" : "自己的工作区，改动都已进 Local"}
+                          syncTone={r.status === "conflict" || r.status === "interrupted" ? "warn" : "ok"}
+                          onRename={(name) => void renameRoute(r.id, name)}
+                          onColor={(color) => void setRouteColor(r.id, color)}
+                          onArchive={() => void archiveRoute(r.id)}
+                          onDelete={() => onDelete(r.id)}
+                          onClose={() => setMenuFor(null)}
+                          at={menuAt}
+                        />
                       )}
                     </div>
                   ))}

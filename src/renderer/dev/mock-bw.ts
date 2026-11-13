@@ -26,7 +26,7 @@ export function installMockBw(): void {
 
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
-    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, createdAt: Date.now(), archivedAt: null, ...extra };
+    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
   };
@@ -168,6 +168,8 @@ export function installMockBw(): void {
     void run(routeId, next.text).then(() => autoBoard(routeId));
   };
 
+  // 上下文用量的假数据
+  [...routes.values()].forEach((r, i) => stops.size && (r.contextTokens = [6200, 21400, 12800, 3100, 4800][i % 5]!));
   // 后台终端的假数据：GitHub 登录这一路开着一个开发服务器，还有一个已经退出的测试
   const terminals: Terminal[] = [];
   const withTerminals = [...routes.values()].find((x) => x.name === "GitHub 登录");
@@ -200,6 +202,11 @@ export function installMockBw(): void {
       emit({ type: "project.updated", project: projects[i]! });
       if (mode === "all") for (const [k, resolve] of permissions) (permissions.delete(k), resolve("allow"));
       return projects[i]!;
+    },
+    renameRoute: async (routeId, name) => setRoute(routeId, { name }),
+    setRouteColor: async (routeId, color) => setRoute(routeId, { color }),
+    async renameStop(stopId, name) {
+      setStop(stopId, { name, nameState: "manual" });
     },
     async setRouteModel(routeId, model) {
       return setRoute(routeId, { model });

@@ -68,6 +68,7 @@ export function App() {
   const changesView = useStore((s) => s.changesView);
   const viewChanges = useStore((s) => s.viewChanges);
   const setRouteModel = useStore((s) => s.setRouteModel);
+  const renameStop = useStore((s) => s.renameStop);
   const routeTerminals = useMemo(() => Object.values(terminals).filter((t) => t.routeId === routeId).sort((a, b) => a.startedAt - b.startedAt), [terminals, routeId]);
   const viewed = terminalView ? terminals[terminalView.id] : undefined;
   const [palette, setPalette] = useState(false);
@@ -176,7 +177,7 @@ export function App() {
             </div>
           ) : (
             <>
-              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} focus={focus} />
+              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} onRenameStop={(stop, name) => void renameStop(stop.id, name)} focus={focus} />
               <WaitingArea
                 items={queue}
                 routes={routes}
@@ -223,7 +224,7 @@ export function App() {
           />
         </main>
 
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} queued={queue.filter((q) => q.routeId === route.id).length} onQueue={(text) => void queueAdd(route.projectId, text, route.id, "auto")} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (

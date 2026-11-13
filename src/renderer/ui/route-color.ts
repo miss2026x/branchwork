@@ -3,13 +3,16 @@ import type { Route } from "../../shared";
 const LINE = ["var(--route-1)", "var(--route-2)", "var(--route-3)", "var(--route-4)", "var(--route-5)", "var(--route-6)", "var(--route-7)"];
 const TAG = ["var(--route-1)", "var(--route-2-tag)", "var(--route-3)", "var(--route-4)", "var(--route-5)", "var(--route-6)", "var(--route-7)"];
 
-/** 一路的线色、路牌色（路牌上有白字，2 路用深一档的橙）和浅底色 */
-export function routeColors(route: Pick<Route, "number" | "express">) {
+/** 可以给一路挑的颜色，按 1–7 编号 */
+export const ROUTE_COLORS = LINE;
+
+/** 一路的线色、路牌色（路牌上有白字，2 路用深一档的橙）和浅底色。自己挑过颜色的用挑的，否则按路号轮着取 */
+export function routeColors(route: Pick<Route, "number" | "express"> & { color?: number | null }) {
   if (route.express) {
     const c = "var(--express)";
     return { line: c, tag: c, tint: `color-mix(in srgb, ${c} 13%, white)`, faded: `color-mix(in srgb, ${c} 34%, var(--canvas))` };
   }
-  const i = (route.number - 1) % LINE.length;
+  const i = ((route.color ?? route.number) - 1) % LINE.length;
   return {
     line: LINE[i]!,
     tag: TAG[i]!,

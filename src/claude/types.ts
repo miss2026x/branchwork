@@ -47,6 +47,8 @@ export interface AskResult {
   /** 这一站提问那条消息、最后一条消息的 ID；拿不到时为空 */
   promptMessageId: string | null;
   lastMessageId: string | null;
+  /** 这一站结束时会话占了多少上下文（最后一次请求读进去的加上写出来的 token 数）；拿不到时为空 */
+  contextTokens?: number | null;
 }
 
 export interface HistoryMessage {

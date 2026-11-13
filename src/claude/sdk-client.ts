@@ -203,6 +203,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
 
       let sessionId: string | null = opts.sessionId ?? null;
       let text = "";
+      let contextTokens: number | null = null;
       let outcome: AskResult["outcome"] = "interrupted"; // 没收到结果消息就算没答完
       let error: string | null = null;
       let started = false;
@@ -224,6 +225,11 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
             const d = m.event?.delta;
             if (m.event?.type === "content_block_delta" && d?.type === "text_delta" && d.text) opts.onEvent?.({ type: "text", text: d.text });
           } else if (m.type === "assistant" && !m.parent_tool_use_id) {
+            const u = (m.message as { usage?: Record<string, unknown> } | undefined)?.usage;
+            if (u) {
+              const sum = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens"].reduce((n, k) => n + (typeof u[k] === "number" ? (u[k] as number) : 0), 0);
+              if (sum > 0) contextTokens = sum;
+            }
             for (const block of asBlocks(m.message?.content)) {
               if (block.type === "text" && typeof block.text === "string") text += block.text;
               if (block.type === "tool_use" && typeof block.name === "string") {
@@ -259,7 +265,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       if (abort.signal.aborted && outcome === "completed") outcome = "interrupted";
 
       const ids = sessionId ? await stopMessageIds(fns, sessionId, opts.afterMessageId) : { promptMessageId: null, lastMessageId: null };
-      return { outcome, sessionId, text, error, ...ids };
+      return { outcome, sessionId, text, error, ...ids, contextTokens };
     },
 
     async fork(sessionId, upToMessageId) {

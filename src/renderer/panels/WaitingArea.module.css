@@ -13,11 +13,11 @@
   pointer-events: auto;
 }
 .fab {
-  height: 40px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px 0 12px;
+  padding: 4px 16px 4px 6px;
   border-radius: 999px;
   background: var(--text-1);
   color: #fff;
@@ -224,4 +224,42 @@
   background: var(--text-1);
   color: #fff;
   font-weight: 700;
+}
+
+.fabIcon {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text-1);
+}
+.fabIcon[data-alert="true"]::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--text-1);
+  border-radius: 50%;
+  background: var(--route-2);
+}
+.fabText {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 18px;
+}
+.fabText small {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.78);
+}
+.fab > svg {
+  margin: 0 2px 0 8px;
 }

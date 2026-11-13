@@ -65,7 +65,7 @@ export class FakeClaude implements ClaudeClient {
     if (opts.signal?.aborted) outcome = "interrupted";
     if (outcome === "failed" && !error) error = "error_during_execution";
     history.push({ id: randomUUID(), role: "assistant", content: text });
-    return { outcome, sessionId, text, error, promptMessageId, lastMessageId: history.at(-1)!.id };
+    return { outcome, sessionId, text, error, promptMessageId, lastMessageId: history.at(-1)!.id, contextTokens: this.contextTokens };
   }
 
   /** 记下被要求提前启动的（目录, 会话） */
@@ -77,6 +77,8 @@ export class FakeClaude implements ClaudeClient {
     this.warmed.push([cwd, sessionId]);
     this.warmedModels.push(model);
   }
+  /** 每一站结束时报的上下文占用 */
+  contextTokens: number | null = null;
   tools: ClaudeTool[] = [];
   useTools(tools: ClaudeTool[]): void {
     this.tools = tools;

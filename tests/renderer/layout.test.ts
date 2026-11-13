@@ -15,6 +15,8 @@ const route = (id: string, number: number, extra: Partial<Route> = {}): Route =>
   parentRouteId: null,
   forkStopId: null,
   model: null,
+  color: null,
+  contextTokens: null,
   createdAt: number,
   archivedAt: null,
   ...extra,

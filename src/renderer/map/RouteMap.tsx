@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import type { QueueItem, Route, Stop } from "../../shared";
-import { BusMark, IconCompress, IconCopy, IconFit, IconFork, IconMinus, IconPlus } from "../ui/icons";
+import { BusMark, IconCompress, IconCopy, IconFit, IconFork, IconMinus, IconPlus, IconEdit } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { firstStops } from "../stores/numbering";
@@ -20,6 +20,7 @@ interface Props {
   onFork(stop: Stop): void;
   /** 用户选了“压缩成快线” */
   onCompress(stop: Stop): void;
+  onRenameStop(stop: Stop, name: string): void;
   /** 要带到视野中间的那一站（从搜索、通知跳过来） */
   focus?: { stopId: string; n: number } | null;
 }
@@ -32,13 +33,16 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, focus: jump }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump }: Props) {
+  /** 正在改名的那一站和输入框里的字 */
+  const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   /** 点开了哪一站的菜单 */
   const [menuStopId, setMenuStopId] = useState<string | null>(null);
+  useEffect(() => setRenaming(null), [menuStopId]);
   const menu = menuStopId ? layout.lanes.flatMap((l) => l.stops.map((spot) => ({ spot, route: l.route }))).find((m) => m.spot.stop.id === menuStopId) : undefined;
   useEffect(() => {
     if (!menuStopId) return;
@@ -201,8 +205,31 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
             <header>
               <Plate route={menu.route} />
               <b>第 {stopNumber(menu.spot.stop)} 站</b>
-              <span className="ell">{menu.spot.stop.name}</span>
+              {renaming === null ? (
+                <span className="ell">{menu.spot.stop.name}</span>
+              ) : (
+                <input
+                  autoFocus
+                  aria-label="站名"
+                  value={renaming}
+                  maxLength={40}
+                  onChange={(e) => setRenaming(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing) return;
+                    if (e.key === "Enter") {
+                      if (renaming.trim() && renaming.trim() !== menu.spot.stop.name) onRenameStop(menu.spot.stop, renaming);
+                      setRenaming(null);
+                      setMenuStopId(null);
+                    } else if (e.key === "Escape") setRenaming(null);
+                  }}
+                />
+              )}
             </header>
+            {menu.spot.stop.kind !== "summary" && (
+              <button role="menuitem" onClick={() => setRenaming(renaming === null ? menu.spot.stop.name : null)}>
+                <IconEdit /> <span>重命名站点{renaming !== null && <small>写好后按 Enter</small>}</span>
+              </button>
+            )}
             <button
               role="menuitem"
               onClick={() => {

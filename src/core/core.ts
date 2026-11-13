@@ -76,6 +76,11 @@ export interface Core {
   setPermissionMode(projectId: string, mode: PermissionMode): Project;
   /** 新开一路（从 Local 当前状态建工作区） */
   createRoute(projectId: string, name?: string): Promise<Route>;
+  renameRoute(routeId: string, name: string): Route;
+  /** 换线路颜色（1–8）；null 回到按路号自动取 */
+  setRouteColor(routeId: string, color: number | null): Route;
+  /** 改站名；改过的不再被自动起的名字覆盖 */
+  renameStop(stopId: string, name: string): Stop;
   /** 这一路以后用哪个模型（别名或完整名字）；null 用默认的。下一站起生效 */
   setRouteModel(routeId: string, model: string | null): Route;
   /** 这一路的工作区里还没进 Local 的改动，带增删的行数 */
@@ -469,7 +474,7 @@ export function createCore(opts: CoreOptions): Core {
             if (e.type === "started") emit({ type: "stop.started", routeId, stopId });
             else if (e.type === "answered") emit({ type: "stop.answered", routeId, stopId });
             else if (e.type === "text") emit({ type: "stop.delta", routeId, stopId, text: e.text });
-            else if (e.type === "tool") emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail: toolDetail(e.input, route.worktreePath) });
+            else if (e.type === "tool") emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail: toolDetail(e.input, route.worktreePath), ...toolStat(e.input) });
           },
           onPermission: (req) =>
             new Promise<PermissionDecision>((resolve) => {
@@ -486,6 +491,7 @@ export function createCore(opts: CoreOptions): Core {
       runningStop.delete(routeId);
       dropPermissions(routeId);
       route = mustRoute(routeId); // 回答期间名字、模型可能被改过
+      if (typeof result.contextTokens === "number") route = setRoute(routeId, { contextTokens: result.contextTokens });
 
       if (result.sessionId && result.sessionId !== route.sessionId) route = setRoute(routeId, { sessionId: result.sessionId });
       const ended = { endedAt: Date.now(), messageId: result.promptMessageId, lastMessageId: result.lastMessageId };
@@ -624,6 +630,8 @@ export function createCore(opts: CoreOptions): Core {
         parentRouteId: null,
         forkStopId: null,
         model: null,
+        color: null,
+        contextTokens: null,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -631,6 +639,27 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "route.updated", route });
       warmRoute(route);
       return route;
+    },
+
+    renameRoute(routeId, name) {
+      mustRoute(routeId);
+      const next = name.replace(/\s+/g, " ").trim().slice(0, 40);
+      if (!next) throw new CoreError("NOT_FOUND", "名字不能是空的");
+      return setRoute(routeId, { name: next });
+    },
+
+    setRouteColor(routeId, color) {
+      mustRoute(routeId);
+      if (color !== null && !(Number.isInteger(color) && color >= 1 && color <= 8)) throw new CoreError("NOT_FOUND", "没有这个颜色");
+      return setRoute(routeId, { color });
+    },
+
+    renameStop(stopId, name) {
+      const stop = db.stops.get(stopId);
+      if (!stop) throw new CoreError("NOT_FOUND", "找不到这一站");
+      const next = name.replace(/\s+/g, " ").trim().slice(0, 40);
+      if (!next) throw new CoreError("NOT_FOUND", "名字不能是空的");
+      return setStop(stopId, { name: next, nameState: "manual" });
     },
 
     setRouteModel(routeId, model) {
@@ -693,6 +722,8 @@ export function createCore(opts: CoreOptions): Core {
         parentRouteId: parent.id,
         forkStopId: stop.id,
         model: parent.model,
+        color: null,
+        contextTokens: null,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -793,6 +824,8 @@ export function createCore(opts: CoreOptions): Core {
         parentRouteId: source.id,
         forkStopId: stop.id,
         model: source.model,
+        color: null,
+        contextTokens: null,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -926,7 +959,7 @@ export function createCore(opts: CoreOptions): Core {
           }
           for (const b of Array.isArray(m.content) ? (m.content as { type?: string; text?: unknown; name?: unknown; input?: unknown }[]) : []) {
             if (b.type === "text" && typeof b.text === "string" && b.text) pushText(items, b.text);
-            if (b.type === "tool_use" && typeof b.name === "string") items.push({ kind: "tool", tool: b.name, detail: toolDetail((b.input as Record<string, unknown>) ?? {}, route.worktreePath) });
+            if (b.type === "tool_use" && typeof b.name === "string") items.push({ kind: "tool", tool: b.name, ...toolStat((b.input as Record<string, unknown>) ?? {}), detail: toolDetail((b.input as Record<string, unknown>) ?? {}, route.worktreePath) });
           }
         }
         return { stopId: stop.id, items };
@@ -946,6 +979,14 @@ function pushText(items: ChatItem[], text: string): void {
   const last = items.at(-1);
   if (last?.kind === "text") last.text += "\n\n" + text;
   else items.push({ kind: "text", text });
+}
+
+/** 改文件的工具这一次增、删了多少行（从它的输入里数出来；不是改文件的工具返回空） */
+function toolStat(input: Record<string, unknown>): { added?: number; removed?: number } {
+  const lines = (v: unknown) => (typeof v === "string" && v ? v.replace(/\n$/, "").split("\n").length : 0);
+  if (typeof input.old_string === "string" || typeof input.new_string === "string") return { added: lines(input.new_string), removed: lines(input.old_string) };
+  if (typeof input.file_path === "string" && typeof input.content === "string") return { added: lines(input.content), removed: 0 };
+  return {};
 }
 
 /** 工具调用的一行说明：改的是哪个文件、跑的是什么命令 */

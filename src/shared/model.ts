@@ -47,6 +47,10 @@ export interface Route {
   forkStopId: string | null;
   /** 这一路用哪个模型：模型的别名（opus、sonnet、haiku）或完整名字；空表示用 Claude Code 的默认 */
   model: string | null;
+  /** 线路颜色：1–8 中的一个；空表示按路号自动取 */
+  color: number | null;
+  /** 这一路的会话现在占了多少上下文（token 数）；还没问过或不知道时为空 */
+  contextTokens: number | null;
   createdAt: number;
   archivedAt: number | null;
 }
@@ -147,7 +151,7 @@ export interface Terminal {
 }
 
 /** 一站回答里的一段：一段文字，或一次工具调用 */
-export type ChatItem = { kind: "text"; text: string } | { kind: "tool"; tool: string; detail: string };
+export type ChatItem = { kind: "text"; text: string } | { kind: "tool"; tool: string; detail: string; /** 改文件的工具：这一次增、删了多少行 */ added?: number; removed?: number };
 
 export interface StopContent {
   stopId: string;

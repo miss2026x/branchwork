@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { QueueItem, QueueMode, Route } from "../../shared";
-import { IconClose, IconMore } from "../ui/icons";
+import { IconClose, IconMore, IconWait } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./WaitingArea.module.css";
 
@@ -126,11 +126,24 @@ export function WaitingArea({ items, routes, onAdd, onAssign, onRemove, onBoard,
     return "马上发出";
   };
 
+  /** 手动登车、那一路已经到站的：现在就能登车 */
+  const ready = items.filter((it) => it.mode === "manual" && it.routeId && byId.get(it.routeId) && !busy(byId.get(it.routeId)!)).length;
+  const unassigned = items.filter((it) => !it.routeId).length;
+
   return (
     <div className={css.wrap}>
       <button className={css.fab} aria-expanded={open} onClick={() => setOpen(!open)}>
-        {open ? <IconClose size={14} /> : <i />}
-        候车 {items.length}
+        {open ? (
+          <IconClose size={14} />
+        ) : (
+          <span className={css.fabIcon} data-alert={ready > 0}>
+            <IconWait size={16} />
+          </span>
+        )}
+        <span className={css.fabText}>
+          候车 {items.length}
+          {!open && items.length > 0 && <small>{ready > 0 ? `${ready} 条可以登车了` : unassigned > 0 && unassigned === items.length ? `${unassigned} 条还没派车` : "到站后发出"}</small>}
+        </span>
       </button>
 
       {open && (

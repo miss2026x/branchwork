@@ -12,11 +12,14 @@
   right: 190px;
   display: flex;
   gap: 8px;
-  overflow: hidden;
+  /* 放不下时横向滚动，不把名字挤短 */
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+  margin: -2px;
 }
 .tab {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: none;
   max-width: 200px;
   height: 36px;
   display: flex;
@@ -361,4 +364,15 @@
     transform: scale(1.8);
     opacity: 0;
   }
+}
+
+.menu header input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1.5px solid var(--route-1);
+  border-radius: var(--r-6);
+  font: inherit;
+  outline: none;
 }

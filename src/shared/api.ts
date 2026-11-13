@@ -15,6 +15,12 @@ export interface BwApi {
   /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
   setPermissionMode(projectId: string, mode: PermissionMode): Promise<Project>;
   createRoute(projectId: string, name?: string): Promise<Route>;
+  /** 改线路名称 */
+  renameRoute(routeId: string, name: string): Promise<Route>;
+  /** 换线路颜色（1–8）；null 回到按路号自动取 */
+  setRouteColor(routeId: string, color: number | null): Promise<Route>;
+  /** 改站名。改过的站不会再被自动起的名字覆盖 */
+  renameStop(stopId: string, name: string): Promise<void>;
   /** 这一路以后用哪个模型；null 表示用默认的。下一站起生效 */
   setRouteModel(routeId: string, model: string | null): Promise<Route>;
   /** 这一路的工作区里有哪些改动还没进 Local，各增删了多少行 */

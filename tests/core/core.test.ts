@@ -1041,3 +1041,52 @@ describe("后台终端", () => {
     expect(core.terminals(project.id)).toEqual([]);
   });
 });
+
+describe("改名、换颜色、上下文用量", () => {
+  it("路可以改名、换颜色；改过名的路不会再被第一站的名字覆盖", async () => {
+    const route = await core.createRoute(project.id);
+    expect(core.renameRoute(route.id, "  登录  重构 ").name).toBe("登录 重构");
+    expect(core.setRouteColor(route.id, 5).color).toBe(5);
+    expect(() => core.setRouteColor(route.id, 99)).toThrow();
+    expect(() => core.renameRoute(route.id, "   ")).toThrow();
+    await core.ask(route.id, "第一个问题");
+    expect(routeOf(route.id)).toMatchObject({ name: "登录 重构", color: 5 });
+    expect(core.setRouteColor(route.id, null).color).toBeNull();
+  });
+
+  it("站可以改名；改过的站不会被小模型晚到的名字覆盖", async () => {
+    let give!: (name: string | null) => void;
+    claude.namer = () => new Promise((r) => (give = r));
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "看看登录为什么慢");
+    const stop = stopsOf(route.id)[0]!;
+    expect(core.renameStop(stop.id, "登录性能")).toMatchObject({ name: "登录性能", nameState: "manual" });
+    give("查登录慢");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(stopsOf(route.id)[0]!.name).toBe("登录性能");
+  });
+
+  it("每站结束记下会话占了多少上下文", async () => {
+    const route = await core.createRoute(project.id);
+    expect(route.contextTokens).toBeNull();
+    claude.contextTokens = 21400;
+    await core.ask(route.id, "问一句");
+    expect(routeOf(route.id).contextTokens).toBe(21400);
+  });
+
+  it("改文件的工具带上增删的行数", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      t.tool("Edit", { file_path: "a.ts", old_string: "one\ntwo", new_string: "1\n2\n3" });
+      t.tool("Write", { file_path: "b.ts", content: "x\ny\n" });
+      t.tool("Bash", { command: "ls" });
+    };
+    await core.ask(route.id, "改两个文件");
+    const tools = events.filter((e) => e.type === "stop.tool") as Extract<BwEvent, { type: "stop.tool" }>[];
+    expect(tools.map((t) => [t.tool, t.added, t.removed])).toEqual([
+      ["Edit", 3, 2],
+      ["Write", 2, 0],
+      ["Bash", undefined, undefined],
+    ]);
+  });
+});
