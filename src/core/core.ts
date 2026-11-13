@@ -7,6 +7,7 @@ import type {
   BwEvent,
   BwListener,
   ChatItem,
+  DirectoryInfo,
   FileStat,
   StopContent,
   PermissionDecision,
@@ -23,7 +24,7 @@ import type {
   SyncOutcomeStatus,
   Terminal,
 } from "../shared";
-import { createSyncEngine, type SyncEngine } from "../sync";
+import { createSyncEngine, inspectRepo, type SyncEngine } from "../sync";
 import { createTerminals, type TerminalInfo, type Terminals } from "../terminal";
 
 export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED";
@@ -66,6 +67,10 @@ export interface Core {
   /** 订阅事件，返回取消订阅的函数 */
   on(listener: BwListener): () => void;
   addProject(localDir: string, name?: string): Promise<Project>;
+  /** 添加项目前看一眼这个文件夹 */
+  inspectDirectory(dir: string): Promise<DirectoryInfo>;
+  /** 这个项目所有路的同步记录，新的在前 */
+  projectLog(projectId: string): SyncLogEntry[];
   listProjects(): Project[];
   snapshot(projectId: string): ProjectSnapshot;
   /**
@@ -541,10 +546,20 @@ export function createCore(opts: CoreOptions): Core {
       const dir = path.resolve(localDir);
       const existing = db.projects.byLocalDir(dir);
       if (existing) return existing;
-      const project: Project = { id: id("p"), name: name ?? path.basename(dir), localDir: dir, permissionMode: "ask", createdAt: Date.now() };
+      const project: Project = { id: id("p"), name: name?.trim() || path.basename(dir), localDir: dir, permissionMode: "ask", createdAt: Date.now() };
       await makeEngine(dir, path.join(opts.worktreesRoot, project.id)); // 不是可用的仓库会在这里报错
       db.projects.insert(project);
       return project;
+    },
+
+    async inspectDirectory(localDir) {
+      const dir = path.resolve(localDir);
+      return { dir, name: path.basename(dir), ...(await inspectRepo(dir)), projectId: db.projects.byLocalDir(dir)?.id ?? null };
+    },
+
+    projectLog(projectId) {
+      mustProject(projectId);
+      return db.syncLog.listByRoutes(db.routes.listByProject(projectId).map((r) => r.id));
     },
 
     listProjects: () => db.projects.list(),

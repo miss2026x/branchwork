@@ -119,6 +119,21 @@ export interface ProjectSnapshot {
   queue: QueueItem[];
 }
 
+/** 添加项目前看一眼这个文件夹 */
+export interface DirectoryInfo {
+  dir: string;
+  /** 默认的项目名：文件夹的名字 */
+  name: string;
+  exists: boolean;
+  isRepo: boolean;
+  branch: string | null;
+  /** 没提交的改动有几个文件 */
+  dirty: number;
+  hasClaudeMd: boolean;
+  /** 已经加过的项目（加过就不用再加） */
+  projectId: string | null;
+}
+
 /** 工作区里一个还没进 Local 的文件，以及它增删了多少行 */
 export interface FileStat {
   path: string;

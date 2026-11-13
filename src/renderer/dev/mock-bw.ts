@@ -203,6 +203,17 @@ export function installMockBw(): void {
       if (mode === "all") for (const [k, resolve] of permissions) (permissions.delete(k), resolve("allow"));
       return projects[i]!;
     },
+    inspectDirectory: async (dir) => ({ dir, name: dir.split(/[\\/]/).filter(Boolean).at(-1) ?? dir, exists: true, isRepo: !dir.includes("bad"), branch: "main", dirty: dir.includes("dirty") ? 3 : 0, hasClaudeMd: true, projectId: null }),
+    projectLog: async (projectId) => {
+      const rs = [...routes.values()].filter((r) => r.projectId === projectId);
+      const last = (r: Route) => [...stops.values()].filter((s) => s.routeId === r.id).at(-1)?.id ?? null;
+      const at = Date.now();
+      return rs.flatMap((r, i): SyncLogEntry[] => [
+        { id: `l${i}a`, routeId: r.id, stopId: last(r), direction: "push", status: r.status === "conflict" ? "conflict" : "ok", files: r.status === "conflict" ? [{ path: "src/auth/session.ts", note: "both-modified" }] : [{ path: "src/auth/github.ts", note: "added" }, { path: "src/auth/routes.ts", note: "modified" }], message: null, at: at - i * 240_000 },
+        { id: `l${i}b`, routeId: r.id, stopId: last(r), direction: "pull", status: i % 2 ? "ok" : "noop", files: i % 2 ? [{ path: ".env.example", note: "modified" }] : [], message: null, at: at - i * 240_000 - 90_000 },
+      ]);
+    },
+    openLocal: async () => {},
     renameRoute: async (routeId, name) => setRoute(routeId, { name }),
     setRouteColor: async (routeId, color) => setRoute(routeId, { color }),
     async renameStop(stopId, name) {

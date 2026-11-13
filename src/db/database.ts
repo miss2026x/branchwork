@@ -41,6 +41,7 @@ export interface Db {
   syncLog: {
     insert(e: SyncLogEntry): void;
     listByRoute(routeId: string, limit?: number): SyncLogEntry[];
+    listByRoutes(routeIds: string[], limit?: number): SyncLogEntry[];
   };
   close(): void;
 }
@@ -221,6 +222,7 @@ export function openDb(file: string): Db {
     syncLog: {
       insert: syncLog.insert,
       listByRoute: (rid, limit = 100) => syncLog.where("route_id = ? ORDER BY at DESC, rowid DESC LIMIT ?", rid, limit),
+      listByRoutes: (rids, limit = 200) => (rids.length ? syncLog.where(`route_id IN (${rids.map(() => "?").join(",")}) ORDER BY at DESC, rowid DESC LIMIT ?`, ...rids, limit) : []),
     },
     close: () => sql.close(),
   };

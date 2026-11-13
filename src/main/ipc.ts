@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { Core } from "../core";
 import type { BwApi } from "../shared";
 
@@ -25,7 +25,13 @@ export function registerIpc(core: Core): void {
     listProjects: async () => core.listProjects(),
     snapshot: async (projectId) => core.snapshot(projectId),
     setPermissionMode: async (projectId, mode) => core.setPermissionMode(projectId, mode),
-    addProject: (localDir) => core.addProject(localDir),
+    addProject: (localDir, name) => core.addProject(localDir, name),
+    inspectDirectory: (dir) => core.inspectDirectory(dir),
+    projectLog: async (projectId) => core.projectLog(projectId),
+    async openLocal(projectId) {
+      const project = core.listProjects().find((p) => p.id === projectId);
+      if (project) await shell.openPath(project.localDir);
+    },
     createRoute: (projectId, name) => core.createRoute(projectId, name),
     renameRoute: async (routeId, name) => core.renameRoute(routeId, name),
     setRouteColor: async (routeId, color) => core.setRouteColor(routeId, color),

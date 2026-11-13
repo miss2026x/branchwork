@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, FileStat, Terminal } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, Terminal } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -41,6 +41,10 @@ interface State {
   /** 各项目候车区里的问题 */
   queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
+  /** 正开着的整块弹窗：添加项目、开一路新车、同步记录 */
+  dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null };
+  /** 正在看“全部项目”页 */
+  overview: boolean;
   /** 后台终端，按编号记 */
   terminals: Record<string, Terminal>;
   /** 正在看的那个后台终端和它到现在为止的输出 */
@@ -66,6 +70,20 @@ interface State {
   selectProject(projectId: string): void;
   selectRoute(routeId: string): void;
   addProject(): Promise<void>;
+  /** 打开“添加项目”弹窗；dir 不给就先让用户选文件夹 */
+  openAddProject(dir?: string): Promise<void>;
+  addProjectAt(dir: string, name: string): Promise<void>;
+  openNewRoute(): void;
+  /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
+  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; question?: string; itemId?: string }): Promise<void>;
+  /** 看这个项目的同步记录；null 关掉 */
+  viewLog(projectId: string | null): void;
+  closeDialog(): void;
+  setOverview(on: boolean): void;
+  openLocal(projectId: string): Promise<void>;
+  /** 让用户选一个文件夹；取消返回 null */
+  pickDirectory(): Promise<string | null>;
+  inspectDirectory(dir: string): Promise<DirectoryInfo>;
   createRoute(name?: string): Promise<void>;
   /** 跳到某一站：选中它那一路，地图和对话都带过去 */
   jumpToStop(stopId: string): void;
@@ -272,6 +290,8 @@ export const useStore = create<State>((set, get) => {
     lastSync: {},
     queue: {},
     drafts: {},
+    dialog: null,
+    overview: false,
     terminals: {},
     terminalView: null,
     changesView: null,
@@ -316,7 +336,7 @@ export const useStore = create<State>((set, get) => {
     selectRoute(routeId) {
       const route = get().routes[routeId];
       if (!route) return;
-      set((s) => ({ selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
+      set((s) => ({ overview: false, selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
       void loadHistory(routeId);
       void window.bw.warm(routeId).catch(() => {});
       // 这一路最近一次同步的结果（冲突面板要用）
@@ -326,6 +346,68 @@ export const useStore = create<State>((set, get) => {
         },
         () => {},
       );
+    },
+
+    async openAddProject(dir) {
+      try {
+        const picked = dir ?? (await window.bw.pickDirectory());
+        if (picked) set({ dialog: { kind: "add-project", dir: picked } });
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async addProjectAt(dir, name) {
+      try {
+        const project = await window.bw.addProject(dir, name.trim() || undefined);
+        set((s) => ({ dialog: null, projects: s.projects.some((p) => p.id === project.id) ? s.projects : [...s.projects, project] }));
+        await loadProject(project.id);
+        get().selectProject(project.id);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    openNewRoute() {
+      if (get().projects.length > 0) set({ dialog: { kind: "new-route" } });
+    },
+
+    async startRoute({ projectId, name, color, model, question, itemId }) {
+      try {
+        let route = await window.bw.createRoute(projectId, name?.trim() || undefined);
+        if (color) route = await window.bw.setRouteColor(route.id, color);
+        if (model) route = await window.bw.setRouteModel(route.id, model);
+        set((s) => ({ dialog: null, routes: { ...s.routes, [route.id]: route } }));
+        get().selectRoute(route.id);
+        if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
+        if (question?.trim()) void get().ask(route.id, question);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    viewLog(projectId) {
+      if (!projectId) return set({ dialog: null });
+      set({ dialog: { kind: "log", projectId, entries: null } });
+      void window.bw.projectLog(projectId).then(
+        (entries) => set((s) => (s.dialog?.kind === "log" && s.dialog.projectId === projectId ? { dialog: { kind: "log", projectId, entries } } : {})),
+        (e) => set({ error: message(e), dialog: null }),
+      );
+    },
+
+    closeDialog() {
+      set({ dialog: null });
+    },
+
+    async openLocal(projectId) {
+      await window.bw.openLocal(projectId).catch((e) => set({ error: message(e) }));
+    },
+
+    pickDirectory: () => window.bw.pickDirectory().catch(() => null),
+    inspectDirectory: (dir) => window.bw.inspectDirectory(dir),
+
+    setOverview(on) {
+      set({ overview: on });
     },
 
     async addProject() {

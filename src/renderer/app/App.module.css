@@ -190,3 +190,19 @@
   background: rgba(255, 255, 255, 0.16);
   color: #fff;
 }
+
+/* 全部项目页：占满下面整块，左栏、地图、对话栏先收起 */
+.body[data-overview="true"] > :not(:first-child) {
+  display: none;
+}
+.crumbLink {
+  padding: 4px 6px;
+  border-radius: var(--r-6);
+  font: inherit;
+  color: inherit;
+}
+.crumbLink:hover,
+.crumbLink[aria-current="page"] {
+  background: var(--surface-2);
+  color: var(--text-1);
+}

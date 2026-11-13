@@ -23,6 +23,11 @@ export function ProjectRail({
   const unarchiveRoute = useStore((s) => s.unarchiveRoute);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [menuAt, setMenuAt] = useState({ top: 0, left: 0 });
+  const [projectMenu, setProjectMenu] = useState<string | null>(null);
+  const openNewRoute = useStore((s) => s.openNewRoute);
+  const openAddProject = useStore((s) => s.openAddProject);
+  const viewLog = useStore((s) => s.viewLog);
+  const openLocal = useStore((s) => s.openLocal);
   const [showArchived, setShowArchived] = useState<Record<string, boolean>>({});
   const projects = useStore((s) => s.projects);
   const routes = useStore((s) => s.routes);
@@ -42,7 +47,7 @@ export function ProjectRail({
             .filter((r) => r.projectId === p.id && r.status !== "archived")
             .sort((a, b) => a.number - b.number);
           return (
-            <section key={p.id}>
+            <section key={p.id} className={css.projectSection}>
               <button
                 className={css.avatar}
                 aria-current={p.id === projectId}
@@ -92,7 +97,7 @@ export function ProjectRail({
         disabled={!projectId}
         title="新对话"
         aria-label="新对话"
-        onClick={() => void createRoute()}
+        onClick={() => openNewRoute()}
       >
         <IconPlus />
       </button>
@@ -112,7 +117,7 @@ export function ProjectRail({
           <button
             title="添加项目"
             aria-label="添加项目"
-            onClick={() => void addProject()}
+            onClick={() => void openAddProject()}
           >
             <IconPlus />
           </button>
@@ -127,7 +132,7 @@ export function ProjectRail({
             const archived = mine.filter((r) => r.status === "archived");
             const open = !closed[p.id];
             return (
-              <section key={p.id}>
+              <section key={p.id} className={css.projectSection}>
                 <button
                   className={css.project}
                   aria-expanded={open}
@@ -141,6 +146,30 @@ export function ProjectRail({
                   <b className="ell">{p.name}</b>
                   {!open && <small>{list.length} 路车</small>}
                 </button>
+                <button className={css.projectMore} aria-label={`${p.name} 的菜单`} aria-expanded={projectMenu === p.id} onClick={() => setProjectMenu(projectMenu === p.id ? null : p.id)}>
+                  <IconMore />
+                </button>
+                {projectMenu === p.id && (
+                  <>
+                    <div className={css.backdrop} onClick={() => setProjectMenu(null)} />
+                    <div className={`${css.menu} ${css.projectMenu}`} role="menu">
+                      <button role="menuitem" onClick={() => (setProjectMenu(null), selectProject(p.id), openNewRoute())}>
+                        在此项目开新对话
+                      </button>
+                      <button role="menuitem" onClick={() => (setProjectMenu(null), viewLog(p.id))}>
+                        同步记录
+                      </button>
+                      {archived.length > 0 && (
+                        <button role="menuitem" onClick={() => (setProjectMenu(null), setClosed((c) => ({ ...c, [p.id]: false })), setShowArchived((v) => ({ ...v, [p.id]: true })))}>
+                          已归档 · {archived.length}
+                        </button>
+                      )}
+                      <button role="menuitem" onClick={() => (setProjectMenu(null), void openLocal(p.id))}>
+                        在文件夹中打开 Local
+                      </button>
+                    </div>
+                  </>
+                )}
                 {open &&
                   list.map((r) => (
                     <div
@@ -231,7 +260,7 @@ export function ProjectRail({
         <button
           className={css.newChat}
           disabled={!projectId}
-          onClick={() => void createRoute()}
+          onClick={() => openNewRoute()}
         >
           <IconPlus /> 新对话
         </button>

@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { FileStat, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
+import type { DirectoryInfo, FileStat, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -10,7 +10,13 @@ export interface BwApi {
   listProjects(): Promise<Project[]>;
   /** 弹出系统的选目录窗口；取消返回 null */
   pickDirectory(): Promise<string | null>;
-  addProject(localDir: string): Promise<Project>;
+  /** 添加项目前看一眼这个文件夹：是不是 git 仓库、在哪个分支、有没有 CLAUDE.md */
+  inspectDirectory(dir: string): Promise<DirectoryInfo>;
+  addProject(localDir: string, name?: string): Promise<Project>;
+  /** 这个项目所有路的同步记录，新的在前 */
+  projectLog(projectId: string): Promise<SyncLogEntry[]>;
+  /** 在系统的文件管理器里打开这个项目的 Local */
+  openLocal(projectId: string): Promise<void>;
   snapshot(projectId: string): Promise<ProjectSnapshot>;
   /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
   setPermissionMode(projectId: string, mode: PermissionMode): Promise<Project>;

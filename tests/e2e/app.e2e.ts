@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "listProjects", "onEvent", "pickDirectory", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "inspectDirectory", "listProjects", "onEvent", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -63,8 +63,18 @@ describe("应用", () => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] });
     }, local);
     await page.getByRole("button", { name: "选择项目目录" }).click();
+    // 添加项目的弹窗：先看一眼这个文件夹能不能用，名字可以改
+    const add = page.getByRole("dialog", { name: "添加项目" });
+    await expect.poll(() => add.getByText(/git 仓库，当前在/).isVisible()).toBe(true);
+    expect(await add.getByLabel("项目名称").inputValue()).toBe("my-project");
+    await shot("1b-add-project");
+    await add.getByRole("button", { name: "添加", exact: true }).click();
     await expect.poll(() => page.getByText("开出第一路").isVisible()).toBe(true);
     await page.getByRole("main").getByRole("button", { name: "新对话" }).click();
+    // 开一路新车的弹窗：什么都不填也能开
+    const fresh = page.getByRole("dialog", { name: "开一路新车" });
+    await shot("1c-new-route");
+    await fresh.getByRole("button", { name: /开出 1路/ }).click();
     await expect.poll(() => page.getByText("这一路还没有站").isVisible()).toBe(true);
     expect(await page.getByRole("heading", { name: "新对话" }).isVisible()).toBe(true);
     await shot("2-first-route");
@@ -405,5 +415,34 @@ describe("应用", () => {
     await notices.getByRole("button", { name: "登车", exact: true }).click();
     await expect.poll(() => page.getByRole("log").getByText("这一条要我点了才发").first().isVisible(), { timeout: 30000 }).toBe(true);
     await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+  });
+  it("开新车时带上名称、颜色、模型和第一个问题；同步记录里能看到每一站带进 Local 的文件；全部项目页", async () => {
+    const notes = () => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
+    await page.keyboard.press("Control+n");
+    const fresh = page.getByRole("dialog", { name: "开一路新车" });
+    await fresh.getByPlaceholder("不填就用第一个问题起名").fill("带着问题出发");
+    await fresh.getByRole("radio", { name: "颜色 6" }).click();
+    await fresh.getByRole("combobox").selectOption("haiku");
+    await fresh.getByLabel("第一个问题").fill("新车的第一个问题");
+    await fresh.getByRole("button", { name: /发车/ }).click();
+    await expect.poll(() => page.getByRole("heading", { name: "带着问题出发" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(notes, { timeout: 60000 }).toContain("新车的第一个问题");
+    expect(await page.getByRole("button", { name: /^模型：Haiku/ }).isVisible()).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+
+    await page.getByRole("button", { name: "my-project 的菜单" }).click();
+    await page.getByRole("menuitem", { name: "同步记录" }).click();
+    const log = page.getByRole("dialog", { name: "Local 同步记录" });
+    await expect.poll(() => log.getByText(/个文件进了 Local/).first().isVisible(), { timeout: 30000 }).toBe(true);
+    expect(await log.getByText("demo-notes.md").first().isVisible()).toBe(true);
+    await shot("25-sync-log");
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "全部项目" }).click();
+    await expect.poll(() => page.getByRole("heading", { name: "全部项目" }).isVisible()).toBe(true);
+    expect(await page.getByText(/\d+ 路车/).first().isVisible()).toBe(true);
+    await shot("26-overview");
+    await page.getByRole("button", { name: "打开 my-project" }).click();
+    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
   });
 });

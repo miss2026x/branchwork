@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
+import { AddProjectDialog } from "../dialogs/AddProjectDialog";
 import { ChangesDialog } from "../dialogs/ChangesDialog";
+import { NewRouteDialog } from "../dialogs/NewRouteDialog";
+import { SyncLogDialog } from "../dialogs/SyncLogDialog";
+import { Overview } from "../overview/Overview";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { TerminalDialog } from "../terminal/TerminalDialog";
 import { stopOffset } from "../stores/numbering";
@@ -71,6 +75,17 @@ export function App() {
   const renameStop = useStore((s) => s.renameStop);
   const routeTerminals = useMemo(() => Object.values(terminals).filter((t) => t.routeId === routeId).sort((a, b) => a.startedAt - b.startedAt), [terminals, routeId]);
   const viewed = terminalView ? terminals[terminalView.id] : undefined;
+  const dialog = useStore((s) => s.dialog);
+  const pickDirectory = useStore((s) => s.pickDirectory);
+  const inspectDirectory = useStore((s) => s.inspectDirectory);
+  const closeDialog = useStore((s) => s.closeDialog);
+  const openAddProject = useStore((s) => s.openAddProject);
+  const addProjectAt = useStore((s) => s.addProjectAt);
+  const openNewRoute = useStore((s) => s.openNewRoute);
+  const startRoute = useStore((s) => s.startRoute);
+  const overview = useStore((s) => s.overview);
+  const setOverview = useStore((s) => s.setOverview);
+  const selectProject = useStore((s) => s.selectProject);
   const [palette, setPalette] = useState(false);
   const [waitingSignal, setWaitingSignal] = useState(0);
   const tier = useTier();
@@ -103,12 +118,12 @@ export function App() {
         setPalette((v) => !v);
       } else if (key === "n" && !document.querySelector('[aria-modal="true"]')) {
         e.preventDefault();
-        void createRoute();
+        openNewRoute();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [createRoute]);
+  }, [openNewRoute]);
 
   /** 去某一路 / 某一站；窄窗口里顺便把对话栏滑出来 */
   const goToRoute = (id: string) => {
@@ -131,7 +146,9 @@ export function App() {
           <b>Branchwork</b>
         </div>
         <nav className={css.crumbs} aria-label="位置">
-          <span>全部项目</span>
+          <button className={css.crumbLink} aria-current={overview ? "page" : undefined} onClick={() => setOverview(true)}>
+            全部项目
+          </button>
           {project && (
             <>
               <i>›</i>
@@ -153,7 +170,20 @@ export function App() {
         </button>
       </header>
 
-      <div className={css.body} data-tier={tier}>
+      <div className={css.body} data-tier={tier} data-overview={overview}>
+        {overview && (
+          <Overview
+            projects={projects}
+            routes={allRoutes}
+            stops={allStops}
+            queue={allQueues}
+            currentProjectId={projectId}
+            onOpenProject={(id) => (selectProject(id), setOverview(false))}
+            onOpenRoute={goToRoute}
+            onNewRoute={(id) => (selectProject(id), setOverview(false), openNewRoute())}
+            onAddProject={() => void openAddProject()}
+          />
+        )}
         <ProjectRail compact={tier !== "wide"} onDelete={(id) => setDeleting({ routeId: id, unsynced: null })} />
 
         <main className={css.center}>
@@ -162,7 +192,7 @@ export function App() {
               <BusMark size={56} />
               <h1>先加一个项目</h1>
               <p>选一个有提交记录的 git 仓库目录。Branchwork 会把它当作 Local：你真正运行代码的地方。每条对话在自己的工作区里改，到站后再把改动带回这里。</p>
-              <button className={css.primary} onClick={() => void addProject()}>
+              <button className={css.primary} onClick={() => void openAddProject()}>
                 <IconFolder /> 选择项目目录
               </button>
             </div>
@@ -171,7 +201,7 @@ export function App() {
               <BusMark size={56} />
               <h1>开出第一路</h1>
               <p>一路就是一条和 Claude 的对话，每问一次是一站。</p>
-              <button className={css.primary} onClick={() => void createRoute()}>
+              <button className={css.primary} onClick={() => openNewRoute()}>
                 新对话
               </button>
             </div>
@@ -275,6 +305,22 @@ export function App() {
             setForkFrom(null);
           }}
         />
+      )}
+
+      {dialog?.kind === "add-project" && <AddProjectDialog dir={dialog.dir} onPick={pickDirectory} onInspect={inspectDirectory} onAdd={(dir, name) => void addProjectAt(dir, name)} onCancel={closeDialog} />}
+      {dialog?.kind === "new-route" && projectId && (
+        <NewRouteDialog
+          projects={projects}
+          projectId={projectId}
+          nextNumber={(id) => Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === id).map((r) => r.number)) + 1}
+          parked={(id) => (allQueues[id] ?? []).filter((q) => !q.routeId)}
+          onAddProject={() => void openAddProject()}
+          onCreate={(o) => void startRoute(o)}
+          onCancel={closeDialog}
+        />
+      )}
+      {dialog?.kind === "log" && projects.find((p) => p.id === dialog.projectId) && (
+        <SyncLogDialog project={projects.find((p) => p.id === dialog.projectId)!} entries={dialog.entries} routes={allRoutes} stops={allStops} stopNumber={stopNumber} onViewRoute={goToRoute} onClose={closeDialog} />
       )}
 
       {changesView && allRoutes[changesView.routeId] && <ChangesDialog route={allRoutes[changesView.routeId]!} files={changesView.files} onClose={() => viewChanges(null)} />}

@@ -93,8 +93,7 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
-  color: var(--text-3);
-  opacity: 0;
+  color: var(--text-4);
 }
 .row:hover .more,
 .more:focus-visible,
@@ -313,4 +312,29 @@
   position: absolute;
   inset: 0;
   z-index: 7;
+}
+
+.projectSection {
+  position: relative;
+}
+.projectMore {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+  color: var(--text-4);
+}
+.projectSection:hover > .projectMore,
+.projectMore:focus-visible,
+.projectMore[aria-expanded="true"] {
+  opacity: 1;
+  background: var(--surface-2);
+}
+.projectMenu {
+  top: 34px;
+  right: 2px;
 }
