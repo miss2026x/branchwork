@@ -46,7 +46,7 @@ describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () =
       }),
     );
     const r = await client.ask({ cwd: "/wt/r1", prompt: "第二站", sessionId: "S1", afterMessageId: "a1", onEvent: (e) => events.push(e) });
-    expect(r).toEqual({ outcome: "completed", sessionId: "S1", text: "改好了", error: null, promptMessageId: "u2", lastMessageId: "a3" });
+    expect(r).toEqual({ outcome: "completed", sessionId: "S1", text: "改好了", error: null, promptMessageId: "u2", lastMessageId: "a3", contextTokens: null });
     expect(events).toEqual([
       { type: "started" },
       { type: "text", text: "改" },
@@ -428,5 +428,13 @@ describe("模型、应用自己的工具、起名", () => {
     expect(await broken.name("x")).toBeNull();
     const silent = createClaudeClient(fakeSdk([], { query: () => (async function* () { await new Promise(() => {}); })() }), { namingTimeoutMs: 50 });
     expect(await silent.name("x")).toBeNull();
+  });
+});
+
+describe("上下文用量", () => {
+  it("取最后一条回答消息的用量：读进去的（含缓存）加写出来的", async () => {
+    const withUsage = (usage: Record<string, number>) => ({ type: "assistant", message: { content: [{ type: "text", text: "x" }], usage } });
+    const client = createClaudeClient(fakeSdk([init, withUsage({ input_tokens: 10, cache_read_input_tokens: 1000, output_tokens: 5 }), withUsage({ input_tokens: 20, cache_read_input_tokens: 2000, cache_creation_input_tokens: 300, output_tokens: 80 }), success]));
+    expect((await client.ask({ cwd: "/wt", prompt: "x" })).contextTokens).toBe(2400);
   });
 });
