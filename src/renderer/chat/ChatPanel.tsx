@@ -7,7 +7,7 @@ import { ModelControl } from "./ModelControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
-import { IconChevron, IconSend, IconStop, IconWait, IconWarn } from "../ui/icons";
+import { IconChevron, IconEye, IconSend, IconStop, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./ChatPanel.module.css";
@@ -25,6 +25,9 @@ interface Props {
   permissionMode: PermissionMode;
   projectName: string;
   onPermissionMode(mode: PermissionMode): void;
+  /** 正在看的以前的某一站；没有就是跟着最新 */
+  viewing?: Stop;
+  onBackToLatest(): void;
   /** 这一路换模型 */
   onModel(model: string | null): void;
   /** 这一路的后台终端 */
@@ -56,7 +59,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -128,9 +131,17 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         <div className={css.headText}>
           <h2 className="ell">{route.name}</h2>
           <p className="ell">
-            {busy && <i className={css.statusDot} style={{ background: colors.line }} />}
-            <StatusLine route={route} n={offset + stops.length} phase={pending !== undefined ? "syncing" : currentLive?.phase} />
-            {busy && waiting[0] && <span className={css.next}>下一站{waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
+            {viewing && (
+              <>
+                <b>正在看第 {offset + viewing.seq} 站</b>
+                <button className={css.back} onClick={onBackToLatest}>
+                  回到最新
+                </button>
+              </>
+            )}
+            {!viewing && busy && <i className={css.statusDot} style={{ background: colors.line }} />}
+            {!viewing && <StatusLine route={route} n={offset + stops.length} phase={pending !== undefined ? "syncing" : currentLive?.phase} />}
+            {!viewing && busy && waiting[0] && <span className={css.next}>下一站{waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
           </p>
         </div>
         {onCollapse && (
@@ -231,7 +242,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             );
           }
           return (
-            <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id}>
+            <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id} data-viewing={viewing?.id === s.id}>
               <div className={css.ask} style={{ background: colors.tint }}>
                 {s.prompt}
               </div>
@@ -320,7 +331,18 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         onStop={onStopTerminal}
       />
 
-      <footer className={css.composer}>
+      {viewing && (
+        <div className={css.viewingNote}>
+          <IconEye size={18} />
+          <span>
+            在看第 {offset + viewing.seq} 站的记录。要从这里接着问，用地图底部的“从第 {offset + viewing.seq} 站开新对话”。
+            <button className={css.inlineLink} onClick={onBackToLatest}>
+              回到最新
+            </button>
+          </span>
+        </div>
+      )}
+      <footer className={css.composer} hidden={!!viewing}>
         {busy && (
           <div className={css.running}>
             <span style={{ color: colors.tag }}>

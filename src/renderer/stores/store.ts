@@ -45,6 +45,8 @@ interface State {
   dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null };
   /** 正在看“全部项目”页 */
   overview: boolean;
+  /** 正在看的以前的某一站（不是最新的）；空表示跟着最新 */
+  viewing: string | null;
   /** 后台终端，按编号记 */
   terminals: Record<string, Terminal>;
   /** 正在看的那个后台终端和它到现在为止的输出 */
@@ -100,6 +102,10 @@ interface State {
   renameRoute(routeId: string, name: string): Promise<void>;
   setRouteColor(routeId: string, color: number | null): Promise<void>;
   renameStop(stopId: string, name: string): Promise<void>;
+  /** 看以前的某一站；null 回到最新 */
+  viewStop(stopId: string | null): void;
+  /** 截线；requeue 为真时把那一站的提问放回输入框（改站） */
+  truncate(routeId: string, stopId: string, requeue: boolean): Promise<void>;
   /** 打开一个后台终端看输出；null 关掉 */
   viewTerminal(terminalId: string | null): void;
   /** 还在跑的停掉；已退出的从列表里拿掉 */
@@ -236,6 +242,17 @@ export const useStore = create<State>((set, get) => {
       case "sync.result":
         set((s) => ({ lastSync: { ...s.lastSync, [e.entry.routeId]: e.entry } }));
         break;
+      case "stops.removed":
+        set((s) => {
+          const stops = { ...s.stops };
+          const content = { ...s.content };
+          for (const id of e.stopIds) {
+            delete stops[id];
+            delete content[id];
+          }
+          return { stops, content, viewing: s.viewing && e.stopIds.includes(s.viewing) ? null : s.viewing };
+        });
+        break;
       case "terminal.updated":
         set((s) => ({ terminals: { ...s.terminals, [e.terminal.id]: e.terminal } }));
         break;
@@ -292,6 +309,7 @@ export const useStore = create<State>((set, get) => {
     drafts: {},
     dialog: null,
     overview: false,
+    viewing: null,
     terminals: {},
     terminalView: null,
     changesView: null,
@@ -336,7 +354,7 @@ export const useStore = create<State>((set, get) => {
     selectRoute(routeId) {
       const route = get().routes[routeId];
       if (!route) return;
-      set((s) => ({ overview: false, selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
+      set((s) => ({ overview: false, viewing: s.viewing && s.stops[s.viewing]?.routeId === routeId ? s.viewing : null, selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
       void loadHistory(routeId);
       void window.bw.warm(routeId).catch(() => {});
       // 这一路最近一次同步的结果（冲突面板要用）
@@ -536,6 +554,23 @@ export const useStore = create<State>((set, get) => {
         (e) => set({ error: message(e) }),
       );
     },
+    viewStop(stopId) {
+      if (!stopId) return set({ viewing: null });
+      const stop = get().stops[stopId];
+      if (!stop) return;
+      get().selectRoute(stop.routeId);
+      set((s) => ({ viewing: stopId, focus: { stopId, n: (s.focus?.n ?? 0) + 1 } }));
+    },
+
+    async truncate(routeId, stopId, requeue) {
+      try {
+        const { prompt } = await window.bw.truncate(routeId, stopId);
+        if (requeue) set((s) => ({ drafts: { ...s.drafts, [routeId]: prompt } }));
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
     async renameStop(stopId, name) {
       await window.bw.renameStop(stopId, name).catch((e) => set({ error: message(e) }));
     },

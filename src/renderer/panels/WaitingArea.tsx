@@ -15,13 +15,15 @@ interface Props {
   onStartNew(itemId: string): void;
   /** 每次变化就把浮窗打开（从搜索跳过来时用） */
   openSignal?: number;
+  /** 开始或结束拖一个问题（拖到线路图上某一路的末尾去派车） */
+  onDrag?(item: QueueItem | null): void;
 }
 
 const busy = (r: Route) => r.status === "answering" || r.status === "awaiting_permission";
 const canBoard = (r: Route) => r.status === "idle" || r.status === "interrupted";
 
 /** 候车区：准备好的问题先放着。右上角一个按钮，点开是浮窗。只收数据、发出操作 */
-export function WaitingArea({ items, routes, onAdd, onAssign, onRemove, onBoard, onStartNew, openSignal = 0 }: Props) {
+export function WaitingArea({ items, routes, onAdd, onAssign, onRemove, onBoard, onStartNew, openSignal = 0, onDrag }: Props) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (openSignal > 0) setOpen(true);
@@ -50,7 +52,19 @@ export function WaitingArea({ items, routes, onAdd, onAssign, onRemove, onBoard,
   const row = (it: QueueItem, sub: string, action?: ReactNode) => {
     const route = it.routeId ? byId.get(it.routeId) : undefined;
     return (
-      <li key={it.id} className={css.item} data-kind={route ? "assigned" : "none"}>
+      <li
+        key={it.id}
+        className={css.item}
+        data-kind={route ? "assigned" : "none"}
+        draggable={!!onDrag}
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", it.text);
+          e.dataTransfer.effectAllowed = "move";
+          // 浮窗先让开，露出下面的线路图
+          setTimeout(() => (onDrag?.(it), setOpen(false)), 0);
+        }}
+        onDragEnd={() => onDrag?.(null)}
+      >
         <div className={css.line}>
           {route && <Plate route={route} />}
           <div className={css.text}>

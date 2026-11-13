@@ -302,3 +302,30 @@
   font-size: 12px;
   color: var(--text-3);
 }
+
+.plain {
+  margin: 0 24px 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-10);
+  background: var(--surface-1);
+  font-size: 13px;
+}
+.checkRow {
+  display: flex;
+  gap: 10px;
+  margin: 4px 24px 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.checkRow input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--text-1);
+}
+.checkRow small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+}

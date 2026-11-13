@@ -21,6 +21,7 @@ const api: BwApi = {
   projectLog: call("projectLog"),
   openLocal: call("openLocal"),
   createRoute: call("createRoute"),
+  truncate: call("truncate"),
   renameRoute: call("renameRoute"),
   setRouteColor: call("setRouteColor"),
   renameStop: call("renameStop"),

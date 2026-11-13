@@ -29,6 +29,8 @@ export type BwEvent =
       canRemember: boolean;
     }
   | { type: "sync.result"; entry: SyncLogEntry }
+  /** 截线：这一路上这些站被删掉了 */
+  | { type: "stops.removed"; routeId: string; stopIds: string[] }
   /** 后台终端开了、退出了、认出了端口 */
   | { type: "terminal.updated"; terminal: Terminal }
   /** 后台终端新吐出来的一段输出 */

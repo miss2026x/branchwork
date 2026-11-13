@@ -33,6 +33,7 @@ export function registerIpc(core: Core): void {
       if (project) await shell.openPath(project.localDir);
     },
     createRoute: (projectId, name) => core.createRoute(projectId, name),
+    truncate: (routeId, stopId) => core.truncate(routeId, stopId),
     renameRoute: async (routeId, name) => core.renameRoute(routeId, name),
     setRouteColor: async (routeId, color) => core.setRouteColor(routeId, color),
     renameStop: async (stopId, name) => void core.renameStop(stopId, name),

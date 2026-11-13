@@ -292,7 +292,8 @@
 /* 站点菜单 */
 .menu {
   position: absolute;
-  z-index: 3;
+  /* 压在候车区的浮窗上面：菜单是刚点出来的，不能被挡住 */
+  z-index: 9;
   width: 280px;
   padding: 6px;
   border-radius: var(--r-12);
@@ -375,4 +376,243 @@
   border-radius: var(--r-6);
   font: inherit;
   outline: none;
+}
+
+.menu button > span {
+  flex: 1;
+  min-width: 0;
+}
+.menu kbd {
+  flex: none;
+  font: 11px/20px var(--mono);
+  color: var(--text-4);
+}
+.menu hr {
+  margin: 6px 4px;
+  border: 0;
+  border-top: 1px solid var(--divider);
+}
+.dangerItem,
+.dangerItem svg,
+.dangerItem small {
+  color: var(--red) !important;
+}
+.dangerItem {
+  font-weight: 700;
+}
+.dangerItem small {
+  font-weight: 400;
+}
+
+/* 悬停卡片 */
+.card {
+  position: absolute;
+  z-index: 8;
+  width: 420px;
+  padding: 14px 16px 12px;
+  border-radius: var(--r-12);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+  cursor: default;
+}
+.card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.card header time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.cardAsk {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 23px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.cardAnswer {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  min-height: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.cardMeta .ok {
+  color: var(--green);
+}
+.cardMeta .warn {
+  color: var(--amber-text);
+}
+.card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+.card footer button {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 12px;
+}
+.card footer button:disabled {
+  color: var(--text-4);
+}
+.card footer .cardPrimary {
+  border-color: var(--text-1);
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 700;
+}
+.cardDark {
+  width: 320px;
+  background: var(--text-1);
+  color: #fff;
+}
+.cardDark header em {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #1c5a3c;
+  color: #b9f0d4;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.cardDark header em[data-mode="manual"] {
+  background: #5a4310;
+  color: #ffe2a3;
+}
+.cardDark .cardMeta {
+  color: rgba(255, 255, 255, 0.7);
+}
+.cardDark footer {
+  border-top-color: rgba(255, 255, 255, 0.16);
+}
+.cardDark footer button {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+.cardDark footer .cardDanger {
+  color: #ffb4a6;
+}
+
+/* 正在看以前的某一站 */
+.stop[data-viewing="true"] .node {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--route-1) 22%, transparent);
+  transform: scale(1.15);
+}
+.viewingFlag {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--route-1);
+}
+.selectBar {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-0);
+  font-size: 14px;
+}
+.selectBar > i {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--border);
+}
+.selectBar .spacer {
+  flex: 1;
+}
+.selectBar button {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.selectBar button:disabled {
+  opacity: 0.45;
+}
+.selectBar .selectPrimary {
+  border-color: var(--text-1);
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 700;
+}
+.selectBar button[aria-label] {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+  border-color: transparent;
+}
+
+/* 拖拽派车：线路末尾的落点 */
+.drop {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transform: translateY(-50%);
+  padding: 6px;
+  border: 2px dashed var(--text-1);
+  border-radius: 22px;
+  background: var(--surface-0);
+}
+.drop > div {
+  width: 150px;
+  padding: 8px 10px;
+  border: 2px dashed;
+  border-radius: 16px;
+  text-align: center;
+}
+.drop > div[data-mode="auto"] {
+  border-style: solid;
+  background: var(--green);
+  border-color: var(--green) !important;
+  color: #fff;
+}
+.drop > div[data-over="true"] {
+  transform: scale(1.04);
+  box-shadow: var(--e2);
+}
+.drop b {
+  display: block;
+  font-size: 13px;
+}
+.drop small {
+  font-size: 11px;
+  opacity: 0.85;
 }

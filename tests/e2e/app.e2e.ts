@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "inspectDirectory", "listProjects", "onEvent", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "distill", "fork", "history", "inspectDirectory", "listProjects", "onEvent", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -116,7 +116,7 @@ describe("应用", () => {
   });
 
   it("从第 1 站开新对话：新的一路带着第 1 站的历史，有自己的工作区，改动照样进 Local", async () => {
-    await page.locator('button[title="记一笔：接入 GitHub 登录"]').click();
+    await page.locator('button[data-prompt="记一笔：接入 GitHub 登录"]').click({ button: "right" });
     await page.getByRole("menuitem", { name: /从这站开新对话/ }).click();
     const dialog = page.getByRole("dialog", { name: "从第 1 站开新对话" });
     await expect.poll(() => dialog.isVisible()).toBe(true);
@@ -165,7 +165,7 @@ describe("应用", () => {
   });
 
   it("压缩成快线：提炼出摘要，改一改，开出快1；它是全新的对话，第一站是摘要", async () => {
-    await page.getByLabel(/· 记一笔：接入/).click(); // 1 路的第 1 站
+    await page.getByLabel(/· 记一笔：接入/).click({ button: "right" }); // 1 路的第 1 站
     await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
     const dialog = page.getByRole("dialog", { name: "压缩成快线" });
     await dialog.getByRole("button", { name: "开始提炼" }).click();
@@ -180,7 +180,7 @@ describe("应用", () => {
     // 点右上角关掉只是收起来：再打开，改过的摘要还在，不用重新等
     await dialog.getByRole("button", { name: "关闭" }).click();
     expect(await dialog.isVisible()).toBe(false);
-    await page.getByLabel(/· 记一笔：接入/).click();
+    await page.getByLabel(/· 记一笔：接入/).click({ button: "right" });
     await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
     expect(await dialog.locator("textarea").first().inputValue()).toBe("## 做完了\n- 记了一笔 GitHub 登录");
     // “不要这条快线”要再确认一次
@@ -301,7 +301,7 @@ describe("应用", () => {
 
   it("压缩可以先收起来：提炼在后台继续，好了右下角提醒，点开就是摘要", async () => {
     await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
-    await page.locator('[class*="node"]').last().click();
+    await page.locator('[class*="node"]').last().click({ button: "right" });
     await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
     const dialog = page.getByRole("dialog", { name: "压缩成快线" });
     await dialog.getByRole("button", { name: "开始提炼" }).click();
@@ -392,7 +392,7 @@ describe("应用", () => {
     await expect.poll(() => rail.getByText("查资料（改过名）").isVisible()).toBe(true);
     await expect.poll(() => page.getByRole("heading", { name: "查资料（改过名）" }).isVisible()).toBe(true);
 
-    await page.locator('[class*="node"]').last().click();
+    await page.locator('[class*="node"]').last().click({ button: "right" });
     await page.getByRole("menuitem", { name: /重命名站点/ }).click();
     await page.getByLabel("站名").fill("我起的站名");
     await page.keyboard.press("Enter");
@@ -444,5 +444,68 @@ describe("应用", () => {
     await shot("26-overview");
     await page.getByRole("button", { name: "打开 my-project" }).click();
     await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+  });
+  it("地图上的站：点一下看这一站的记录，悬停出卡片；截线删掉这一站和后面的站，问题可以放回输入框", async () => {
+    // 前面的测试可能把候车区的浮窗留着，先收起来，免得挡住地图
+    const fab = page.getByRole("button", { name: /^候车 \d/ });
+    if ((await fab.getAttribute("aria-expanded")) === "true") await fab.click();
+    await page.locator("textarea").fill("截线前的一站");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("log").getByText("截线前的一站").first().isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+    await page.locator("textarea").fill("要被截掉的一站");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+    const nodes = page.locator('[class*="node"]');
+    const count = await nodes.count();
+
+    // 悬停：出卡片
+    await page.locator('button[data-prompt="截线前的一站"]').hover();
+    await expect.poll(() => page.getByRole("button", { name: "打开这站" }).isVisible(), { timeout: 10000 }).toBe(true);
+    await shot("27-hover-card");
+    // 点一下：进入“正在看”
+    await page.locator('button[data-prompt="截线前的一站"]').click();
+    const bar = page.getByRole("toolbar", { name: "选中的站" });
+    await expect.poll(() => bar.isVisible()).toBe(true);
+    expect(await page.getByText(/^正在看第 \d+ 站$/).isVisible()).toBe(true);
+    expect(await page.locator("textarea").isVisible()).toBe(false);
+    await shot("28-viewing");
+    await page.getByRole("button", { name: "回到最新" }).first().click();
+    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+
+    // 右键最后一站：改站（截线并把问题放回输入框）
+    await page.locator('button[data-prompt="要被截掉的一站"]').click({ button: "right" });
+    await page.getByRole("menuitem", { name: /改站/ }).click();
+    const cut = page.getByRole("alertdialog", { name: /截线/ });
+    expect(await cut.getByRole("checkbox").isChecked()).toBe(true);
+    await shot("29-truncate");
+    await cut.getByRole("button", { name: "截线", exact: true }).click();
+    await expect.poll(() => nodes.count()).toBe(count - 1);
+    expect(await page.locator("textarea").inputValue()).toBe("要被截掉的一站");
+    expect(await page.getByRole("log").getByText("要被截掉的一站").count()).toBe(0);
+    await page.locator("textarea").fill("");
+  });
+  it("拖拽派车：把候车区里的问题拖到一路的末尾，松手选手动登车", async () => {
+    await page.getByRole("button", { name: /^候车 \d/ }).click();
+    await page.getByLabel("放一个问题进候车区").fill("拖过去的问题");
+    await page.getByRole("button", { name: "放进来" }).click();
+    const area = page.getByRole("region", { name: "候车区" });
+    const item = area.getByRole("listitem").filter({ hasText: "拖过去的问题" });
+    await expect.poll(() => item.isVisible()).toBe(true);
+    // 开始拖：浮窗让开，每一路末尾出现落点
+    await item.dispatchEvent("dragstart", { dataTransfer: await page.evaluateHandle(() => new DataTransfer()) });
+    const target = page.getByText("松手：手动登车").first();
+    await expect.poll(() => target.isVisible()).toBe(true);
+    await shot("30-drag-dispatch");
+    await target.dispatchEvent("drop", { dataTransfer: await page.evaluateHandle(() => new DataTransfer()) });
+    await expect.poll(() => page.getByText("松手：手动登车").count()).toBe(0);
+    await page.getByRole("button", { name: /^候车 \d/ }).click();
+    await expect.poll(() => area.getByText("拖过去的问题").isVisible()).toBe(true);
+    expect(await area.getByText("未派车").count()).toBe(0);
+    // 收拾：把它撤掉
+    await area.getByRole("button", { name: /「拖过去的问题」的更多操作/ }).click();
+    await area.getByRole("button", { name: "删除这个问题" }).click();
+    await expect.poll(() => area.getByText("拖过去的问题").count()).toBe(0);
   });
 });

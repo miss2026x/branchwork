@@ -81,6 +81,8 @@ export interface Core {
   setPermissionMode(projectId: string, mode: PermissionMode): Project;
   /** 新开一路（从 Local 当前状态建工作区） */
   createRoute(projectId: string, name?: string): Promise<Route>;
+  /** 截线：删掉这一路从这一站起的所有站，会话退回到这一站之前；代码不动。返回这一站的提问 */
+  truncate(routeId: string, stopId: string): Promise<{ prompt: string }>;
   renameRoute(routeId: string, name: string): Route;
   /** 换线路颜色（1–8）；null 回到按路号自动取 */
   setRouteColor(routeId: string, color: number | null): Route;
@@ -654,6 +656,43 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "route.updated", route });
       warmRoute(route);
       return route;
+    },
+
+    async truncate(routeId, stopId) {
+      let route = mustRoute(routeId);
+      if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路还在回答，等它到站再截线");
+      if (distilling.has(routeId)) throw new CoreError("ROUTE_BUSY", "这一路正在提炼摘要，等它好了再截线");
+      const all = db.stops.listByRoute(routeId);
+      const target = all.find((s) => s.id === stopId);
+      if (!target) throw new CoreError("NOT_FOUND", "找不到这一站");
+      if (target.kind === "summary") throw new CoreError("NOT_FOUND", "摘要站是这条快线的起点，不能截掉");
+      const prev = all.filter((s) => s.seq < target.seq).at(-1);
+
+      // 会话退回到这一站之前：复制到上一站的最后一条消息为止，得到新的会话，旧的删掉
+      let sessionId: string | null = null;
+      if (route.sessionId) {
+        let upTo = prev?.lastMessageId ?? null;
+        if (!prev && route.parentRouteId) {
+          // 分叉出来的路截第一站：留下从父路带来的那一段，也就是这一站提问之前的部分
+          const messages = await claude.history(route.sessionId);
+          const at = messages.findIndex((m) => m.id === target.messageId);
+          upTo = at > 0 ? messages[at - 1]!.id : null;
+          if (!upTo) throw new CoreError("NOT_FOUND", "这一站没留下对话记录，没法从这里截线");
+        } else if (prev && !upTo) {
+          throw new CoreError("NOT_FOUND", "上一站没留下对话记录，没法从这里截线");
+        }
+        if (upTo) sessionId = await claude.fork(route.sessionId, upTo);
+      }
+      claude.cool(route.worktreePath);
+      const old = route.sessionId;
+      const removed = all.filter((s) => s.seq >= target.seq).map((s) => s.id);
+      db.stops.deleteFrom(routeId, target.seq);
+      emit({ type: "stops.removed", routeId, stopIds: removed });
+      // 没答完的那一站被截掉了，这一路就不再是“没答完”
+      route = setRoute(routeId, { sessionId, contextTokens: null, status: route.status === "interrupted" ? "idle" : route.status });
+      if (old && old !== sessionId) await claude.deleteSession(old).catch(() => {});
+      warmRoute(route);
+      return { prompt: target.prompt };
     },
 
     renameRoute(routeId, name) {

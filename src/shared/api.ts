@@ -25,6 +25,11 @@ export interface BwApi {
   renameRoute(routeId: string, name: string): Promise<Route>;
   /** 换线路颜色（1–8）；null 回到按路号自动取 */
   setRouteColor(routeId: string, color: number | null): Promise<Route>;
+  /**
+   * 截线：删掉这一路上从这一站起的所有站（只删对话，不动代码）。
+   * 返回被截掉的那一站的提问，方便放回输入框改一改重新问。
+   */
+  truncate(routeId: string, stopId: string): Promise<{ prompt: string }>;
   /** 改站名。改过的站不会再被自动起的名字覆盖 */
   renameStop(stopId: string, name: string): Promise<void>;
   /** 这一路以后用哪个模型；null 表示用默认的。下一站起生效 */

@@ -1090,3 +1090,72 @@ describe("改名、换颜色、上下文用量", () => {
     ]);
   });
 });
+
+describe("截线", () => {
+  it("删掉这一站和后面的站，会话退回到这一站之前；代码不动；能接着问", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, "one.txt", "1\n");
+    await core.ask(route.id, "第一站");
+    claude.script = (t) => write(t.cwd, "two.txt", "2\n");
+    await core.ask(route.id, "第二站");
+    claude.script = () => {};
+    await core.ask(route.id, "第三站");
+    const [, second] = stopsOf(route.id);
+    const before = routeOf(route.id).sessionId!;
+
+    const { prompt } = await core.truncate(route.id, second!.id);
+    expect(prompt).toBe("第二站");
+    expect(stopsOf(route.id).map((s) => s.prompt)).toEqual(["第一站"]);
+    expect(events).toContainEqual({ type: "stops.removed", routeId: route.id, stopIds: expect.arrayContaining([second!.id]) });
+    // 会话换成了只到第一站为止的那一份，旧的删掉了
+    const after = routeOf(route.id).sessionId!;
+    expect(after).not.toBe(before);
+    expect((await claude.history(after)).filter((m) => m.role === "user")).toHaveLength(1);
+    await expect(claude.history(before)).resolves.toEqual([]);
+    // 代码不动：第二站带进 Local 的文件还在
+    expect(has(lab.local, "two.txt")).toBe(true);
+
+    await core.ask(route.id, "换个问法");
+    expect(stopsOf(route.id).map((s) => [s.seq, s.prompt])).toEqual([
+      [1, "第一站"],
+      [2, "换个问法"],
+    ]);
+    expect(claude.asks.at(-1)!.sessionId).toBe(after);
+  });
+
+  it("截掉第一站：独立的路回到没发车；分叉出来的路留下从父路带来的那一段", async () => {
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "父路第一站");
+    await core.ask(route.id, "父路第二站");
+    const forked = await core.fork(route.id, stopsOf(route.id)[0]!.id);
+    await core.ask(forked.id, "子路第一站");
+    await core.truncate(forked.id, stopsOf(forked.id)[0]!.id);
+    expect(stopsOf(forked.id)).toEqual([]);
+    const kept = await claude.history(routeOf(forked.id).sessionId!);
+    expect(kept.filter((m) => m.role === "user").map((m) => m.content)).toEqual(["父路第一站"]);
+
+    await core.truncate(route.id, stopsOf(route.id)[0]!.id);
+    expect(routeOf(route.id).sessionId).toBeNull();
+    expect(stopsOf(route.id)).toEqual([]);
+    // 从被截掉的站分出去的路不受影响
+    expect(routeOf(forked.id).status).toBe("idle");
+  });
+
+  it("正在回答时不能截线；没答完的一站截掉后，这一路不再是没答完", async () => {
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "第一站");
+    claude.script = () => "interrupted";
+    await core.ask(route.id, "第二站");
+    expect(routeOf(route.id).status).toBe("interrupted");
+    await core.truncate(route.id, stopsOf(route.id)[1]!.id);
+    expect(routeOf(route.id).status).toBe("idle");
+
+    let release: (() => void) | undefined;
+    claude.script = () => new Promise<void>((r) => (release = r));
+    const pending = core.ask(route.id, "慢的一站");
+    while (!release) await new Promise((r) => setTimeout(r, 10));
+    await expect(core.truncate(route.id, stopsOf(route.id)[0]!.id)).rejects.toThrow(/还在回答/);
+    release();
+    await pending;
+  });
+});

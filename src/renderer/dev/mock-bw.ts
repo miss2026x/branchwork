@@ -214,6 +214,13 @@ export function installMockBw(): void {
       ]);
     },
     openLocal: async () => {},
+    async truncate(routeId, stopId) {
+      const target = stops.get(stopId)!;
+      const gone = [...stops.values()].filter((s) => s.routeId === routeId && s.seq >= target.seq).map((s) => s.id);
+      gone.forEach((id) => stops.delete(id));
+      emit({ type: "stops.removed", routeId, stopIds: gone });
+      return { prompt: target.prompt };
+    },
     renameRoute: async (routeId, name) => setRoute(routeId, { name }),
     setRouteColor: async (routeId, color) => setRoute(routeId, { color }),
     async renameStop(stopId, name) {

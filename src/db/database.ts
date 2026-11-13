@@ -29,6 +29,8 @@ export interface Db {
     listByProject(projectId: string): Stop[];
     update(id: string, patch: Partial<Omit<Stop, "id" | "routeId">>): Stop;
     nextSeq(routeId: string): number;
+    /** 删掉这一路上从第 seq 站起的所有站 */
+    deleteFrom(routeId: string, seq: number): void;
   };
   queue: {
     insert(q: QueueItem): void;
@@ -211,6 +213,7 @@ export function openDb(file: string): Db {
       listByProject: (pid) => stops.where("route_id IN (SELECT id FROM route WHERE project_id = ?) ORDER BY started_at, seq", pid),
       update: (id, patch) => stops.update(id, patch),
       nextSeq: (rid) => ((one("SELECT MAX(seq) AS n FROM stop WHERE route_id = ?", rid)?.n as number | null) ?? 0) + 1,
+      deleteFrom: (rid, seq) => run("DELETE FROM stop WHERE route_id = ? AND seq >= ?", rid, seq),
     },
     queue: {
       insert: queue.insert,

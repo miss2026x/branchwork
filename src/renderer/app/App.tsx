@@ -6,6 +6,7 @@ import { AddProjectDialog } from "../dialogs/AddProjectDialog";
 import { ChangesDialog } from "../dialogs/ChangesDialog";
 import { NewRouteDialog } from "../dialogs/NewRouteDialog";
 import { SyncLogDialog } from "../dialogs/SyncLogDialog";
+import { TruncateDialog } from "../dialogs/TruncateDialog";
 import { Overview } from "../overview/Overview";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { TerminalDialog } from "../terminal/TerminalDialog";
@@ -86,6 +87,12 @@ export function App() {
   const overview = useStore((s) => s.overview);
   const setOverview = useStore((s) => s.setOverview);
   const selectProject = useStore((s) => s.selectProject);
+  const viewing = useStore((s) => s.viewing);
+  const viewStop = useStore((s) => s.viewStop);
+  const truncate = useStore((s) => s.truncate);
+  const [truncating, setTruncating] = useState<{ stop: Stop; requeue: boolean } | null>(null);
+  /** 正从候车区拖出来的问题 */
+  const [dragging, setDragging] = useState<QueueItem | null>(null);
   const [palette, setPalette] = useState(false);
   const [waitingSignal, setWaitingSignal] = useState(0);
   const tier = useTier();
@@ -207,7 +214,30 @@ export function App() {
             </div>
           ) : (
             <>
-              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} onRenameStop={(stop, name) => void renameStop(stop.id, name)} focus={focus} />
+              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} onRenameStop={(stop, name) => void renameStop(stop.id, name)}
+                viewingStopId={viewing}
+                onViewStop={(stop) => viewStop(stop?.id ?? null)}
+                preview={(stop) => {
+                  const items = content[stop.id];
+                  return items ? { answer: items.filter((it) => it.kind === "text").map((it) => it.text).join(" "), tools: items.filter((it) => it.kind === "tool").length } : null;
+                }}
+                onHoverStop={(stop) => ensureHistory(stop.routeId)}
+                onTruncate={(stop, requeue) => setTruncating({ stop, requeue })}
+                onParkAnswer={(stop) => {
+                  const text = (content[stop.id] ?? []).filter((it) => it.kind === "text").map((it) => it.text).join("\n").trim();
+                  if (projectId && text) void queueAdd(projectId, text.slice(0, 4000));
+                  setWaitingSignal((n) => n + 1);
+                }}
+                onQueueMode={(item, mode) => void queueAssign(item.id, item.routeId, mode)}
+                onQueueEdit={(item) => {
+                  if (!item.routeId) return;
+                  setDraft(item.routeId, item.text);
+                  void queueRemove(item.id);
+                  goToRoute(item.routeId);
+                }}
+                onQueueRemove={(item) => void queueRemove(item.id)}
+                dragging={dragging}
+                onDropItem={(item, id, mode) => (setDragging(null), void queueAssign(item.id, id, mode))} focus={focus} />
               <WaitingArea
                 items={queue}
                 routes={routes}
@@ -217,6 +247,7 @@ export function App() {
                 onBoard={(itemId) => void queueBoard(itemId)}
                 onStartNew={(itemId) => void queueStartNew(itemId)}
                 openSignal={waitingSignal}
+                onDrag={setDragging}
               />
               {tier === "narrow" && route && !drawer && (
                 <button className={css.drawerButton} onClick={() => setDrawer(true)}>
@@ -254,7 +285,7 @@ export function App() {
           />
         </main>
 
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -321,6 +352,22 @@ export function App() {
       )}
       {dialog?.kind === "log" && projects.find((p) => p.id === dialog.projectId) && (
         <SyncLogDialog project={projects.find((p) => p.id === dialog.projectId)!} entries={dialog.entries} routes={allRoutes} stops={allStops} stopNumber={stopNumber} onViewRoute={goToRoute} onClose={closeDialog} />
+      )}
+
+      {truncating && allRoutes[truncating.stop.routeId] && (
+        <TruncateDialog
+          route={allRoutes[truncating.stop.routeId]!}
+          stop={truncating.stop}
+          stopNumber={stopNumber(truncating.stop)}
+          lastNumber={stopNumber(truncating.stop) + Object.values(allStops).filter((s) => s.routeId === truncating.stop.routeId && s.seq > truncating.stop.seq).length}
+          forks={Object.values(allRoutes).filter((r) => r.parentRouteId === truncating.stop.routeId && r.forkStopId && (allStops[r.forkStopId]?.seq ?? 0) >= truncating.stop.seq)}
+          requeue={truncating.requeue}
+          onCancel={() => setTruncating(null)}
+          onConfirm={(requeue) => {
+            void truncate(truncating.stop.routeId, truncating.stop.id, requeue);
+            setTruncating(null);
+          }}
+        />
       )}
 
       {changesView && allRoutes[changesView.routeId] && <ChangesDialog route={allRoutes[changesView.routeId]!} files={changesView.files} onClose={() => viewChanges(null)} />}
