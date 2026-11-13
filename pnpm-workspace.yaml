@@ -1,4 +1,14 @@
-# pnpm 默认不运行依赖包的安装脚本。Electron 要靠安装脚本下载它的程序本体，所以在这里放行
+# 这个仓库用 pnpm 11。它默认不跑依赖的安装脚本，下面 allowBuilds 的每一项必须写成 true 或 false。
+# 漏掉，或留着 “set this to true or false” 这样的占位文字，pnpm install 和 pnpm dev 都会以
+# ERR_PNPM_IGNORED_BUILDS 失败。
+# 合并冲突时不要删掉这里已有的批准项；新依赖如果带安装脚本，要在这里补上 true 或 false。
+#
+# Electron 的程序本体不是靠这里下载的：Electron 45 自己不再带安装脚本，
+# 是 package.json 里的 "postinstall": "install-electron" 负责下载。那一行不能删。
+allowBuilds:
+  esbuild: true # Vite 靠它的安装脚本准备本机二进制
+  electron-winstaller: true # electron-builder 的依赖，安装脚本只是选对本机的 7z
 onlyBuiltDependencies:
   - electron
   - esbuild
+  - electron-winstaller

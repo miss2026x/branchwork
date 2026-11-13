@@ -61,3 +61,28 @@ describe("模块规则", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("安装能跑通（pnpm 11）", () => {
+  const root = path.resolve(__dirname, "..");
+
+  it("pnpm-workspace.yaml：带安装脚本的依赖都明确写了 true 或 false，没有留占位文字", () => {
+    const text = fs.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf8");
+    const block = /^allowBuilds:\n((?:[ \t]+.*\n?)+)/m.exec(text)?.[1] ?? "";
+    const entries = Object.fromEntries(
+      block
+        .split("\n")
+        .map((l) => l.replace(/#.*$/, "").trim())
+        .filter(Boolean)
+        .map((l) => l.split(/:\s*/) as [string, string]),
+    );
+    // 已有的批准项不能丢
+    expect(entries).toMatchObject({ esbuild: "true", "electron-winstaller": "true" });
+    for (const [name, value] of Object.entries(entries)) expect(["true", "false"], `allowBuilds 里的 ${name} 必须是 true 或 false`).toContain(value);
+    for (const name of ["electron", "esbuild", "electron-winstaller"]) expect(text).toMatch(new RegExp(`^  - ${name}$`, "m"));
+  });
+
+  it("package.json 保留 postinstall：Electron 45 不自带安装脚本，靠它下载程序本体", () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { scripts: Record<string, string> };
+    expect(pkg.scripts.postinstall).toBe("install-electron");
+  });
+});

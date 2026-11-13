@@ -17,7 +17,8 @@
     "dev:web": "vite -c vite.renderer.config.ts",
     "test:e2e": "vitest run -c vitest.e2e.config.ts",
     "dist:dir": "electron-vite build && electron-builder --dir",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && electron-builder",
+    "postinstall": "install-electron"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
