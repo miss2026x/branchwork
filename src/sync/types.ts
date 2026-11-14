@@ -15,6 +15,8 @@ export interface ConflictFile {
   reason: ConflictReason;
   /** git 给出的原始说明，放进同步记录里备查 */
   detail: string;
+  /** 两边改到一起的是第几行到第几行（按合并时“我方”那一份数，大致位置）；不是内容冲突时没有 */
+  lines?: [number, number][];
 }
 
 export interface FileChange {
@@ -93,6 +95,8 @@ export interface SyncHooks {
   afterJournalWritten?: () => void | Promise<void>;
   /** Local 写完之后、工作区对齐之前 */
   afterLocalWritten?: () => void | Promise<void>;
+  /** 发现 Local 被别人改过（不是哪一路同步进去的，多半是你自己手动改的）：这次看到的和上次看到的差了哪些文件 */
+  onLocalEdited?: (files: FileChange[]) => void;
 }
 
 export interface SyncEngineOptions {

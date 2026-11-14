@@ -1,6 +1,6 @@
 .rail {
   flex: none;
-  width: 264px;
+  width: var(--rail-w, 264px);
   display: flex;
   flex-direction: column;
   background: var(--surface-0);

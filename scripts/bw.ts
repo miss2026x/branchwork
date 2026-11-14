@@ -62,7 +62,7 @@ const core = createCore({ db, claude, worktreesRoot: path.join(home, "worktrees"
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const showSync = (e: SyncLogEntry | null) => {
   if (!e) return console.log(dim("同步：没有需要同步的改动"));
-  const dir = { pull: "站前 Local → 工作区", push: "站后 工作区 → Local", resolve: "解决冲突", recover: "启动时补写" }[e.direction];
+  const dir = { pull: "站前 Local → 工作区", push: "站后 工作区 → Local", resolve: "解决冲突", recover: "启动时补写", local: "发现你直接改了 Local" }[e.direction];
   const status = { ok: "完成", noop: "无变化", conflict: "有冲突，没有写入", error: "出错" }[e.status];
   console.log(`同步（${dir}）：${status}${e.message ? "  " + e.message : ""}`);
   for (const f of e.files) console.log(`  ${f.note.padEnd(14)} ${f.path}`);

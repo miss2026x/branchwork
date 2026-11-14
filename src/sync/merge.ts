@@ -39,6 +39,16 @@ export async function mergeTrees(dir: string, base: string, ours: string, theirs
     const note = notes.get(p);
     return { path: p, reason: reasonOf(note?.type ?? ""), detail: note?.text ?? "" };
   });
+  // 内容冲突：从带标记的合并结果里数出冲突在第几行
+  await Promise.all(
+    conflicts
+      .filter((c) => c.reason === "both-modified" || c.reason === "both-added")
+      .map(async (c) => {
+        const blob = await git(dir, ["cat-file", "-p", `${tree}:${c.path}`], { okCodes: [128] });
+        const lines = blob.code === 0 ? conflictLines(blob.stdout) : [];
+        if (lines.length > 0) c.lines = lines;
+      }),
+  );
   return { tree, conflicts };
 }
 
@@ -49,4 +59,26 @@ function reasonOf(type: string): ConflictReason {
   if (type.includes("binary")) return "binary";
   if (type.includes("rename")) return "rename";
   return "other";
+}
+
+/** 带冲突标记的文件里，每处冲突在“我方”那一份里是第几行到第几行 */
+export function conflictLines(text: string): [number, number][] {
+  const out: [number, number][] = [];
+  let line = 0; // 我方这一份数到第几行了
+  let state: "none" | "ours" | "theirs" = "none";
+  let from = 0;
+  for (const l of text.split("\n")) {
+    if (state === "none" && l.startsWith("<<<<<<< ")) {
+      state = "ours";
+      from = line + 1;
+    } else if (state === "ours" && (l.startsWith("||||||| ") || l === "=======")) {
+      state = "theirs";
+      out.push([from, Math.max(from, line)]);
+    } else if (state === "theirs" && l.startsWith(">>>>>>> ")) {
+      state = "none";
+    } else if (state !== "theirs") {
+      line++;
+    }
+  }
+  return out;
 }

@@ -1234,3 +1234,90 @@ describe("删掉对话，留下工作区", () => {
     expect(fs.existsSync(route.worktreePath)).toBe(false);
   });
 });
+
+describe("导入终端里开过的会话", () => {
+  const seed = () => {
+    claude.sessions.set("term-1", [
+      { id: "u1", role: "user", content: "看一下 session 过期问题" },
+      { id: "a1", role: "assistant", content: [{ type: "text", text: "在 config 里" }] },
+      { id: "t1", role: "user", content: [{ type: "tool_result", content: "ok" }] },
+      { id: "a2", role: "assistant", content: [{ type: "text", text: "看完了" }] },
+      { id: "u2", role: "user", content: [{ type: "text", text: "改成 7 天" }] },
+      { id: "a3", role: "assistant", content: [{ type: "text", text: "改好了" }] },
+    ]);
+    claude.terminalSessions = [{ id: "term-1", title: "看一下 session 过期问题", lastModified: 5 }];
+  };
+
+  it("列出来：带上问了几次；Branchwork 自己的会话不算", async () => {
+    seed();
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "自己问的");
+    claude.terminalSessions.push({ id: core.snapshot(project.id).routes[0]!.sessionId!, title: "自己问的", lastModified: 9 });
+    expect(await core.terminalSessions(lab.local)).toEqual([{ id: "term-1", title: "看一下 session 过期问题", questions: 2, lastModified: 5 }]);
+  });
+
+  it("导进来是一路：每个提问一站（工具结果不算提问），会话是复制的，可以接着问、可以分叉", async () => {
+    seed();
+    const [route] = await core.importSessions(project.id, ["term-1"]);
+    expect(route!.name).toBe("看一下 session 过期问题");
+    expect(route!.sessionId).not.toBe("term-1");
+    expect(fs.existsSync(route!.worktreePath)).toBe(true);
+    const stops = core.snapshot(project.id).stops.filter((s) => s.routeId === route!.id);
+    expect(stops.map((s) => [s.seq, s.prompt, s.status, s.messageId, s.lastMessageId])).toEqual([
+      [1, "看一下 session 过期问题", "done", "u1", "a2"],
+      [2, "改成 7 天", "done", "u2", "a3"],
+    ]);
+    // 原来的会话没动
+    expect(claude.sessions.get("term-1")).toHaveLength(6);
+    // 接着问：第三站
+    await core.ask(route!.id, "再加个测试");
+    expect(core.snapshot(project.id).stops.filter((s) => s.routeId === route!.id).map((s) => s.seq)).toEqual([1, 2, 3]);
+    // 从导入的第一站分叉
+    const child = await core.fork(route!.id, stops[0]!.id);
+    expect(claude.sessions.get(child.sessionId!)!.map((m) => m.id)).toEqual(["u1", "a1", "t1", "a2"]);
+  });
+
+  it("运行环境：Claude 版本、登录状态、git 版本", async () => {
+    const env = await core.environment();
+    expect(env.claudeVersion).toBe("9.9.9");
+    expect(env.loggedIn).toBe(true);
+    expect(env.gitVersion).toMatch(/^\d+\.\d+/);
+  });
+});
+
+describe("你直接在 Local 里改了文件", () => {
+  it("下一次同步时记进同步记录一条“local”，不算成哪一路的同步结果", async () => {
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "先问一站");
+    fs.writeFileSync(path.join(lab.local, "notes-by-hand.txt"), "我自己写的\n");
+    await core.ask(route.id, "再问一站");
+    const log = core.projectLog(project.id);
+    const local = log.filter((e) => e.direction === "local");
+    expect(local).toHaveLength(1);
+    expect(local[0]!.files).toEqual([{ path: "notes-by-hand.txt", note: "added" }]);
+    // 这一站开始前也照常从 Local 拿到了它
+    expect(log.some((e) => e.direction === "pull" && e.files.some((f) => f.path === "notes-by-hand.txt"))).toBe(true);
+    // 各路自己同步进 Local 的不算
+    const other = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, "by-claude.txt", "x\n");
+    await core.ask(other.id, "写个文件");
+    await core.ask(route.id, "第三站");
+    expect(core.projectLog(project.id).filter((e) => e.direction === "local")).toHaveLength(1);
+  });
+});
+
+describe("特殊的站：短确认、斜杠命令", () => {
+  it("“继续”这类短确认是小点：不起名；斜杠命令直接用命令名；第一站不算短确认", async () => {
+    let named = 0;
+    claude.namer = async () => (named++, "起好的名字");
+    const route = await core.createRoute(project.id);
+    const first = await core.ask(route.id, "继续");
+    const second = await core.ask(route.id, "好的。");
+    const third = await core.ask(route.id, "/review src/auth 仔细点");
+    expect(first).toMatchObject({ stop: { kind: "normal" } });
+    expect(second).toMatchObject({ stop: { kind: "minor", name: "好的。", nameState: "final" } });
+    expect(third).toMatchObject({ stop: { kind: "normal", name: "/review", nameState: "final" } });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(named).toBe(1); // 只有第一站去起了名
+  });
+});

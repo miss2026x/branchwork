@@ -98,13 +98,18 @@ export interface QueueItem {
   createdAt: number;
 }
 
-export type SyncDirection = "pull" | "push" | "resolve" | "recover";
+/** local：不是同步，是发现你直接在 Local 里改了文件 */
+export type SyncDirection = "pull" | "push" | "resolve" | "recover" | "local";
 export type SyncOutcomeStatus = "ok" | "noop" | "conflict" | "error";
 
 export interface SyncFile {
   path: string;
   /** added / modified / deleted，或冲突原因 */
   note: string;
+  /** 冲突时：两边改到一起的大致是第几行到第几行 */
+  lines?: [number, number];
+  /** 冲突时：Local 里这个文件上一次是谁改的。routeId 为空表示是你自己直接改的 */
+  by?: { routeId: string | null; stopId: string | null };
 }
 
 export interface SyncLogEntry {
@@ -148,6 +153,26 @@ export interface DirectoryInfo {
   hasClaudeMd: boolean;
   /** 已经加过的项目（加过就不用再加） */
   projectId: string | null;
+}
+
+/** 在终端里用 claude 命令开过的一个会话（不是 Branchwork 开的） */
+export interface TerminalSession {
+  id: string;
+  /** 会话的标题，或者它的第一个提问 */
+  title: string;
+  /** 问了几次 */
+  questions: number;
+  lastModified: number;
+}
+
+/** 运行环境：缺哪一样，哪一样就用不了 */
+export interface Environment {
+  /** 随应用带的 Claude 的版本；找不到为空 */
+  claudeVersion: string | null;
+  /** 有没有登录 Claude：true 有；false 没有；null 在这里确认不了（比如凭据存在系统钥匙串里） */
+  loggedIn: boolean | null;
+  /** git 的版本；没装为空 */
+  gitVersion: string | null;
 }
 
 /** 工作区里一个还没进 Local 的文件，以及它增删了多少行 */

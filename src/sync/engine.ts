@@ -64,6 +64,8 @@ class Engine implements SyncEngine {
   private readonly snaps: Snapshots;
   /** 每一路的同步基线（文件树编号）。也存在 refs/branchwork/ 下，这里只是免得每次去问 git */
   private readonly bases = new Map<string, string>();
+  /** 上一次看到（或我们自己写成）的 Local 的样子；应用刚启动时不知道 */
+  private seenLocal: string | null = null;
 
   constructor(
     private readonly localDir: string,
@@ -170,6 +172,7 @@ class Engine implements SyncEngine {
           continue;
         }
         this.snaps.noteIs(this.localIndex, merged);
+        this.seenLocal = merged;
         await this.hooks.afterLocalWritten?.();
 
         await this.switchRoute(routeId, work, merged);
@@ -316,9 +319,16 @@ class Engine implements SyncEngine {
   }
 
   /** quick：目录多半没变时传 true，没变就只启动一次 git */
-  private snapLocal(quick: boolean): Promise<string> {
+  private async snapLocal(quick: boolean): Promise<string> {
     const seed = path.join(this.gitDir, "index");
-    return quick ? this.snaps.takeQuick(this.localDir, this.localIndex, seed) : this.snaps.take(this.localDir, this.localIndex, seed);
+    const tree = await (quick ? this.snaps.takeQuick(this.localDir, this.localIndex, seed) : this.snaps.take(this.localDir, this.localIndex, seed));
+    // 和上次看到的不一样，又不是我们自己写进去的：有人直接改了 Local
+    if (this.seenLocal && this.seenLocal !== tree && this.hooks.onLocalEdited) {
+      const files = await diffTrees(this.localDir, this.seenLocal, tree).catch(() => []);
+      if (files.length > 0) this.hooks.onLocalEdited(files);
+    }
+    this.seenLocal = tree;
+    return tree;
   }
 
   private async snapRoute(routeId: string, quick: boolean): Promise<string> {

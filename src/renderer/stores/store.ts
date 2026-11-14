@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -66,7 +66,7 @@ interface State {
   queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
   /** 正开着的整块弹窗：添加项目、开一路新车、同步记录 */
-  dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] };
+  dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "import"; projectId: string } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] };
   /** 正在问“这一路还在回答，怎么归档”的那一路 */
   archiveAsk: string | null;
   /** 等到站后要归档的路 */
@@ -106,7 +106,11 @@ interface State {
   addProject(): Promise<void>;
   /** 打开“添加项目”弹窗；dir 不给就先让用户选文件夹 */
   openAddProject(dir?: string): Promise<void>;
-  addProjectAt(dir: string, name: string): Promise<void>;
+  /** importIds：顺便把终端里开过的这几个会话导进来 */
+  addProjectAt(dir: string, name: string, importIds?: string[]): Promise<void>;
+  /** 项目菜单里的“导入终端里的会话” */
+  openImport(projectId: string): void;
+  importSessions(projectId: string, sessionIds: string[]): Promise<void>;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
   startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; question?: string; itemId?: string }): Promise<void>;
@@ -118,6 +122,10 @@ interface State {
   /** 让用户选一个文件夹；取消返回 null */
   pickDirectory(): Promise<string | null>;
   inspectDirectory(dir: string): Promise<DirectoryInfo>;
+  environment(): Promise<Environment>;
+  terminalSessions(dir: string): Promise<TerminalSession[]>;
+  /** 拖进来的文件夹：直接打开“添加项目” */
+  addDropped(file: File): void;
   createRoute(name?: string): Promise<void>;
   /** 跳到某一站：选中它那一路，地图和对话都带过去 */
   jumpToStop(stopId: string): void;
@@ -303,7 +311,8 @@ export const useStore = create<State>((set, get) => {
         set((s) => ({ queue: { ...s.queue, [e.projectId]: e.items } }));
         break;
       case "sync.result":
-        set((s) => ({ lastSync: { ...s.lastSync, [e.entry.routeId]: e.entry } }));
+        // “你直接改了 Local”不是这一路的同步结果，只进同步记录
+        if (e.entry.direction !== "local") set((s) => ({ lastSync: { ...s.lastSync, [e.entry.routeId]: e.entry } }));
         break;
       case "stops.removed":
         set((s) => {
@@ -444,12 +453,29 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async addProjectAt(dir, name) {
+    async addProjectAt(dir, name, importIds = []) {
       try {
         const project = await window.bw.addProject(dir, name.trim() || undefined);
         set((s) => ({ dialog: null, projects: s.projects.some((p) => p.id === project.id) ? s.projects : [...s.projects, project] }));
         await loadProject(project.id);
         get().selectProject(project.id);
+        if (importIds.length > 0) await get().importSessions(project.id, importIds);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    openImport(projectId) {
+      set({ dialog: { kind: "import", projectId } });
+    },
+
+    async importSessions(projectId, sessionIds) {
+      try {
+        const routes = await window.bw.importSessions(projectId, sessionIds);
+        set((s) => ({ dialog: s.dialog?.kind === "import" ? null : s.dialog }));
+        await loadProject(projectId);
+        if (routes[0]) get().selectRoute(routes[0].id);
+        if (routes.length > 0) get().showToast({ title: `导入了 ${routes.length} 个会话`, detail: "每个会话画成了一路；终端里原来的会话没动" });
       } catch (e) {
         set({ error: message(e) });
       }
@@ -496,6 +522,13 @@ export const useStore = create<State>((set, get) => {
 
     pickDirectory: () => window.bw.pickDirectory().catch(() => null),
     inspectDirectory: (dir) => window.bw.inspectDirectory(dir),
+    environment: () => window.bw.environment(),
+    terminalSessions: (dir) => window.bw.terminalSessions(dir).catch(() => []),
+    addDropped(file) {
+      const dir = window.bw.droppedPath(file);
+      if (dir) void get().openAddProject(dir);
+      else set({ error: "拿不到这个文件夹的位置，点一下自己选吧" });
+    },
 
     setOverview(on) {
       set({ overview: on });

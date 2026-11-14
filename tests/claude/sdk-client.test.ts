@@ -31,6 +31,10 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
     forkSession: async (_id, o) => ({ sessionId: `fork-up-to-${o?.upToMessageId ?? "end"}` }),
     getSessionMessages: async () => transcript,
     deleteSession: async () => {},
+    listSessions: async () => [
+      { sessionId: "s-new", summary: "摘要", lastModified: 2, firstPrompt: "看一下  过期问题" },
+      { sessionId: "s-old", summary: "旧的", lastModified: 1, customTitle: "自己起的名" },
+    ],
     ...extra,
   };
   return fns;
@@ -436,5 +440,28 @@ describe("上下文用量", () => {
     const withUsage = (usage: Record<string, number>) => ({ type: "assistant", message: { content: [{ type: "text", text: "x" }], usage } });
     const client = createClaudeClient(fakeSdk([init, withUsage({ input_tokens: 10, cache_read_input_tokens: 1000, output_tokens: 5 }), withUsage({ input_tokens: 20, cache_read_input_tokens: 2000, cache_creation_input_tokens: 300, output_tokens: 80 }), success]));
     expect((await client.ask({ cwd: "/wt", prompt: "x" })).contextTokens).toBe(2400);
+  });
+});
+
+describe("终端里开过的会话、运行环境", () => {
+  it("列出这个目录下的会话：标题优先用自己起的名字，其次是第一个提问", async () => {
+    const client = createClaudeClient(fakeSdk([]));
+    expect(await client.listSessions("/repo")).toEqual([
+      { id: "s-new", title: "看一下 过期问题", lastModified: 2 },
+      { id: "s-old", title: "自己起的名", lastModified: 1 },
+    ]);
+  });
+
+  it("运行环境：能读到随 SDK 带的 Claude 版本；设了密钥就算已登录", async () => {
+    const before = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "test";
+    try {
+      const env = await createClaudeClient(fakeSdk([])).environment();
+      expect(env.version).toMatch(/^\d+\.\d+/);
+      expect(env.loggedIn).toBe(true);
+    } finally {
+      if (before === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = before;
+    }
   });
 });

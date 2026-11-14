@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "exportRoute", "fork", "history", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -101,6 +101,8 @@ describe("应用", () => {
     await page.locator("textarea").fill("第二个问题");
     await page.getByRole("button", { name: "发车" }).click();
     await expect.poll(() => page.getByRole("alertdialog", { name: "等你批准" }).isVisible(), { timeout: 30000 }).toBe(true);
+    // 拒绝时可以带一句话告诉 Claude 换个做法
+    await page.getByLabel("告诉 Claude 换个做法").fill("先别写文件");
     await page.getByRole("button", { name: "拒绝" }).click();
     await expect.poll(() => page.getByText("已到第 2 站").isVisible(), { timeout: 30000 }).toBe(true);
     expect(await page.getByText("这是这一路的第 2 个问题").isVisible()).toBe(true);
@@ -413,6 +415,11 @@ describe("应用", () => {
     await shot("22-changes");
     await page.keyboard.press("Escape");
     await expect.poll(() => dialog.count()).toBe(0);
+    // 丢掉这些改动：要再确认一次；丢掉之后工作区回到和 Local 对齐的样子
+    await page.getByRole("button", { name: "丢掉这些改动" }).click();
+    await page.getByRole("button", { name: "丢掉", exact: true }).click();
+    await expect.poll(() => page.getByRole("button", { name: "看改了什么" }).count(), { timeout: 30000 }).toBe(0);
+    expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).not.toContain("写完拖一会儿");
   });
   it("改名和换色：路的菜单里改线路名称、换颜色；站的菜单里改站名", async () => {
     const rail = page.getByRole("complementary").first();
@@ -579,5 +586,28 @@ describe("应用", () => {
     await kept.getByRole("button", { name: "删掉" }).click();
     await expect.poll(() => kept.count()).toBe(0);
     await page.keyboard.press("Escape");
+  });
+
+  it("导入终端里开过的会话：每个会话画成一路，里面每个提问是一站，可以接着问", async () => {
+    await page.getByRole("button", { name: "my-project 的菜单" }).click();
+    await page.getByRole("menuitem", { name: /导入终端里的会话/ }).click();
+    const dialog = page.getByRole("dialog", { name: "导入终端里的会话" });
+    await expect.poll(() => dialog.getByText("看一下 session 过期问题").isVisible(), { timeout: 30000 }).toBe(true);
+    expect(await dialog.getByText(/4 问/).isVisible()).toBe(true);
+    await dialog.getByRole("checkbox").first().check();
+    await shot("33-import");
+    await dialog.getByRole("button", { name: "导入 1 个" }).click();
+    await expect.poll(() => page.getByRole("heading", { name: "看一下 session 过期问题" }).isVisible(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => page.getByText("已到第 4 站").isVisible(), { timeout: 30000 }).toBe(true);
+    // 已经导入过的不再列出来
+    await page.getByRole("button", { name: "my-project 的菜单" }).click();
+    await page.getByRole("menuitem", { name: /导入终端里的会话/ }).click();
+    await expect.poll(() => dialog.getByText("升级依赖").isVisible(), { timeout: 30000 }).toBe(true);
+    await page.keyboard.press("Escape");
+    // 接着问：第 5 站
+    await page.locator("textarea").fill("接着导入的会话问");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByText("已到第 5 站").isVisible(), { timeout: 60000 }).toBe(true);
+    await shot("34-imported");
   });
 });

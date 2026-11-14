@@ -28,6 +28,7 @@ export function ProjectRail({
   const openCompress = useStore((s) => s.openCompress);
   const exportRoute = useStore((s) => s.exportRoute);
   const setRouteFlags = useStore((s) => s.setRouteFlags);
+  const openImport = useStore((s) => s.openImport);
   const lastSync = useStore((s) => s.lastSync);
   /** 已归档里点开看详情的那一路 */
   const [archivedOpen, setArchivedOpen] = useState<string | null>(null);
@@ -167,6 +168,9 @@ export function ProjectRail({
                       </button>
                       <button role="menuitem" onClick={() => (setProjectMenu(null), viewLog(p.id))}>
                         同步记录
+                      </button>
+                      <button role="menuitem" onClick={() => (setProjectMenu(null), openImport(p.id))}>
+                        导入终端里的会话…
                       </button>
                       {archived.length > 0 && (
                         <button role="menuitem" onClick={() => (setProjectMenu(null), setClosed((c) => ({ ...c, [p.id]: false })), setShowArchived((v) => ({ ...v, [p.id]: true })))}>

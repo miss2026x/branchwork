@@ -123,3 +123,13 @@ export function gitVersion(): Promise<[number, number]> {
   });
   return versionOnce;
 }
+
+/** git 的版本，比如 "2.43.0"；没装返回 null */
+export async function gitVersionText(): Promise<string | null> {
+  try {
+    const { stdout } = await git(process.cwd(), ["--version"]);
+    return /(\d+\.\d+(?:\.\d+)?)/.exec(stdout)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}

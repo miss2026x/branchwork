@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatItem, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal } from "../../shared";
+import type { ChatItem, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
 import { TerminalStrip } from "../terminal/TerminalStrip";
 import { ModelControl } from "./ModelControl";
 import { PermissionModeControl } from "./PermissionModeControl";
@@ -10,6 +10,7 @@ import { useStore, type LiveStop } from "../stores/store";
 import { IconChevron, IconEye, IconSend, IconStop, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
+import { ordinal } from "../stores/numbering";
 import css from "./ChatPanel.module.css";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
@@ -47,6 +48,8 @@ interface Props {
   onQueue(text: string, mode: QueueMode): void;
   /** 要滚到眼前的那一站 */
   focus?: { stopId: string; n: number } | null;
+  /** 冲突的文件在 Local 里上一次是谁改的，说成一句话 */
+  whoChanged?: (by: NonNullable<SyncFile["by"]>) => string;
   /** 窄窗口里面板是盖在地图上的抽屉：给了就显示收起按钮 */
   onCollapse?: () => void;
 }
@@ -61,7 +64,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -108,7 +111,10 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   /** 回答中写的问题怎么排：到站自动发、到站等你点、只放着 */
   const [queueMode, setQueueMode] = useState<QueueMode>("auto");
   const queued = waiting.length;
-  const total = offset + stops.length;
+  /** 短确认（小点）不占站号 */
+  const counted = stops.filter((s) => s.kind !== "minor").length;
+  const num = (s: Stop) => offset + ordinal(s, stops);
+  const total = offset + counted;
   const [discarding, setDiscarding] = useState(false);
   const denyNote = useRef<HTMLInputElement>(null);
   // 等你批准时：按 1、2、3 直接选（正在打字时不抢）
@@ -154,14 +160,14 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           <p className="ell">
             {viewing && (
               <>
-                <b>正在看第 {offset + viewing.seq} 站</b>
+                <b>正在看第 {num(viewing)} 站</b>
                 <button className={css.back} onClick={onBackToLatest}>
                   回到最新
                 </button>
               </>
             )}
             {!viewing && busy && <i className={css.statusDot} style={{ background: colors.line }} />}
-            {!viewing && <StatusLine route={route} n={offset + stops.length} phase={pending !== undefined ? "syncing" : currentLive?.phase} />}
+            {!viewing && <StatusLine route={route} n={total} phase={pending !== undefined ? "syncing" : currentLive?.phase} />}
             {!viewing && busy && waiting[0] && <span className={css.next}>下一站{waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
           </p>
         </div>
@@ -268,7 +274,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 {s.prompt}
               </div>
               <div className={css.who}>
-                Claude <span>第 {offset + s.seq} 站 · {s.name}</span>
+                Claude <span>第 {num(s)} 站 · {s.name}</span>
               </div>
               <Items items={items} streaming={l?.phase === "answering"} />
               {l && items.length === 0 && <p className={css.waiting}>{l.phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>}
@@ -357,7 +363,11 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               {lastSync.files.map((f) => (
                 <li key={f.path}>
                   <code>{f.path}</code>
-                  <span>{REASONS[f.note] ?? f.note}</span>
+                  <span>
+                    {f.lines && `第 ${f.lines[0]}${f.lines[1] > f.lines[0] ? `–${f.lines[1]}` : ""} 行附近：`}
+                    {REASONS[f.note] ?? f.note}
+                    {f.by && whoChanged ? `。${whoChanged(f.by)}` : ""}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -377,7 +387,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         terminals={terminals}
         stopLabel={(id) => {
           const s = id ? stops.find((x) => x.id === id) : undefined;
-          return s ? `第 ${offset + s.seq} 站` : null;
+          return s ? `第 ${num(s)} 站` : null;
         }}
         onOpen={onOpenTerminal}
         onStop={onStopTerminal}
@@ -387,7 +397,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         <div className={css.viewingNote}>
           <IconEye size={18} />
           <span>
-            在看第 {offset + viewing.seq} 站的记录。要从这里接着问，用地图底部的“从第 {offset + viewing.seq} 站开新对话”。
+            在看第 {num(viewing)} 站的记录。要从这里接着问，用地图底部的“从第 {num(viewing)} 站开新对话”。
             <button className={css.inlineLink} onClick={onBackToLatest}>
               回到最新
             </button>
@@ -406,7 +416,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             </button>
           </div>
         )}
-        {busy && current && <p className={css.queueHint}>第 {offset + current.seq} 站还在回答，现在写的会进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${route.express ? `快${route.express}` : `${route.number}路`} 候车`}</p>}
+        {busy && current && <p className={css.queueHint}>第 {num(current)} 站还在回答，现在写的会进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${route.express ? `快${route.express}` : `${route.number}路`} 候车`}</p>}
         <textarea
           value={draft}
           onChange={(e) => setDraft(route.id, e.target.value)}
@@ -463,7 +473,7 @@ function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean })
             <Markdown remarkPlugins={[remarkGfm]}>{b.text}</Markdown>
           </div>
         ) : (
-          <Tools key={i} tools={b.tools} />
+          <Tools key={i} tools={b.tools} running={!!streaming && i === blocks.length - 1} />
         ),
       )}
     </>
@@ -471,7 +481,7 @@ function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean })
 }
 
 /** 一组工具调用。超过 4 次时只显示最后 3 次，其余收起来 */
-function Tools({ tools }: { tools: Extract<ChatItem, { kind: "tool" }>[] }) {
+function Tools({ tools, running }: { tools: Extract<ChatItem, { kind: "tool" }>[]; running?: boolean }) {
   const [open, setOpen] = useState(false);
   const many = tools.length > 4;
   const shown = many && !open ? tools.slice(-3) : tools;
@@ -493,6 +503,7 @@ function Tools({ tools }: { tools: Extract<ChatItem, { kind: "tool" }>[] }) {
           <code className="ell" title={t.detail}>
             {t.detail}
           </code>
+          {running && i === shown.length - 1 && t.added === undefined && <span className={css.toolRunning} role="img" aria-label="正在运行" />}
           {t.added !== undefined && (
             <em>
               {t.added > 0 && <b>+{t.added}</b>}

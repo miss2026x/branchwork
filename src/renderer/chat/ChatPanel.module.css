@@ -786,3 +786,25 @@
   color: var(--red);
   font-weight: 600;
 }
+
+/* 工具还在跑：三个点 */
+.toolRunning {
+  flex: none;
+  width: 22px;
+  height: 4px;
+  background: radial-gradient(circle, var(--route-2) 2px, transparent 2.5px) 0 0 / 9px 4px repeat-x;
+  animation: toolDots 1.2s steps(4) infinite;
+}
+@keyframes toolDots {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    clip-path: inset(0 -34% 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toolRunning {
+    animation: none;
+  }
+}

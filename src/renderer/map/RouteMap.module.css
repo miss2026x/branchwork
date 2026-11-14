@@ -699,3 +699,88 @@
   font-size: 13px;
   line-height: 22px;
 }
+
+/* 短确认（“继续”“好的”）：小点，不显示名字 */
+.stop[data-kind="minor"][data-status="done"] .node,
+.stop[data-kind="minor"][data-status="interrupted"] .node {
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-width: 3px;
+}
+/* 斜杠命令：等宽字体 */
+.name[data-command="true"] {
+  font-family: var(--mono);
+}
+/* 还在等小模型起名 */
+.naming {
+  position: absolute;
+  left: 0;
+  top: -50px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-0);
+  font-size: 12px;
+  font-style: normal;
+  color: var(--text-2);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.naming i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--text-2);
+  animation: buildingSpin 900ms linear infinite;
+}
+
+/* 冲突站的卡片 */
+.cardConflict {
+  width: 420px;
+}
+.cardConflict header svg {
+  color: var(--amber);
+}
+.cardFile {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.cardFile code {
+  display: block;
+  margin-bottom: 2px;
+  font: 13px var(--mono);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.cardResolve {
+  width: 100%;
+  margin: 8px 0;
+  padding: 12px 14px;
+  border-radius: var(--r-10);
+  background: var(--text-1);
+  color: #fff;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+}
+.cardResolve small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 17px;
+  color: rgba(255, 255, 255, 0.78);
+}

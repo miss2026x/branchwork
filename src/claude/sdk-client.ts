@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import { createRequire } from "node:module";
+import path from "node:path";
 import * as sdk from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, Options } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
@@ -30,6 +33,7 @@ export interface SdkFunctions {
   forkSession(sessionId: string, options?: { upToMessageId?: string }): Promise<{ sessionId: string }>;
   getSessionMessages(sessionId: string): Promise<{ type: string; uuid: string; message: unknown }[]>;
   deleteSession(sessionId: string): Promise<void>;
+  listSessions(options: { dir: string; limit?: number; includeWorktrees?: boolean }): Promise<{ sessionId: string; summary: string; lastModified: number; customTitle?: string; firstPrompt?: string }[]>;
 }
 
 const realSdk: SdkFunctions = {
@@ -38,6 +42,7 @@ const realSdk: SdkFunctions = {
   forkSession: (id, o) => sdk.forkSession(id, o),
   getSessionMessages: (id) => sdk.getSessionMessages(id),
   deleteSession: (id) => sdk.deleteSession(id),
+  listSessions: (o) => sdk.listSessions(o),
 };
 
 export interface ClaudeClientOptions {
@@ -280,7 +285,34 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
     },
 
     deleteSession: (sessionId) => fns.deleteSession(sessionId),
+
+    async listSessions(dir, max = 20) {
+      // 只要这个目录自己的：各路的工作区里开的会话是 Branchwork 自己的，不算
+      const list = await fns.listSessions({ dir, limit: max, includeWorktrees: false });
+      return list.map((s) => ({ id: s.sessionId, title: (s.customTitle || s.firstPrompt || s.summary || "").replace(/\s+/g, " ").trim(), lastModified: s.lastModified }));
+    },
+
+    environment: () => readEnvironment(),
   };
+}
+
+/** Claude 的版本（SDK 的 package.json 里写着它带的是哪一版）和登录状态（只看本机的凭据文件） */
+async function readEnvironment(): Promise<{ version: string | null; loggedIn: boolean | null }> {
+  let version: string | null = null;
+  try {
+    const require = createRequire(import.meta.url);
+    let dir = path.dirname(require.resolve("@anthropic-ai/claude-agent-sdk"));
+    for (let i = 0; i < 4 && !version; i++, dir = path.dirname(dir)) {
+      const pkg = await fs.readFile(path.join(dir, "package.json"), "utf8").then((t) => JSON.parse(t) as { name?: string; claudeCodeVersion?: string }, () => null);
+      if (pkg?.name === "@anthropic-ai/claude-agent-sdk") version = pkg.claudeCodeVersion ?? null;
+    }
+  } catch {
+    // 找不到就不显示版本
+  }
+  const home = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
+  const hasFile = await fs.access(path.join(home, ".credentials.json")).then(() => true, () => false);
+  const loggedIn = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || hasFile ? true : process.platform === "darwin" ? null : false;
+  return { version, loggedIn };
 }
 
 /**

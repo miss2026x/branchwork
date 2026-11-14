@@ -192,7 +192,7 @@
 }
 
 /* 全部项目页：占满下面整块，左栏、地图、对话栏先收起 */
-.body[data-overview="true"] > :not(:first-child) {
+.body[data-overview="true"] > :not([data-ov]) {
   display: none;
 }
 .crumbLink {
@@ -434,4 +434,35 @@
   to {
     transform: scaleX(0);
   }
+}
+
+.gear {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-left: 8px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  color: var(--text-2);
+}
+.gear:hover,
+.gear[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+/* 两栏之间的分隔条 */
+.divider {
+  flex: none;
+  width: 7px;
+  margin: 0 -3px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+}
+.divider:hover,
+.divider:active {
+  background: linear-gradient(90deg, transparent 2px, var(--route-1) 2px, var(--route-1) 5px, transparent 5px);
 }

@@ -22,7 +22,7 @@
   font-size: 13px;
 }
 .checks {
-  margin: -4px 24px 16px;
+  margin: -4px 0 16px;
   padding: 0;
   list-style: none;
   display: flex;
@@ -485,4 +485,68 @@
   width: 16px;
   height: 16px;
   accent-color: var(--text-1);
+}
+
+/* 导入终端里开过的会话 */
+.importBox {
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: var(--r-10);
+  background: var(--surface-1);
+  font-size: 13px;
+}
+.importBox b em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.importBox p {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.sessions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.sessions label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  cursor: pointer;
+}
+.sessions input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text-1);
+}
+.sessions span {
+  flex: 1;
+  min-width: 0;
+}
+.sessions small {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 同步记录里“你直接改了 Local”那一行 */
+.log li i[data-me] {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--text-1);
+}
+.log li small {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.log li p code {
+  font: 12px var(--mono);
 }

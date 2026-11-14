@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import type { Building } from "../panels/WaitingArea";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
-import { AddProjectDialog } from "../dialogs/AddProjectDialog";
+import { AddProjectDialog, ImportDialog } from "../dialogs/AddProjectDialog";
 import { ChangesDialog } from "../dialogs/ChangesDialog";
 import { NewRouteDialog } from "../dialogs/NewRouteDialog";
 import { SyncLogDialog } from "../dialogs/SyncLogDialog";
@@ -11,20 +11,45 @@ import { TruncateDialog } from "../dialogs/TruncateDialog";
 import { Overview } from "../overview/Overview";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { TerminalDialog } from "../terminal/TerminalDialog";
-import { stopOffset } from "../stores/numbering";
+import { ordinal, stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
 import { Notices } from "../notices/Notices";
+import { Settings } from "./Settings";
+import { Welcome } from "./Welcome";
+import { OverviewQueue } from "../overview/OverviewQueue";
 import { CommandPalette } from "../palette/CommandPalette";
 import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
-import { BusMark, IconChat, IconFolder, IconSearch } from "../ui/icons";
+import { BusMark, IconChat, IconFolder, IconSearch, IconSliders } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./App.module.css";
 import { useTier } from "./use-tier";
 
 const EMPTY_QUEUE: QueueItem[] = [];
+
+/** 两栏之间的分隔条：拖动改宽度，双击恢复默认 */
+function Divider({ label, current, onDrag, onReset }: { label: string; current: number | null; onDrag(dx: number, start: number | null): void; onReset(): void }) {
+  const from = useRef<{ x: number; start: number | null } | null>(null);
+  return (
+    <div
+      className={css.divider}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      title={`${label}；双击恢复默认`}
+      onPointerDown={(e) => {
+        from.current = { x: e.clientX, start: current };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => from.current && onDrag(e.clientX - from.current.x, from.current.start)}
+      onPointerUp={() => (from.current = null)}
+      onPointerCancel={() => (from.current = null)}
+      onDoubleClick={onReset}
+    />
+  );
+}
 
 export function App() {
   const init = useStore((s) => s.init);
@@ -59,6 +84,12 @@ export function App() {
   const notices = useStore((s) => s.notices);
   const toast = useStore((s) => s.toast);
   const dismissToast = useStore((s) => s.dismissToast);
+  const importSessions = useStore((s) => s.importSessions);
+  const lastSync = useStore((s) => s.lastSync);
+  const resolveConflict = useStore((s) => s.resolveConflict);
+  const environment = useStore((s) => s.environment);
+  const terminalSessions = useStore((s) => s.terminalSessions);
+  const addDropped = useStore((s) => s.addDropped);
   const dismissNotice = useStore((s) => s.dismissNotice);
   const jumpToStop = useStore((s) => s.jumpToStop);
   const focus = useStore((s) => s.focus);
@@ -119,8 +150,27 @@ export function App() {
   const queueRemove = useStore((s) => s.queueRemove);
   const queueBoard = useStore((s) => s.queueBoard);
   const queueStartNew = useStore((s) => s.queueStartNew);
+  const [settings, setSettings] = useState(false);
+  /** 拖出来的左栏、对话栏宽度；没拖过就用默认的。只记在这台机器上 */
+  const [widths, setWidths] = useState<{ rail: number | null; panel: number | null }>(() => {
+    try {
+      return { rail: null, panel: null, ...(JSON.parse(localStorage.getItem("bw.widths") ?? "{}") as object) };
+    } catch {
+      return { rail: null, panel: null };
+    }
+  });
+  const setWidth = (which: "rail" | "panel", value: number | null) =>
+    setWidths((w) => {
+      const next = { ...w, [which]: value };
+      try {
+        localStorage.setItem("bw.widths", JSON.stringify(next));
+      } catch {
+        // 记不住也没关系
+      }
+      return next;
+    });
   const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
-  const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + stop.seq;
+  const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + ordinal(stop, allStops);
 
   useEffect(() => {
     void init();
@@ -153,6 +203,14 @@ export function App() {
   };
   const isMac = /Mac/.test(navigator.platform);
 
+  /** 冲突的文件在 Local 里上一次是谁改的 */
+  const whoChanged = (by: { routeId: string | null; stopId: string | null }) => {
+    const r = by.routeId ? allRoutes[by.routeId] : undefined;
+    const s = by.stopId ? allStops[by.stopId] : undefined;
+    if (!by.routeId) return "Local 里这一处是你自己直接改的";
+    if (!r) return "Local 里这一处是一条已经删掉的线路改的";
+    return `Local 里这一处刚被 ${r.express ? `快${r.express}` : `${r.number}路`}${s ? ` 第 ${stopNumber(s)} 站` : ""}改过`;
+  };
   const projectStops = Object.values(allStops).filter((s) => routes.some((r) => r.id === s.routeId));
   /** 这个项目里在建的快线：正在提炼的，和摘要好了还没开出的。编号接着已有的快线往下排 */
   const expressBase = Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === projectId).map((r) => r.express ?? 0));
@@ -194,9 +252,13 @@ export function App() {
           <span>搜索提问、候车区、命令</span>
           <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
         </button>
+        <button className={css.gear} aria-label="设置" aria-expanded={settings} onClick={() => setSettings(!settings)}>
+          <IconSliders size={18} />
+        </button>
       </header>
+      {settings && <Settings load={environment} onClose={() => setSettings(false)} />}
 
-      <div className={css.body} data-tier={tier} data-overview={overview}>
+      <div className={css.body} data-tier={tier} data-overview={overview} style={{ ...(widths.rail ? { "--rail-w": `${widths.rail}px` } : {}), ...(widths.panel ? { "--panel-w": `${widths.panel}px` } : {}) } as React.CSSProperties}>
         {overview && (
           <Overview
             projects={projects}
@@ -210,18 +272,29 @@ export function App() {
             onAddProject={() => void openAddProject()}
           />
         )}
+        {overview && projects.length > 0 && (
+          <OverviewQueue
+            projects={projects}
+            routes={allRoutes}
+            queue={allQueues}
+            currentProjectId={projectId}
+            onAdd={(pid, text) => void queueAdd(pid, text)}
+            onAssign={(id, routeId, mode) => void queueAssign(id, routeId, mode)}
+            onBoard={(id) => void queueBoard(id)}
+            onStartNew={(id) => void queueStartNew(id)}
+            onRemove={(id) => void queueRemove(id)}
+          />
+        )}
         <ProjectRail compact={tier !== "wide"} onDelete={(id) => setDeleting({ routeId: id, unsynced: null })} />
+        {tier === "wide" && !overview && <Divider label="拖动调整左栏宽度" onDrag={(dx, start) => setWidth("rail", Math.min(400, Math.max(200, (start ?? 264) + dx)))} current={widths.rail} onReset={() => setWidth("rail", null)} />}
 
         <main className={css.center}>
           {!ready ? null : projects.length === 0 ? (
-            <div className={css.empty}>
-              <BusMark size={56} />
-              <h1>先加一个项目</h1>
-              <p>选一个有提交记录的 git 仓库目录。Branchwork 会把它当作 Local：你真正运行代码的地方。每条对话在自己的工作区里改，到站后再把改动带回这里。</p>
-              <button className={css.primary} onClick={() => void openAddProject()}>
-                <IconFolder /> 选择项目目录
-              </button>
-            </div>
+            <Welcome
+              onPick={() => void openAddProject()}
+              onDrop={addDropped}
+              loadEnvironment={environment}
+            />
           ) : routes.length === 0 ? (
             <form
               className={css.first}
@@ -301,7 +374,10 @@ export function App() {
                 range={compressFrom && !distills[compressFrom.id]?.summary ? { stopId: compressFrom.id, kind: "compress" } : forkFrom ? { stopId: forkFrom.id, kind: "fork" } : null}
                 building={building.map((b) => ({ stopId: b.stopId, express: b.express, name: b.name, ready: b.ready }))}
                 onOpenBuilding={(stopId) => openCompress(stopId)}
-                onJumpStop={goToStop} />
+                onJumpStop={goToStop}
+                conflicts={Object.fromEntries(routes.filter((r) => r.status === "conflict" && lastSync[r.id]?.status === "conflict").map((r) => [r.id, lastSync[r.id]!.files]))}
+                whoChanged={whoChanged}
+                onResolve={(id) => void resolveConflict(id)} />
               <WaitingArea
                 items={Object.values(allQueues).flat()}
                 routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
@@ -355,7 +431,8 @@ export function App() {
           />
         </main>
 
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
+        {route && tier !== "narrow" && !overview && <Divider label="拖动调整对话栏宽度" onDrag={(dx, start) => setWidth("panel", Math.min(680, Math.max(340, (start ?? (tier === "wide" ? 420 : 380)) - dx)))} current={widths.panel} onReset={() => setWidth("panel", null)} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -420,7 +497,8 @@ export function App() {
         />
       )}
 
-      {dialog?.kind === "add-project" && <AddProjectDialog dir={dialog.dir} onPick={pickDirectory} onInspect={inspectDirectory} onAdd={(dir, name) => void addProjectAt(dir, name)} onCancel={closeDialog} />}
+      {dialog?.kind === "add-project" && <AddProjectDialog dir={dialog.dir} onPick={pickDirectory} onInspect={inspectDirectory} loadSessions={terminalSessions} onAdd={(dir, name, ids) => void addProjectAt(dir, name, ids)} onCancel={closeDialog} />}
+      {dialog?.kind === "import" && <ImportDialog project={projects.find((p) => p.id === dialog.projectId)!} load={terminalSessions} onImport={(ids) => void importSessions(dialog.projectId, ids)} onCancel={closeDialog} />}
       {dialog?.kind === "new-route" && projectId && (
         <NewRouteDialog
           projects={projects}

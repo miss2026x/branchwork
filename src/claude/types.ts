@@ -101,4 +101,8 @@ export interface ClaudeClient {
   fork(sessionId: string, upToMessageId?: string): Promise<string>;
   history(sessionId: string): Promise<HistoryMessage[]>;
   deleteSession(sessionId: string): Promise<void>;
+  /** 在这个目录下用 claude 命令开过的会话（新的在前，最多 max 个） */
+  listSessions(dir: string, max?: number): Promise<{ id: string; title: string; lastModified: number }[]>;
+  /** Claude 的版本、有没有登录。只看本机的文件，不启动 Claude */
+  environment(): Promise<{ version: string | null; loggedIn: boolean | null }>;
 }

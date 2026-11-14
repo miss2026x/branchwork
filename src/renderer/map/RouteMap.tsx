@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
-import type { QueueItem, QueueMode, Route, Stop } from "../../shared";
-import { BusMark, IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait } from "../ui/icons";
+import type { QueueItem, QueueMode, Route, Stop, SyncFile } from "../../shared";
+import { BusMark, IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { firstStops } from "../stores/numbering";
 import { estimateTokens, parseSummary } from "../ui/summary-items";
+import { nameRepeat, repeatMark } from "../stores/numbering";
 import { layoutMap, type Lane } from "./layout";
 import css from "./RouteMap.module.css";
 
@@ -50,6 +51,10 @@ interface Props {
   onOpenBuilding?(stopId: string): void;
   /** 跳到另一站（摘要站的来源站） */
   onJumpStop?(stopId: string): void;
+  /** 有同步冲突的路：冲突了哪些文件 */
+  conflicts?: Record<string, SyncFile[]>;
+  whoChanged?: (by: NonNullable<SyncFile["by"]>) => string;
+  onResolve?(routeId: string): void;
 }
 
 const MIN = 0.3;
@@ -60,7 +65,7 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -178,7 +183,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
   };
 
   // 缩得很小时只留线和站点，不显示站名
-  const detail = view.k >= 0.6 ? "full" : view.k >= 0.4 ? "dots" : "lines";
+  const detail = view.k >= 0.6 ? "full" : view.k >= 0.3 ? "dots" : "lines";
 
   return (
     <div className={css.map}>
@@ -479,7 +484,42 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
             })()}
           </div>
         )}
-        {hoverStop && hoverStop.spot.stop.kind !== "summary" && (
+        {hoverStop && hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id] && (
+          <div className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+            {(() => {
+              const files = conflicts[hoverStop.route.id]!;
+              const label = hoverStop.route.express ? `快${hoverStop.route.express}` : `${hoverStop.route.number}路`;
+              return (
+                <>
+                  <header>
+                    <IconWarn size={16} />
+                    <Plate route={hoverStop.route} />
+                    <b>第 {stopNumber(hoverStop.spot.stop)} 站没法自动合进 Local</b>
+                  </header>
+                  {files.slice(0, 3).map((f) => (
+                    <div key={f.path} className={css.cardFile}>
+                      <code>{f.path}</code>
+                      <span>
+                        {f.lines && `第 ${f.lines[0]}${f.lines[1] > f.lines[0] ? `–${f.lines[1]}` : ""} 行附近：`}
+                        {label} 和 Local 改的是同一处{f.by && whoChanged ? `。${whoChanged(f.by)}` : ""}。
+                      </span>
+                    </div>
+                  ))}
+                  {files.length > 3 && <p className={css.cardMeta}>还有 {files.length - 3} 个文件</p>}
+                  <p className={css.cardAnswer}>
+                    <b>这一站还算没同步完</b>，改动留在 {label} 的工作区里；Local 和其他线路都照常。
+                  </p>
+                  <button className={css.cardResolve} onClick={() => (onResolve?.(hoverStop.route.id), setHover(null))}>
+                    让 {label} 的 Claude 解决
+                    <small>在 {label} 开一站“解决同步冲突”，带上 Local 和这边的两段代码；改好后自动再同步一次</small>
+                  </button>
+                  <p className={css.cardMeta}>先不管也行。{label} 照样能看历史、切走、归档，只是解决之前不能开始下一站。</p>
+                </>
+              );
+            })()}
+          </div>
+        )}
+        {hoverStop && hoverStop.spot.stop.kind !== "summary" && !(hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id]) && (
           <div className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             <header>
               <Plate route={hoverStop.route} />
@@ -653,6 +693,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
         </span>
       )}
       {lane.stops.map(({ stop, x, y, junction }, i) => {
+        const laneStops = lane.stops.map((s) => s.stop);
         const answering = stop.status === "answering";
         const latest = i === lane.stops.length - 1;
         // 折叠的路只留分叉站和正在回答的那一站
@@ -677,7 +718,14 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
             {stop.syncState === "conflict" && <b className={css.badgeRed}>!</b>}
             {stop.syncState === "unsynced" && <b className={css.badgeAmber} title="改动还没进 Local" />}
             {viewingStopId === stop.id && <em className={css.viewingFlag}>正在看这一站</em>}
-            <span className={css.name}>{detail === "dots" && stop.kind !== "summary" ? (stop.kind === "minor" ? "" : number(stop)) : stop.name}</span>
+            {stop.nameState === "temp" && latest && detail === "full" && (
+              <em className={css.naming}>
+                <i /> 起名中
+              </em>
+            )}
+            <span className={css.name} data-command={stop.name.startsWith("/")}>
+              {stop.kind === "minor" ? "" : detail === "dots" && stop.kind !== "summary" ? number(stop) : stop.name + repeatMark(nameRepeat(stop, laneStops))}
+            </span>
           </div>
         );
       })}

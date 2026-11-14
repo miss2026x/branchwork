@@ -1,0 +1,246 @@
+.panel {
+  flex: none;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px 20px;
+  border-left: 1px solid var(--border);
+  background: var(--surface-0);
+}
+.panel > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 32px;
+}
+.panel > header i {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--text-1);
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+.panel > p {
+  margin: 8px 0 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px;
+}
+.empty {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.panel h3 {
+  margin: 14px 0 8px;
+  font-size: 13px;
+}
+.panel h3 small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-10);
+}
+.item[data-ready="true"] {
+  border: 2px solid var(--route-2);
+  background: color-mix(in srgb, var(--route-2) 7%, white);
+}
+.item > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.item b,
+.loose b {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.item > div > span,
+.loose > span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.item[data-ready="true"] > div > span {
+  color: var(--route-2);
+}
+.board {
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-8);
+  background: var(--route-2);
+  color: #fff;
+  font-weight: 700;
+}
+.x {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  color: var(--text-3);
+}
+.x:hover {
+  background: var(--surface-2);
+}
+.loose {
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-10);
+}
+.loose[data-open="true"] {
+  border: 2px solid var(--text-1);
+}
+.loose > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.loose > div:first-child b {
+  flex: 1;
+  min-width: 0;
+}
+.loose > div:first-child > button:not(.x) {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 12px;
+}
+.loose h4 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+}
+.loose label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--r-8);
+  font-size: 13px;
+  cursor: pointer;
+}
+.loose label[data-on="true"] {
+  background: color-mix(in srgb, var(--route-2) 14%, white);
+}
+.loose label input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--text-1);
+}
+.loose label span {
+  flex: 1;
+  min-width: 0;
+}
+.loose label small {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 10px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  background: var(--surface-1);
+}
+.modes button {
+  height: 34px;
+  border-radius: var(--r-8);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.modes button[aria-checked="true"] {
+  background: var(--surface-0);
+  color: var(--text-1);
+  font-weight: 700;
+  box-shadow: var(--e1, 0 1px 2px rgba(22, 27, 34, 0.12));
+}
+.loose footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.loose footer button {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--r-8);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.loose footer .go {
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 700;
+}
+.panel form {
+  margin-top: 12px;
+}
+.panel form > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.panel form > div {
+  display: flex;
+  gap: 8px;
+}
+.panel form input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-10);
+}
+.panel form button {
+  flex: none;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-10);
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 700;
+}
+.panel form button:disabled {
+  opacity: 0.45;
+}
+@media (max-width: 1100px) {
+  .panel {
+    display: none;
+  }
+}

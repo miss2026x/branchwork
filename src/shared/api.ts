@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { DirectoryInfo, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
+import type { DirectoryInfo, Environment, TerminalSession, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -12,6 +12,14 @@ export interface BwApi {
   pickDirectory(): Promise<string | null>;
   /** 添加项目前看一眼这个文件夹：是不是 git 仓库、在哪个分支、有没有 CLAUDE.md */
   inspectDirectory(dir: string): Promise<DirectoryInfo>;
+  /** 拖进窗口的文件或文件夹在磁盘上的路径（界面自己拿不到）；拿不到返回空字符串 */
+  droppedPath(file: File): string;
+  /** 运行环境：Claude 的版本、有没有登录、git 能不能用 */
+  environment(): Promise<Environment>;
+  /** 这个文件夹下在终端里用 claude 命令开过的会话 */
+  terminalSessions(dir: string): Promise<TerminalSession[]>;
+  /** 把终端里开过的会话导进来，每个画成一路 */
+  importSessions(projectId: string, sessionIds: string[]): Promise<Route[]>;
   addProject(localDir: string, name?: string): Promise<Project>;
   /** 这个项目所有路的同步记录，新的在前 */
   projectLog(projectId: string): Promise<SyncLogEntry[]>;

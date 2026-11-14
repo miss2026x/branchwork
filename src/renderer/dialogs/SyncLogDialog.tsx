@@ -32,7 +32,7 @@ export function SyncLogDialog({ project, entries, routes, stops, stopNumber, kep
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   // 什么都没发生的同步（没有文件要带）不列出来
-  const shown = (entries ?? []).filter((e) => e.status !== "noop" && routes[e.routeId] && (filter === "all" || (filter === "conflict" ? e.status === "conflict" : e.routeId === filter)));
+  const shown = (entries ?? []).filter((e) => e.status !== "noop" && routes[e.routeId] && (e.direction !== "local" || filter === "all") && (filter === "all" || (filter === "conflict" ? e.status === "conflict" : e.routeId === filter)));
   const involved = [...new Set((entries ?? []).filter((e) => e.status !== "noop").map((e) => e.routeId))].map((id) => routes[id]).filter((r): r is Route => !!r);
   const today = day(Date.now());
 
@@ -68,6 +68,23 @@ export function SyncLogDialog({ project, entries, routes, stops, stopNumber, kep
             const route = routes[e.routeId]!;
             const stop = e.stopId ? stops[e.stopId] : undefined;
             const n = e.files.length;
+            if (e.direction === "local")
+              return (
+                <li key={e.id} data-status="local">
+                  <time title={new Date(e.at).toLocaleString("zh-CN")}>
+                    {day(e.at) !== today && `${day(e.at)} `}
+                    {time(e.at)}
+                  </time>
+                  <i data-me />
+                  <div>
+                    <p>
+                      <b>你</b> 在 Local 手动改了 <code>{e.files[0]?.path}</code>
+                      {n > 1 ? ` 等 ${n} 个文件` : ""}
+                    </p>
+                    <small>各路下一站开始前会拿到</small>
+                  </div>
+                </li>
+              );
             return (
               <li key={e.id} data-status={e.status}>
                 <time title={new Date(e.at).toLocaleString("zh-CN")}>

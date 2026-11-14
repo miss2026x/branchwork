@@ -4,6 +4,7 @@
  * 只依赖 git 和 Node 自带模块，不依赖 Electron、数据库或 Claude。
  */
 export { inspectRepo, type RepoInfo } from "./inspect";
+export { gitVersionText } from "./git";
 export { createSyncEngine } from "./engine";
 export { SyncError } from "./types";
 export type {

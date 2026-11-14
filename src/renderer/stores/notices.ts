@@ -84,6 +84,7 @@ export function reduceNotices(list: Notice[], e: BwEvent, s: NoticeContext): Not
     }
     case "sync.result": {
       const entry = e.entry;
+      if (entry.direction === "local") return list;
       if (entry.status === "conflict" && entry.routeId !== s.selectedRouteId) return put(list, { id: `conflict:${entry.routeId}`, kind: "conflict", routeId: entry.routeId, stopId: entry.stopId, files: entry.files });
       if (entry.status === "error") return put(list, { id: `sync-error:${entry.routeId}`, kind: "sync-error", routeId: entry.routeId, message: entry.message ?? "同步没有成功" });
       if (entry.status === "ok" || entry.status === "noop") return list.filter((n) => !(n.routeId === entry.routeId && (n.kind === "sync-error" || (n.kind === "conflict" && entry.direction !== "pull"))));

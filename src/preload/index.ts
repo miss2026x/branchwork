@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { BwApi, BwEvent, BwListener } from "../shared";
 
 // 和 src/main/ipc.ts 里的名字一致。这个文件在沙箱里运行，只能引用 electron，所以各写一份
@@ -18,6 +18,16 @@ const api: BwApi = {
   snapshot: call("snapshot"),
   setPermissionMode: call("setPermissionMode"),
   inspectDirectory: call("inspectDirectory"),
+  droppedPath: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return "";
+    }
+  },
+  environment: call("environment"),
+  terminalSessions: call("terminalSessions"),
+  importSessions: call("importSessions"),
   projectLog: call("projectLog"),
   openLocal: call("openLocal"),
   createRoute: call("createRoute"),

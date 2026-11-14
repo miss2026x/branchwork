@@ -8,6 +8,7 @@ import type {
   BwListener,
   ChatItem,
   DirectoryInfo,
+  Environment,
   FileStat,
   KeptWorktree,
   StopContent,
@@ -24,8 +25,9 @@ import type {
   SyncLogEntry,
   SyncOutcomeStatus,
   Terminal,
+  TerminalSession,
 } from "../shared";
-import { createSyncEngine, inspectRepo, type SyncEngine } from "../sync";
+import { createSyncEngine, gitVersionText, inspectRepo, type SyncEngine, type SyncHooks } from "../sync";
 import { createTerminals, type TerminalInfo, type Terminals } from "../terminal";
 
 export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED";
@@ -53,7 +55,7 @@ export interface CoreOptions {
   /** 给站起名（用小模型，只看提问）。默认开；一次性的命令行调用应关掉 */
   naming?: boolean;
   /** 测试里换成假的同步引擎工厂；默认用真的 */
-  createEngine?: (localDir: string, worktreesDir: string) => Promise<SyncEngine>;
+  createEngine?: (localDir: string, worktreesDir: string, hooks?: SyncHooks) => Promise<SyncEngine>;
 }
 
 export type AskReport =
@@ -70,6 +72,15 @@ export interface Core {
   addProject(localDir: string, name?: string): Promise<Project>;
   /** 添加项目前看一眼这个文件夹 */
   inspectDirectory(dir: string): Promise<DirectoryInfo>;
+  /** 运行环境：Claude 的版本、有没有登录、git 能不能用 */
+  environment(): Promise<Environment>;
+  /** 这个文件夹下在终端里用 claude 命令开过的会话（Branchwork 自己开的不算） */
+  terminalSessions(dir: string): Promise<TerminalSession[]>;
+  /**
+   * 把终端里开过的会话导进来，每个会话画成一路：会话复制一份（原来的不动），里面每个提问是一站；
+   * 新的工作区，代码从 Local 的现在开始。
+   */
+  importSessions(projectId: string, sessionIds: string[]): Promise<Route[]>;
   /** 这个项目所有路的同步记录，新的在前 */
   projectLog(projectId: string): SyncLogEntry[];
   listProjects(): Project[];
@@ -164,9 +175,23 @@ export interface Core {
   dispose(): void;
 }
 
+/** 一条用户消息里他自己打的字；只是工具结果的话返回 null */
+function promptText(content: unknown): string | null {
+  if (typeof content === "string") return content.trim() || null;
+  if (!Array.isArray(content)) return null;
+  const text = (content as { type?: string; text?: unknown }[])
+    .filter((b) => b.type === "text" && typeof b.text === "string")
+    .map((b) => b.text as string)
+    .join("\n")
+    .trim();
+  return text || null;
+}
+
 export function createCore(opts: CoreOptions): Core {
   const { db, claude } = opts;
-  const makeEngine = opts.createEngine ?? ((localDir, worktreesDir) => createSyncEngine({ localDir, worktreesDir }));
+  const makeEngine = opts.createEngine ?? ((localDir, worktreesDir, hooks) => createSyncEngine({ localDir, worktreesDir, hooks }));
+  /** 各项目里刚发现的“你直接在 Local 里改了这些文件”，等下一次同步时记进同步记录 */
+  const localEdits = new Map<string, SyncFile[]>();
 
   const listeners = new Set<BwListener>();
   const engines = new Map<string, Promise<SyncEngine>>();
@@ -217,7 +242,12 @@ export function createCore(opts: CoreOptions): Core {
     let e = engines.get(project.id);
     if (!e) {
       e = (async () => {
-        const engine = await makeEngine(project.localDir, path.join(opts.worktreesRoot, project.id));
+        const engine = await makeEngine(project.localDir, path.join(opts.worktreesRoot, project.id), {
+          onLocalEdited: (files) => {
+            const known = localEdits.get(project.id) ?? [];
+            localEdits.set(project.id, [...known.filter((k) => !files.some((f) => f.path === k.path)), ...files.map((f) => ({ path: f.path, note: f.kind }))]);
+          },
+        });
         // 上次如果在写 Local 途中退出，这里补写完
         const r = await engine.recover();
         if (r.status !== "clean" && db.routes.get(r.routeId)) {
@@ -249,11 +279,26 @@ export function createCore(opts: CoreOptions): Core {
 
   /** 跑一次同步并记下来；noop 不记。引擎抛错也记成一条，不往外抛 */
   const sync = async (routeId: string, stopId: string | null, direction: "pull" | "push", run: () => ReturnType<SyncEngine["pullBeforeStop"]>): Promise<SyncLogEntry | null> => {
+    const noteLocalEdits = () => {
+      const projectId = db.routes.get(routeId)?.projectId;
+      const files = projectId ? localEdits.get(projectId) : undefined;
+      if (!projectId || !files) return;
+      localEdits.delete(projectId);
+      log(routeId, null, "local", "ok", files);
+    };
     try {
       const r = await run();
+      noteLocalEdits();
       if (r.status === "noop") return null;
       if (r.status === "ok") return log(routeId, stopId, direction, "ok", r.changed.map((c) => ({ path: c.path, note: c.kind })));
-      return log(routeId, stopId, direction, "conflict", r.files.map((f) => ({ path: f.path, note: f.reason })));
+      // 冲突的文件：Local 里它上一次是哪一路哪一站带进去的；找不到就是你自己直接改的
+      const projectId = db.routes.get(routeId)?.projectId;
+      const history = projectId ? db.syncLog.listByRoutes(db.routes.listByProject(projectId).map((x) => x.id)) : [];
+      const whoTouched = (file: string): SyncFile["by"] => {
+        const hit = history.find((e) => e.routeId !== routeId && e.status === "ok" && (e.direction === "push" || e.direction === "local") && e.files.some((f) => f.path === file));
+        return { routeId: hit && hit.direction === "push" ? hit.routeId : null, stopId: hit?.direction === "push" ? hit.stopId : null };
+      };
+      return log(routeId, stopId, direction, "conflict", r.files.map((f) => ({ path: f.path, note: f.reason, ...(f.lines?.[0] ? { lines: f.lines[0] } : {}), by: whoTouched(f.path) })));
     } catch (e) {
       return log(routeId, stopId, direction, "error", [], e instanceof Error ? e.message : String(e));
     }
@@ -451,13 +496,17 @@ export function createCore(opts: CoreOptions): Core {
 
       // ── 回答 ──
       const previous = db.stops.listByRoute(routeId);
+      // “继续”“好的”这类短确认：不起名，画成小点。斜杠命令：直接用命令名
+      const minor = !resolving && previous.length > 0 && previous.at(-1)!.kind !== "summary" && isShortConfirm(text);
+      const command = resolving ? null : slashCommand(text);
+      const fixedName = minor || command !== null;
       let stop: Stop = {
         id: id("s"),
         routeId,
         seq: db.stops.nextSeq(routeId),
-        kind: "normal",
-        name: resolving?.name ?? tempName(text),
-        nameState: resolving ? "final" : "temp",
+        kind: minor ? "minor" : "normal",
+        name: resolving?.name ?? command ?? (minor ? text.trim() : tempName(text)),
+        nameState: resolving || fixedName ? "final" : "temp",
         prompt: text,
         status: "answering",
         syncState: "none",
@@ -471,7 +520,7 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "stop.created", stop });
       // 还没起名的路，用它自己的第一站当名字
       if (route.name === NEW_ROUTE_NAME && !resolving) route = setRoute(routeId, { name: stop.name });
-      if (!resolving) nameStop(stop.id, routeId, text, stop.name);
+      if (!resolving && !fixedName) nameStop(stop.id, routeId, text, stop.name);
       runningStop.set(routeId, stop.id);
 
       const stopId = stop.id;
@@ -570,6 +619,94 @@ export function createCore(opts: CoreOptions): Core {
     async inspectDirectory(localDir) {
       const dir = path.resolve(localDir);
       return { dir, name: path.basename(dir), ...(await inspectRepo(dir)), projectId: db.projects.byLocalDir(dir)?.id ?? null };
+    },
+
+    async environment() {
+      const [c, gitVersion] = await Promise.all([claude.environment().catch(() => ({ version: null, loggedIn: null })), gitVersionText()]);
+      return { claudeVersion: c.version, loggedIn: c.loggedIn, gitVersion };
+    },
+
+    async terminalSessions(localDir) {
+      const dir = path.resolve(localDir);
+      const mine = new Set(db.projects.list().flatMap((p) => db.routes.listByProject(p.id)).map((r) => r.sessionId));
+      const list = (await claude.listSessions(dir).catch(() => [])).filter((s) => !mine.has(s.id));
+      const out: TerminalSession[] = [];
+      for (const s of list) {
+        const questions = (await claude.history(s.id).catch(() => [])).filter((m) => m.role === "user" && promptText(m.content) !== null).length;
+        if (questions > 0) out.push({ id: s.id, title: s.title || "没有标题的会话", questions, lastModified: s.lastModified });
+      }
+      return out;
+    },
+
+    async importSessions(projectId, sessionIds) {
+      const project = mustProject(projectId);
+      const engine = await engineFor(project);
+      const titles = new Map((await claude.listSessions(project.localDir).catch(() => [])).map((s) => [s.id, s.title]));
+      const made: Route[] = [];
+      for (const source of sessionIds) {
+        // 复制一份：之后在 Branchwork 里接着问，终端里原来那个会话不受影响
+        const sessionId = await claude.fork(source);
+        const history = await claude.history(sessionId);
+        const routeId = id("r");
+        let worktreePath: string;
+        try {
+          worktreePath = (await engine.createWorktree(routeId)).path;
+        } catch (e) {
+          await claude.deleteSession(sessionId).catch(() => {});
+          throw e;
+        }
+        const first = history.find((m) => m.role === "user" && promptText(m.content) !== null);
+        const route: Route = {
+          id: routeId,
+          projectId,
+          number: db.routes.nextNumber(projectId),
+          express: null,
+          name: (titles.get(source) || (first ? stopName(promptText(first.content)!) : "") || "导入的会话").slice(0, 40),
+          status: "idle",
+          sessionId,
+          worktreePath,
+          parentRouteId: null,
+          forkStopId: null,
+          model: null,
+          color: null,
+          contextTokens: null,
+          pinned: false,
+          folded: false,
+          orphanOf: null,
+          createdAt: Date.now(),
+          archivedAt: null,
+        };
+        db.routes.insert(route);
+        emit({ type: "route.updated", route });
+        // 每个提问是一站：从这条提问到下一条提问之前的最后一条消息
+        let seq = 0;
+        for (let i = 0; i < history.length; i++) {
+          const text = history[i]!.role === "user" ? promptText(history[i]!.content) : null;
+          if (text === null) continue;
+          let end = i;
+          while (end + 1 < history.length && !(history[end + 1]!.role === "user" && promptText(history[end + 1]!.content) !== null)) end++;
+          const stop: Stop = {
+            id: id("s"),
+            routeId,
+            seq: ++seq,
+            kind: "normal",
+            name: stopName(text),
+            nameState: "final",
+            prompt: text,
+            status: "done",
+            syncState: "none",
+            messageId: history[i]!.id,
+            lastMessageId: history[end]!.id,
+            error: null,
+            startedAt: route.createdAt + seq,
+            endedAt: route.createdAt + seq,
+          };
+          db.stops.insert(stop);
+          emit({ type: "stop.created", stop });
+        }
+        made.push(route);
+      }
+      return made;
     },
 
     projectLog(projectId) {
@@ -1134,6 +1271,16 @@ export const NEW_ROUTE_NAME = "新对话";
  * 站的临时名字：取提问的第一句（至少 4 个字才在标点处断开），
  * 再按显示宽度截到 8 个汉字宽（英文字母算半个）。
  */
+/** “继续”“好的”“yes”这类短确认 */
+export function isShortConfirm(prompt: string): boolean {
+  return /^(继续|接着来?|接着做|好的?|好吧|可以|行|嗯+|是的?|对|没问题|go( on| ahead)?|ok(ay)?|yes|yep|y|continue|sure|next|proceed|lgtm)[\s。.!！~～]*$/i.test(prompt.trim());
+}
+
+/** 斜杠命令（/init、/review）：返回命令名；不是斜杠命令返回 null */
+export function slashCommand(prompt: string): string | null {
+  return /^\/[A-Za-z][\w:-]*(?=\s|$)/.exec(prompt.trim())?.[0] ?? null;
+}
+
 export function stopName(prompt: string): string {
   const text = prompt.replace(/\s+/g, " ").trim();
   // 英文的句号和逗号只有后面是空格或结尾时才算断句（b.txt、1,000 里的不算）

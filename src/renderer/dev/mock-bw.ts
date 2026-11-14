@@ -59,7 +59,7 @@ export function installMockBw(): void {
     const r3 = addRoute(p.id, "Cookie 方案", { parentRouteId: r1.id, forkStopId: fork.id, status: "conflict" });
     addStop(r3.id, "改 Cookie 结构", "把 cookie 改成只存会话 ID。", [{ kind: "text", text: "已改。" }]);
     addStop(r3.id, "写回 session", "把剩下的字段写回 session。", [{ kind: "tool", tool: "Edit", detail: "src/auth/session.ts" }, { kind: "text", text: "写好了。" }], { syncState: "conflict" });
-    logs.set(r3.id, [{ id: "y1", routeId: r3.id, stopId: null, direction: "push", status: "conflict", files: [{ path: "src/auth/session.ts", note: "both-modified" }], message: null, at: Date.now() }]);
+    logs.set(r3.id, [{ id: "y1", routeId: r3.id, stopId: null, direction: "push", status: "conflict", files: [{ path: "src/auth/session.ts", note: "both-modified", lines: [42, 58], by: { routeId: r1.id, stopId: fork.id } }], message: null, at: Date.now() }]);
     const r4 = addRoute(p.id, "修复 CI 缓存", { status: "interrupted" });
     addStop(r4.id, "看 CI 配置", "CI 的缓存为什么总是不命中？", [{ kind: "text", text: "缓存的 key 里带了提交号，所以每次都" }], { status: "interrupted", syncState: "unsynced", error: "已停车" });
     addRoute("p2", "首页改版");
@@ -203,12 +203,23 @@ export function installMockBw(): void {
       if (mode === "all") for (const [k, resolve] of permissions) (permissions.delete(k), resolve("allow"));
       return projects[i]!;
     },
+    environment: async () => ({ claudeVersion: "2.4.1", loggedIn: true, gitVersion: "2.43.0" }),
+    terminalSessions: async (dir) =>
+      dir.includes("bad")
+        ? []
+        : [
+            { id: "t1", title: "看一下 session 过期问题", questions: 4, lastModified: Date.now() - 6 * 86_400_000 },
+            { id: "t2", title: "升级依赖", questions: 2, lastModified: Date.now() - 32 * 86_400_000 },
+          ],
+    importSessions: async () => [],
+    droppedPath: (file) => `/Users/me/code/${file.name}`,
     inspectDirectory: async (dir) => ({ dir, name: dir.split(/[\\/]/).filter(Boolean).at(-1) ?? dir, exists: true, isRepo: !dir.includes("bad"), branch: "main", dirty: dir.includes("dirty") ? 3 : 0, hasClaudeMd: true, projectId: null }),
     projectLog: async (projectId) => {
       const rs = [...routes.values()].filter((r) => r.projectId === projectId);
       const last = (r: Route) => [...stops.values()].filter((s) => s.routeId === r.id).at(-1)?.id ?? null;
       const at = Date.now();
       return rs.flatMap((r, i): SyncLogEntry[] => [
+        ...(i === 1 ? [{ id: `l${i}m`, routeId: r.id, stopId: null, direction: "local" as const, status: "ok" as const, files: [{ path: ".env.example", note: "modified" }], message: null, at: at - i * 240_000 + 60_000 }] : []),
         { id: `l${i}a`, routeId: r.id, stopId: last(r), direction: "push", status: r.status === "conflict" ? "conflict" : "ok", files: r.status === "conflict" ? [{ path: "src/auth/session.ts", note: "both-modified" }] : [{ path: "src/auth/github.ts", note: "added" }, { path: "src/auth/routes.ts", note: "modified" }], message: null, at: at - i * 240_000 },
         { id: `l${i}b`, routeId: r.id, stopId: last(r), direction: "pull", status: i % 2 ? "ok" : "noop", files: i % 2 ? [{ path: ".env.example", note: "modified" }] : [], message: null, at: at - i * 240_000 - 90_000 },
       ]);

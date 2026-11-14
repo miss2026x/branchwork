@@ -113,4 +113,13 @@ export class FakeClaude implements ClaudeClient {
   async deleteSession(sessionId: string): Promise<void> {
     this.sessions.delete(sessionId);
   }
+
+  /** 假装在终端里开过的会话；测试里往 sessions 里放好历史，再把它列在这里 */
+  terminalSessions: { id: string; title: string; lastModified: number }[] = [];
+  async listSessions(): Promise<{ id: string; title: string; lastModified: number }[]> {
+    return this.terminalSessions;
+  }
+  async environment(): Promise<{ version: string | null; loggedIn: boolean | null }> {
+    return { version: "9.9.9", loggedIn: true };
+  }
 }

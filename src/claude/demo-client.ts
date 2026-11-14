@@ -51,7 +51,7 @@ export function createDemoClaudeClient(): ClaudeClient {
         blocks.push({ type: "tool_use", name: "Write", input });
         opts.onEvent?.({ type: "tool", tool: "Write", input });
         const decision = opts.onPermission ? await opts.onPermission({ tool: "Write", input, canRemember: true }) : "deny";
-        if (decision === "deny") {
+        if (decision === "deny" || typeof decision === "object") {
           await say("你没有批准，文件没有改。");
         } else if (!stopped()) {
           await fs.appendFile(file, `- 第 ${n} 站：${opts.prompt.replace(/\s+/g, " ")}\n`);
@@ -66,7 +66,7 @@ export function createDemoClaudeClient(): ClaudeClient {
         blocks.push({ type: "tool_use", name: start.title, input });
         opts.onEvent?.({ type: "tool", tool: start.title, input });
         const decision = opts.onPermission ? await opts.onPermission({ tool: start.title, input, canRemember: false }) : "deny";
-        if (decision === "deny") await say("\n\n你没有批准，后台终端没有开。");
+        if (decision === "deny" || typeof decision === "object") await say("\n\n你没有批准，后台终端没有开。");
         else if (!stopped()) await say("\n\n" + (await start.run(input, { cwd: opts.cwd }).catch((e: unknown) => String(e))));
       }
       if (stopped()) outcome = "interrupted";
@@ -82,6 +82,19 @@ export function createDemoClaudeClient(): ClaudeClient {
       return id;
     },
     history: async (sessionId) => sessions.get(sessionId) ?? [],
+    // 演示：假装在终端里开过两个会话
+    async listSessions() {
+      const seed = (id: string, prompts: string[]) => {
+        if (!sessions.has(id)) sessions.set(id, prompts.flatMap((p) => [{ id: randomUUID(), role: "user" as const, content: p }, { id: randomUUID(), role: "assistant" as const, content: [{ type: "text", text: `（演示）关于“${p}”的回答。` }] }]));
+      };
+      seed("demo-terminal-1", ["看一下 session 过期问题", "过期时间是在哪里设的？", "改成 7 天", "加个测试"]);
+      seed("demo-terminal-2", ["升级依赖", "跑一遍测试"]);
+      return [
+        { id: "demo-terminal-1", title: "看一下 session 过期问题", lastModified: Date.now() - 6 * 86_400_000 },
+        { id: "demo-terminal-2", title: "升级依赖", lastModified: Date.now() - 30 * 86_400_000 },
+      ];
+    },
+    environment: async () => ({ version: "演示模式", loggedIn: true }),
     deleteSession: async (sessionId) => void sessions.delete(sessionId),
     useTools(list) {
       tools = list;

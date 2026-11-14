@@ -4,7 +4,7 @@ import type { Core } from "../core";
 import type { BwApi } from "../shared";
 
 /** 界面能调用的操作，除了 onEvent（事件走单独的通道） */
-type Calls = Omit<BwApi, "onEvent">;
+type Calls = Omit<BwApi, "onEvent" | "droppedPath">;
 
 /** 两个通道的名字。preload 里有一份同样的；它在沙箱里运行，不能引用这个文件 */
 export const CALL = "bw:call";
@@ -28,6 +28,9 @@ export function registerIpc(core: Core): void {
     setPermissionMode: async (projectId, mode) => core.setPermissionMode(projectId, mode),
     addProject: (localDir, name) => core.addProject(localDir, name),
     inspectDirectory: (dir) => core.inspectDirectory(dir),
+    environment: () => core.environment(),
+    terminalSessions: (dir) => core.terminalSessions(dir),
+    importSessions: (projectId, ids) => core.importSessions(projectId, ids),
     projectLog: async (projectId) => core.projectLog(projectId),
     async openLocal(projectId) {
       const project = core.listProjects().find((p) => p.id === projectId);
