@@ -26,7 +26,7 @@ export function installMockBw(): void {
 
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
-    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, createdAt: Date.now(), archivedAt: null, ...extra };
+    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
   };
@@ -228,6 +228,7 @@ export function installMockBw(): void {
     exportRoute: async () => null,
     renameRoute: async (routeId, name) => setRoute(routeId, { name }),
     setRouteColor: async (routeId, color) => setRoute(routeId, { color }),
+    setRouteFlags: async (routeId, flags) => setRoute(routeId, flags),
     async renameStop(stopId, name) {
       setStop(stopId, { name, nameState: "manual" });
     },

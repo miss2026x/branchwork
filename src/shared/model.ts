@@ -51,6 +51,12 @@ export interface Route {
   color: number | null;
   /** 这一路的会话现在占了多少上下文（token 数）；还没问过或不知道时为空 */
   contextTokens: number | null;
+  /** 置顶：在左栏里排在最前面 */
+  pinned: boolean;
+  /** 折叠：线路图上只留线，不画它的站 */
+  folded: boolean;
+  /** 父路被删掉了：这里记下它当时的叫法（“2路”），线路图上标“从已删除的 2路 开出” */
+  orphanOf: string | null;
   createdAt: number;
   archivedAt: number | null;
 }

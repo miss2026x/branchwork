@@ -29,6 +29,7 @@ const api: BwApi = {
   exportRoute: call("exportRoute"),
   renameRoute: call("renameRoute"),
   setRouteColor: call("setRouteColor"),
+  setRouteFlags: call("setRouteFlags"),
   renameStop: call("renameStop"),
   setRouteModel: call("setRouteModel"),
   changes: call("changes"),

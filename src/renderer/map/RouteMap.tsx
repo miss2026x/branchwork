@@ -4,6 +4,7 @@ import { BusMark, IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdi
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { firstStops } from "../stores/numbering";
+import { estimateTokens, parseSummary } from "../ui/summary-items";
 import { layoutMap, type Lane } from "./layout";
 import css from "./RouteMap.module.css";
 
@@ -42,6 +43,13 @@ interface Props {
   onDropItem(item: QueueItem, routeId: string, mode: QueueMode): void;
   /** 要带到视野中间的那一站（从搜索、通知跳过来） */
   focus?: { stopId: string; n: number } | null;
+  /** 正开着“压缩成快线”或“从这站开新对话”的弹窗：在图上标出会带上哪几站 */
+  range?: { stopId: string; kind: "compress" | "fork" } | null;
+  /** 正在提炼、或摘要已经好了还没开出的快线：画在来源站上方的虚线牌 */
+  building?: { stopId: string; express: number; name: string; ready: boolean }[];
+  onOpenBuilding?(stopId: string): void;
+  /** 跳到另一站（摘要站的来源站） */
+  onJumpStop?(stopId: string): void;
 }
 
 const MIN = 0.3;
@@ -52,7 +60,7 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -225,6 +233,17 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                     ) : (
                       <path d={lane.path} fill="none" stroke={c} strokeWidth={on ? 10 : 8} strokeLinecap="round" strokeLinejoin="round" />
                     )}
+                    {/* 父路被删掉了：在线头上方标一下它是从哪开出来的 */}
+                    {lane.route.orphanOf && !lane.link && detail !== "lines" && (
+                      <g opacity={on ? 1 : 0.7}>
+                        <path d={`M ${lane.from.x + 14} ${lane.y - 48} V ${lane.y - 12}`} stroke="var(--line-strong)" strokeWidth={2.5} strokeDasharray="4 5" strokeLinecap="round" fill="none" />
+                        <circle cx={lane.from.x + 14} cy={lane.y - 60} r={12} fill="var(--canvas)" stroke="var(--line-strong)" strokeWidth={1.5} strokeDasharray="3 3" />
+                        <path d={`M ${lane.from.x + 10} ${lane.y - 64} l 8 8 M ${lane.from.x + 18} ${lane.y - 64} l -8 8`} stroke="var(--text-3)" strokeWidth={1.5} strokeLinecap="round" />
+                        <text x={lane.from.x + 36} y={lane.y - 56} fontSize={12} fill="var(--text-2)">
+                          从已删除的 {lane.route.orphanOf} 开出
+                        </text>
+                      </g>
+                    )}
                     {/* 选中的路：从父路带来的那几站，用它自己的颜色在父路的线下面再描一遍 */}
                     {on && !lane.route.express && inherited(lane, layout.lanes).map((d, i) => <path key={i} d={d} fill="none" stroke={colors.line} strokeWidth={5} strokeLinecap="round" />)}
                     {(() => {
@@ -236,7 +255,59 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                   </g>
                 );
               })}
+            {/* 弹窗开着时：标出会带上的那几站 */}
+            {(() => {
+              const lane = range && layout.lanes.find((l) => l.stops.some((s) => s.stop.id === range.stopId));
+              if (!range || !lane) return null;
+              const at = lane.stops.findIndex((s) => s.stop.id === range.stopId);
+              const first = lane.stops[0]!;
+              const upto = lane.stops[at]!;
+              const last = lane.stops.at(-1)!;
+              const n = stopNumber(upto.stop);
+              if (range.kind === "compress")
+                return (
+                  <g>
+                    <rect x={first.x - 30} y={lane.y - 26} width={upto.x - first.x + 60} height={52} rx={26} fill="color-mix(in srgb, var(--express) 12%, transparent)" stroke="var(--express)" strokeWidth={2} strokeDasharray="6 5" />
+                    <text x={upto.x + 30} y={lane.y - 56} textAnchor="end" fontSize={12} fontWeight={700} fill="var(--express)">
+                      压缩范围：起点到第 {n} 站
+                    </text>
+                  </g>
+                );
+              return (
+                <g fontSize={12} fontWeight={700}>
+                  <path d={`M ${first.x - 16} ${lane.y - 50} H ${upto.x + 16}`} stroke="var(--text-1)" strokeWidth={2} strokeLinecap="round" />
+                  <text x={(first.x + upto.x) / 2} y={lane.y - 58} textAnchor="middle" fill="var(--text-1)">
+                    会带上{n > 1 ? `第 1–${n} 站` : "第 1 站"}
+                  </text>
+                  {at < lane.stops.length - 1 && (
+                    <>
+                      <path d={`M ${upto.x + 34} ${lane.y - 50} H ${last.x + 16}`} stroke="var(--line-strong)" strokeWidth={2} strokeLinecap="round" strokeDasharray="2 5" />
+                      <text x={(upto.x + 50 + last.x) / 2} y={lane.y - 58} textAnchor="middle" fill="var(--text-3)" fontWeight={500}>
+                        {stopNumber(last.stop) > n + 1 ? `第 ${n + 1}–${stopNumber(last.stop)} 站不带` : `第 ${n + 1} 站不带`}
+                      </text>
+                    </>
+                  )}
+                </g>
+              );
+            })()}
+            {/* 在建的快线：从来源站往上拐出去的虚线 */}
+            {building.map((b) => {
+              const spot = allSpots.find((m) => m.spot.stop.id === b.stopId)?.spot;
+              return spot ? <path key={b.stopId} d={`M ${spot.x} ${spot.y - 14} V ${spot.y - 52} H ${spot.x + 64}`} fill="none" stroke="var(--express)" strokeWidth={3} strokeDasharray="5 6" strokeLinecap="round" /> : null;
+            })}
           </svg>
+
+          {building.map((b) => {
+            const spot = allSpots.find((m) => m.spot.stop.id === b.stopId)?.spot;
+            if (!spot) return null;
+            return (
+              <button key={b.stopId} className={css.building} style={{ left: spot.x + 68, top: spot.y - 52 }} data-ready={b.ready} onClick={() => onOpenBuilding?.(b.stopId)} title={b.name}>
+                <b>快{b.express}</b>
+                {b.ready ? "摘要好了" : "提炼中"}
+                {!b.ready && <i />}
+              </button>
+            );
+          })}
 
           {layout.lanes.map((lane) => (
             <LaneNodes
@@ -368,11 +439,51 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
 
-        {hoverStop && (
+        {hoverStop && hoverStop.spot.stop.kind === "summary" && (
+          <div className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+            {(() => {
+              const stop = hoverStop.spot.stop;
+              const source = allSpots.find((m) => m.spot.stop.id === hoverStop.route.forkStopId);
+              const items = parseSummary(stop.prompt).flatMap((g) => g.items);
+              return (
+                <>
+                  <header>
+                    <Plate route={hoverStop.route} />
+                    <b>摘要站</b>
+                    {source && (
+                      <span className={css.cardFrom}>
+                        来自 <Plate route={source.route} /> 第 1–{stopNumber(source.spot.stop)} 站
+                      </span>
+                    )}
+                  </header>
+                  <ul className={css.cardList}>
+                    {items.slice(0, 3).map((it, i) => (
+                      <li key={i}>{clip(it, 60)}</li>
+                    ))}
+                  </ul>
+                  <p className={css.cardMeta}>
+                    <span>这一站不是提问，是 Claude 提炼的交接摘要，约 {estimateTokens(stop.prompt) >= 1000 ? `${(estimateTokens(stop.prompt) / 1000).toFixed(1)}k` : estimateTokens(stop.prompt)}。</span>
+                  </p>
+                  <footer>
+                    <button className={css.cardPrimary} onClick={() => (onViewStop(stop), setHover(null))}>
+                      看完整摘要
+                    </button>
+                    {source && (
+                      <button onClick={() => (onJumpStop?.(source.spot.stop.id), setHover(null))}>
+                        跳到 {source.route.express ? `快${source.route.express}` : `${source.route.number}路`} 第 {stopNumber(source.spot.stop)} 站
+                      </button>
+                    )}
+                  </footer>
+                </>
+              );
+            })()}
+          </div>
+        )}
+        {hoverStop && hoverStop.spot.stop.kind !== "summary" && (
           <div className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             <header>
               <Plate route={hoverStop.route} />
-              <b>{hoverStop.spot.stop.kind === "summary" ? "摘要站" : `第 ${stopNumber(hoverStop.spot.stop)} 站`}</b>
+              <b>第 {stopNumber(hoverStop.spot.stop)} 站</b>
               <time>{new Date(hoverStop.spot.stop.startedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}</time>
             </header>
             <p className={css.cardAsk}>{clip(hoverStop.spot.stop.prompt, 90)}</p>
@@ -381,7 +492,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
               const pv = preview(stop);
               return (
                 <>
-                  {stop.kind !== "summary" && <p className={css.cardAnswer}>{stop.status === "answering" ? "还在回答…" : pv ? clip(pv.answer, 110) || "这一站没有文字回答。" : "正在读取回答…"}</p>}
+                  {<p className={css.cardAnswer}>{stop.status === "answering" ? "还在回答…" : pv ? clip(pv.answer, 110) || "这一站没有文字回答。" : "正在读取回答…"}</p>}
                   <p className={css.cardMeta}>
                     {pv && pv.tools > 0 && <span>{pv.tools} 次工具调用</span>}
                     {stop.syncState === "synced" && <span className={css.ok}>✓ 改动已进 Local</span>}
@@ -536,9 +647,16 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
         <span className="ell">{lane.route.name}</span>
       </button>
 
+      {lane.route.folded && lane.stops.length > 0 && (
+        <span className={css.folded} style={{ left: (lane.stops[0]!.x + lane.stops.at(-1)!.x) / 2, top: lane.y }}>
+          已折叠 · {lane.stops.filter((s) => s.stop.kind !== "summary").length} 站
+        </span>
+      )}
       {lane.stops.map(({ stop, x, y, junction }, i) => {
         const answering = stop.status === "answering";
         const latest = i === lane.stops.length - 1;
+        // 折叠的路只留分叉站和正在回答的那一站
+        if (lane.route.folded && !junction && !answering) return null;
         return (
           <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id}>
             {answering && (

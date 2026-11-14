@@ -37,6 +37,7 @@ export function registerIpc(core: Core): void {
     truncate: (routeId, stopId) => core.truncate(routeId, stopId),
     renameRoute: async (routeId, name) => core.renameRoute(routeId, name),
     setRouteColor: async (routeId, color) => core.setRouteColor(routeId, color),
+    setRouteFlags: async (routeId, flags) => core.setRouteFlags(routeId, flags),
     renameStop: async (stopId, name) => void core.renameStop(stopId, name),
     setRouteModel: async (routeId, model) => core.setRouteModel(routeId, model),
     changes: (routeId) => core.changes(routeId),

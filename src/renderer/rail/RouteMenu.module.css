@@ -80,10 +80,20 @@
 }
 .item {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 7px 8px;
   border-radius: var(--r-8);
   text-align: left;
   font-size: 14px;
+}
+.item svg {
+  flex: none;
+}
+.item > span {
+  flex: 1;
+  min-width: 0;
 }
 .item:hover {
   background: var(--surface-2);

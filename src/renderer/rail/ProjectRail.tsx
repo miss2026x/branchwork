@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Route } from "../../shared";
 import { useStore } from "../stores/store";
-import { IconChevron, IconMore, IconPlus, IconWarn, IconTerminal } from "../ui/icons";
+import { IconChevron, IconMore, IconPlus, IconWarn, IconTerminal, IconPin } from "../ui/icons";
 import { RouteMenu } from "./RouteMenu";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
@@ -27,6 +27,10 @@ export function ProjectRail({
   const requestArchive = useStore((s) => s.requestArchive);
   const openCompress = useStore((s) => s.openCompress);
   const exportRoute = useStore((s) => s.exportRoute);
+  const setRouteFlags = useStore((s) => s.setRouteFlags);
+  const lastSync = useStore((s) => s.lastSync);
+  /** 已归档里点开看详情的那一路 */
+  const [archivedOpen, setArchivedOpen] = useState<string | null>(null);
   const terminals = useStore((s) => s.terminals);
   const queue = useStore((s) => s.queue);
   const openNewRoute = useStore((s) => s.openNewRoute);
@@ -194,6 +198,11 @@ export function ProjectRail({
                         {depth > 0 && <i className={css.branch} data-express={!!r.express} style={{ marginLeft: (depth - 1) * 14 }} aria-hidden />}
                         <Plate route={r} />
                         <span className={`ell ${css.label}`}>{r.name}</span>
+                        {r.pinned && (
+                          <span className={css.term} title="已置顶">
+                            <IconPin size={12} />
+                          </span>
+                        )}
                         {Object.values(terminals).some((t) => t.routeId === r.id && t.status === "running") && (
                           <span className={css.term} title="有后台终端在跑">
                             <IconTerminal size={13} />
@@ -234,6 +243,8 @@ export function ProjectRail({
                           })()}
                           onExport={() => void exportRoute(r.id)}
                           onDelete={() => onDelete(r.id)}
+                          onPin={(pinned) => void setRouteFlags(r.id, { pinned })}
+                          onFold={(folded) => void setRouteFlags(r.id, { folded })}
                           onClose={() => setMenuFor(null)}
                           at={menuAt}
                         />
@@ -256,22 +267,35 @@ export function ProjectRail({
                       已归档 {archived.length}
                     </button>
                     {showArchived[p.id] &&
-                      archived.map((r) => (
-                        <div key={r.id} className={css.archived}>
-                          <span className="ell">
-                            {r.number}路 · {r.name}
-                          </span>
-                          <button onClick={() => void unarchiveRoute(r.id)}>
-                            恢复
-                          </button>
-                          <button
-                            className={css.danger}
-                            onClick={() => onDelete(r.id)}
-                          >
-                            删除
-                          </button>
-                        </div>
-                      ))}
+                      archived.map((r) => {
+                        const count = Object.values(stops).filter((x) => x.routeId === r.id && x.kind !== "summary").length;
+                        const dirty = Object.values(stops).some((x) => x.routeId === r.id && (x.syncState === "unsynced" || x.syncState === "conflict")) || lastSync[r.id]?.status === "conflict";
+                        const on = archivedOpen === r.id;
+                        return (
+                          <div key={r.id} className={css.archived} data-open={on}>
+                            <button className={css.archivedHead} aria-expanded={on} onClick={() => setArchivedOpen(on ? null : r.id)}>
+                              <Plate route={r} />
+                              <span className="ell">{r.name}</span>
+                              {dirty && !on ? <i className={css.half} title="还有改动没进 Local" /> : <small>{r.archivedAt ? ago(r.archivedAt) : ""}</small>}
+                            </button>
+                            {on && (
+                              <>
+                                <p>
+                                  {count} 站 · {dirty ? "还有改动留在工作区，没进 Local" : "改动都已进 Local"}
+                                </p>
+                                <div>
+                                  <button className={css.restore} onClick={() => void unarchiveRoute(r.id)}>
+                                    恢复
+                                  </button>
+                                  <button className={css.danger} onClick={() => onDelete(r.id)}>
+                                    删除
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
                   </>
                 )}
               </section>
@@ -291,6 +315,17 @@ export function ProjectRail({
   );
 }
 
+/** 多久以前：今天 / 昨天 / N 天前 / 上周 / 月日 */
+function ago(at: number): string {
+  const days = Math.floor((Date.now() - at) / 86_400_000);
+  if (days <= 0) return "今天";
+  if (days === 1) return "昨天";
+  if (days < 7) return `${days} 天前`;
+  if (days < 14) return "上周";
+  const d = new Date(at);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
 /** 把路排成树：分叉出来的路跟在它的父路后面，记下深了几层 */
 function asTree(list: Route[]): { route: Route; depth: number }[] {
   const ids = new Set(list.map((r) => r.id));
@@ -299,10 +334,15 @@ function asTree(list: Route[]): { route: Route; depth: number }[] {
     for (const r of list) {
       const parent = r.parentRouteId && ids.has(r.parentRouteId) ? r.parentRouteId : null;
       if (parent !== parentId) continue;
+      if (depth === 0 && pass !== !!r.pinned) continue;
       out.push({ route: r, depth });
       walk(r.id, depth + 1);
     }
   };
+  // 置顶的（连同从它分出去的）排在前面
+  let pass = true;
+  walk(null, 0);
+  pass = false;
   walk(null, 0);
   return out;
 }

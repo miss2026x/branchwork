@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "exportRoute", "fork", "history", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "exportRoute", "fork", "history", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -170,10 +170,27 @@ describe("应用", () => {
     await page.getByLabel(/· 记一笔：接入/).click({ button: "right" }); // 1 路的第 1 站
     await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
     const dialog = page.getByRole("dialog", { name: "压缩成快线" });
+    await shot("10a-compress");
     await dialog.getByRole("button", { name: "开始提炼" }).click();
-    await expect.poll(() => dialog.getByText("摘要好了，看一眼再发车").isVisible(), { timeout: 60000 }).toBe(true);
+    // 一开始提炼弹窗就收起来：进度在线路图上那块虚线牌子里，好了右下角提醒
+    await expect.poll(() => dialog.count()).toBe(0);
+    await expect.poll(() => page.getByRole("button", { name: /快1\s*(提炼中|摘要好了)/ }).count()).toBe(1);
+    await shot("10b-distilling");
+    const summaryNotice = page.getByRole("region", { name: "通知" }).getByRole("button", { name: "查看摘要" });
+    await expect.poll(() => summaryNotice.isVisible(), { timeout: 60000 }).toBe(true);
+    await summaryNotice.click();
+    await expect.poll(() => dialog.getByText("摘要好了，看一眼再发车").isVisible()).toBe(true);
     const before = fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
-    await dialog.locator("textarea").first().fill("## 做完了\n- 记了一笔 GitHub 登录");
+    // 摘要是一条一条的：点文字直接改，也能加一条
+    const firstItem = dialog.getByRole("textbox", { name: /第 1 条/ }).first();
+    await firstItem.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type("记了一笔 GitHub 登录");
+    await page.keyboard.press("Enter");
+    await dialog.getByRole("button", { name: "+ 加一条" }).click();
+    await dialog.getByLabel("新的一条").fill("别忘了回调地址");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => dialog.getByText("别忘了回调地址").isVisible()).toBe(true);
 
     // 点弹窗外面、按 Esc 都不会把它关掉
     await page.mouse.click(5, 300);
@@ -184,7 +201,8 @@ describe("应用", () => {
     expect(await dialog.isVisible()).toBe(false);
     await page.getByLabel(/· 记一笔：接入/).click({ button: "right" });
     await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
-    expect(await dialog.locator("textarea").first().inputValue()).toBe("## 做完了\n- 记了一笔 GitHub 登录");
+    expect(await dialog.getByText("记了一笔 GitHub 登录").isVisible()).toBe(true);
+    expect(await dialog.getByText("别忘了回调地址").isVisible()).toBe(true);
     // “不要这条快线”要再确认一次
     await dialog.getByRole("button", { name: "不要这条快线" }).click();
     await dialog.getByRole("button", { name: "留着" }).click();
@@ -215,7 +233,10 @@ describe("应用", () => {
     await page.getByRole("menuitem", { name: /归档/ }).click();
     await expect.poll(() => rail.getByText("已归档 1").isVisible()).toBe(true);
     await rail.getByText("已归档 1").click();
+    await rail.getByRole("button", { name: /换个思路/ }).click();
     await rail.getByRole("button", { name: "恢复" }).click();
+    await shot("7b-restored");
+    await page.getByRole("status").getByRole("button", { name: "去看看" }).click();
     await expect.poll(() => page.getByRole("heading", { name: "换个思路" }).isVisible()).toBe(true);
     expect(worktrees()).toHaveLength(3);
 
@@ -224,6 +245,16 @@ describe("应用", () => {
     await shot("8-delete");
     // 三种处理：默认是改成归档；这里选全部删掉
     expect(await page.getByRole("alertdialog").getByRole("button", { name: "归档", exact: true }).isVisible()).toBe(true);
+    await page.getByRole("alertdialog").getByRole("radio", { name: /全部删掉/ }).check();
+    await page.getByRole("alertdialog").getByRole("button", { name: "全部删掉", exact: true }).click();
+    await expect.poll(() => rail.getByText("换个思路").count(), { timeout: 30000 }).toBe(0);
+    // 删掉之后几秒内可以撤销：路回来了，工作区也没动
+    await shot("8b-deleted");
+    await page.getByRole("status").getByRole("button", { name: "撤销" }).click();
+    await expect.poll(() => rail.getByText("换个思路").count()).toBe(1);
+    expect(worktrees().length).toBe(3);
+    await page.getByLabel("换个思路 的更多操作").click({ force: true });
+    await page.getByRole("menuitem", { name: /删除/ }).click();
     await page.getByRole("alertdialog").getByRole("radio", { name: /全部删掉/ }).check();
     await page.getByRole("alertdialog").getByRole("button", { name: "全部删掉", exact: true }).click();
     await expect.poll(() => rail.getByText("换个思路").count(), { timeout: 30000 }).toBe(0);
@@ -310,7 +341,6 @@ describe("应用", () => {
     await page.getByRole("menuitem", { name: /压缩成快线/ }).click();
     const dialog = page.getByRole("dialog", { name: "压缩成快线" });
     await dialog.getByRole("button", { name: "开始提炼" }).click();
-    await dialog.getByRole("button", { name: "先收起来" }).click();
     await expect.poll(() => dialog.count()).toBe(0);
     const notices = page.getByRole("region", { name: "通知" });
     await expect.poll(() => notices.getByText("的摘要提炼好了").isVisible(), { timeout: 60000 }).toBe(true);

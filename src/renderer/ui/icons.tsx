@@ -30,6 +30,13 @@ export const IconEdit = (p: P) => <Icon {...p}><path d="M4 20h4L19 9l-4-4L4 16v4
 export const IconArrow = (p: P) => <Icon {...p}><path d="M7 17L17 7M9 7h8v8" /></Icon>;
 export const IconCut = (p: P) => <Icon {...p}><circle cx="6" cy="7" r="2.5" /><circle cx="6" cy="17" r="2.5" /><path d="M8 8.5L20 17M8 15.5L20 7" /></Icon>;
 export const IconEye = (p: P) => <Icon {...p}><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="2.8" /></Icon>;
+export const IconPin = (p: P) => <Icon {...p}><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6zM12 15v6" /></Icon>;
+export const IconFold = (p: P) => <Icon {...p}><path d="M4 12h16M8 6h8M8 18h8" /></Icon>;
+export const IconArchive = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="5" rx="1" /><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4" /></Icon>;
+export const IconDownload = (p: P) => <Icon {...p}><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></Icon>;
+export const IconTrash = (p: P) => <Icon {...p}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" /></Icon>;
+export const IconGear = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></Icon>;
+export const IconCheck = (p: P) => <Icon {...p}><path d="M5 12.5l4.5 4.5L19 7.5" /></Icon>;
 export const IconStop = (p: P) => <Icon {...p}><rect x="6" y="6" width="12" height="12" rx="2" /></Icon>;
 
 /** 应用图标里的那辆车 */

@@ -25,6 +25,8 @@ export interface BwApi {
   renameRoute(routeId: string, name: string): Promise<Route>;
   /** 换线路颜色（1–8）；null 回到按路号自动取 */
   setRouteColor(routeId: string, color: number | null): Promise<Route>;
+  /** 置顶到左栏、在线路图上折叠（只收起站，线还在） */
+  setRouteFlags(routeId: string, flags: { pinned?: boolean; folded?: boolean }): Promise<Route>;
   /**
    * 截线：删掉这一路上从这一站起的所有站（只删对话，不动代码）。
    * 返回被截掉的那一站的提问，方便放回输入框改一改重新问。

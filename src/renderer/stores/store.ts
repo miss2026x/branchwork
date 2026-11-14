@@ -18,8 +18,32 @@ export interface PendingPermission {
 }
 
 /** 一次“压缩成快线”的提炼：在后台跑，弹窗关了也继续，好了再提醒 */
+export interface Toast {
+  id: number;
+  title: string;
+  detail?: string;
+  /** 左边的路牌 */
+  route?: Route;
+  action?: { label: string; run(): void };
+  /** 下面那条倒计时的线走多久（毫秒）；不给就不画 */
+  countdown?: number;
+}
+
+export interface PendingDelete {
+  route: Route;
+  force: boolean;
+  keep: boolean;
+  /** 撤销时要放回去的东西 */
+  children: Route[];
+  queue: QueueItem[];
+}
+
 export interface Distill {
   routeId: string;
+  /** 开始时填的快线名称 */
+  name: string;
+  /** 提炼好之后不等我看，直接开出 */
+  direct: boolean;
   status: "running" | "ready" | "failed";
   summary: string;
   error: string | null;
@@ -47,6 +71,10 @@ interface State {
   archiveAsk: string | null;
   /** 等到站后要归档的路 */
   archiveWhenDone: string[];
+  /** 底部的深色提示条：刚做完的一件事，有的可以撤销或跳过去看 */
+  toast: Toast | null;
+  /** 刚删掉、还能撤销的那一路：界面上已经拿掉，过几秒才真的删 */
+  pendingDelete: PendingDelete | null;
   /** 正在看“全部项目”页 */
   overview: boolean;
   /** 正在看的以前的某一站（不是最新的）；空表示跟着最新 */
@@ -95,7 +123,7 @@ interface State {
   jumpToStop(stopId: string): void;
   openCompress(stopId: string | null): void;
   /** 开始提炼（已有摘要时是重新生成）。立即返回，结果写进 distills */
-  startDistill(routeId: string, stopId: string, keep: string): void;
+  startDistill(routeId: string, stopId: string, keep: string, name?: string, direct?: boolean): void;
   /** 取消提炼；已有的摘要留着 */
   cancelDistill(stopId: string): void;
   setSummary(stopId: string, summary: string): void;
@@ -119,14 +147,22 @@ interface State {
   /** 把这一路各站的回答读回来（已经读过就不再读） */
   ensureHistory(routeId: string): void;
   ask(routeId: string, text: string): Promise<void>;
-  fork(routeId: string, stopId: string, name: string, firstQuestion: string): Promise<void>;
-  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string): Promise<void>;
+  fork(routeId: string, stopId: string, name: string, firstQuestion: string, opts?: { color?: number | null; itemId?: string; switchTo?: boolean }): Promise<void>;
+  /** itemId：第一个问题是从候车区挑的，开出后把它从候车区拿掉 */
+  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string, itemId?: string): Promise<void>;
   resolveConflict(routeId: string): Promise<void>;
   resync(routeId: string): Promise<void>;
   archiveRoute(routeId: string): Promise<void>;
   unarchiveRoute(routeId: string): Promise<void>;
   /** 返回 null 表示已删除；返回文件列表表示还有没进 Local 的改动，没有删 */
   deleteRoute(routeId: string, force: boolean, keepWorktree?: boolean): Promise<SyncFile[] | null>;
+  /** 撤销刚才的删除 */
+  undoDelete(): void;
+  /** 不等了，现在就真的删掉（退出前、又删了另一路时） */
+  flushDelete(): Promise<void>;
+  showToast(toast: Omit<Toast, "id">, ms?: number): void;
+  dismissToast(): void;
+  setRouteFlags(routeId: string, flags: { pinned?: boolean; folded?: boolean }): Promise<void>;
   /** 同步记录窗口里：打开或彻底删掉一个留下的工作区 */
   openKept(id: string): void;
   removeKept(id: string): Promise<void>;
@@ -155,8 +191,14 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).rep
  * 界面拿数据的唯一通道。启动时取一次快照，之后只按事件更新；界面不自己改主进程的数据。
  * 只有这个文件碰 window.bw。
  */
+/** 删除之后留多久可以撤销 */
+const UNDO_MS = 7000;
+
 export const useStore = create<State>((set, get) => {
   let started = false;
+  let toastSeq = 0;
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let deleteTimer: ReturnType<typeof setTimeout> | undefined;
   const apply = (e: BwEvent) => {
     // 通知先按“事件之前的数据”算一遍
     set((s) => {
@@ -190,6 +232,8 @@ export const useStore = create<State>((set, get) => {
           }
           const permissions = { ...s.permissions };
           if (e.route.status !== "awaiting_permission") delete permissions[e.route.id];
+          // 刚删掉、还在等撤销的路：界面上不放回去，只把最新的样子记着
+          if (s.pendingDelete?.route.id === e.route.id) return { pendingDelete: { ...s.pendingDelete, route: e.route } };
           return { routes: { ...s.routes, [e.route.id]: e.route }, pendingAsk, drafts, permissions };
         });
         break;
@@ -329,6 +373,8 @@ export const useStore = create<State>((set, get) => {
     dialog: null,
     archiveAsk: null,
     archiveWhenDone: [],
+    toast: null,
+    pendingDelete: null,
     overview: false,
     viewing: null,
     terminals: {},
@@ -348,6 +394,8 @@ export const useStore = create<State>((set, get) => {
       if (started) return; // 开发模式下 React 会把初始化跑两遍，事件只能订阅一次
       started = true;
       window.bw.onEvent(apply);
+      // 关窗口前：还在等撤销的删除现在就做掉
+      window.addEventListener("beforeunload", () => void get().flushDelete());
       try {
         const projects = await window.bw.listProjects();
         set({ projects });
@@ -428,7 +476,11 @@ export const useStore = create<State>((set, get) => {
     viewLog(projectId) {
       if (!projectId) return set({ dialog: null });
       set({ dialog: { kind: "log", projectId, entries: null, kept: [] } });
-      void Promise.all([window.bw.projectLog(projectId), window.bw.keptWorktrees(projectId).catch(() => [])]).then(
+      // 刚删掉还在等撤销的那一路：现在就删掉，记录里才看得到它留下的工作区
+      void get()
+        .flushDelete()
+        .then(() => Promise.all([window.bw.projectLog(projectId), window.bw.keptWorktrees(projectId).catch(() => [])]))
+        .then(
         ([entries, kept]) => set((s) => (s.dialog?.kind === "log" && s.dialog.projectId === projectId ? { dialog: { kind: "log", projectId, entries, kept } } : {})),
         (e) => set({ error: message(e), dialog: null }),
       );
@@ -489,11 +541,14 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async fork(routeId, stopId, name, firstQuestion) {
+    async fork(routeId, stopId, name, firstQuestion, opts = {}) {
       try {
-        const route = await window.bw.fork(routeId, stopId, name);
+        let route = await window.bw.fork(routeId, stopId, name);
+        if (opts.color) route = await window.bw.setRouteColor(route.id, opts.color);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
-        get().selectRoute(route.id);
+        if (opts.itemId) void window.bw.queueRemove(opts.itemId).catch(() => {});
+        if (opts.switchTo === false) get().showToast({ title: `已开出 ${route.number}路 ${route.name}`, detail: firstQuestion.trim() ? "第一个问题已发出" : "停在分叉站，等你提问", route, action: { label: "去看看", run: () => get().selectRoute(route.id) } });
+        else get().selectRoute(route.id);
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
       } catch (e) {
         set({ error: message(e) });
@@ -511,24 +566,33 @@ export const useStore = create<State>((set, get) => {
       set((s) => ({ compressStopId: stopId, notices: stopId ? s.notices.filter((n) => !(n.kind === "summary" && n.stopId === stopId)) : s.notices }));
     },
 
-    startDistill(routeId, stopId, keep) {
+    startDistill(routeId, stopId, keep, name, direct) {
       const before = get().distills[stopId];
       if (before?.status === "running") return;
       const startedAt = Date.now();
       const mine = () => get().distills[stopId]?.startedAt === startedAt;
-      set((s) => ({ distills: { ...s.distills, [stopId]: { routeId, status: "running", summary: before?.summary ?? "", error: null, startedAt } } }));
+      const base = { routeId, name: name ?? before?.name ?? "", direct: direct ?? false };
+      set((s) => ({
+        distills: { ...s.distills, [stopId]: { ...base, status: "running", summary: before?.summary ?? "", error: null, startedAt } },
+        // 第一次提炼：弹窗收起来，进度在线路图和候车区里看
+        compressStopId: before?.summary ? s.compressStopId : null,
+      }));
       window.bw.distill(routeId, stopId, keep.trim() || undefined).then(
         (summary) => {
           if (!mine()) return; // 已取消或丢掉
+          if (base.direct) {
+            set((s) => ({ distills: { ...s.distills, [stopId]: { ...base, status: "ready", summary, error: null, startedAt } } }));
+            return void get().createExpress(routeId, stopId, summary, base.name, "");
+          }
           set((s) => ({
-            distills: { ...s.distills, [stopId]: { routeId, status: "ready", summary, error: null, startedAt } },
+            distills: { ...s.distills, [stopId]: { ...base, status: "ready", summary, error: null, startedAt } },
             // 弹窗没开着：提醒一下
             notices: s.compressStopId === stopId ? s.notices : [...s.notices.filter((n) => n.id !== `summary:${stopId}`), { id: `summary:${stopId}`, kind: "summary", routeId, stopId }],
           }));
         },
         (e) => {
           if (!mine()) return;
-          set((s) => ({ distills: { ...s.distills, [stopId]: { routeId, status: before?.summary ? "ready" : "failed", summary: before?.summary ?? "", error: message(e), startedAt } } }));
+          set((s) => ({ distills: { ...s.distills, [stopId]: { ...base, status: before?.summary ? "ready" : "failed", summary: before?.summary ?? "", error: message(e), startedAt } }, error: before?.summary || s.compressStopId === stopId ? s.error : `摘要没有提炼出来：${message(e)}` }));
         },
       );
     },
@@ -635,12 +699,16 @@ export const useStore = create<State>((set, get) => {
       set((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
     },
 
-    async createExpress(routeId, stopId, summary, name, firstQuestion) {
+    async createExpress(routeId, stopId, summary, name, firstQuestion, itemId) {
       try {
         const route = await window.bw.createExpress(routeId, stopId, summary, name);
+        if (itemId) void window.bw.queueRemove(itemId).catch(() => {});
         get().dropDistill(stopId);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
+        const source = get().routes[routeId];
+        const from = source ? `${source.express ? `快${source.express}` : `${source.number}路`} 照常` : "";
+        get().showToast({ title: `已开出 快${route.express} ${route.name}`, detail: [firstQuestion.trim() ? "第一个问题已发出" : "停在摘要站，等你提问", from].filter(Boolean).join("，"), route });
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
       } catch (e) {
         set({ error: message(e) });
@@ -677,7 +745,7 @@ export const useStore = create<State>((set, get) => {
       try {
         const route = await window.bw.unarchiveRoute(routeId);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
-        get().selectRoute(routeId);
+        get().showToast({ title: `已恢复 ${route.name}`, detail: "下次提问前，先拿 Local 的最新代码", route, action: { label: "去看看", run: () => get().selectRoute(routeId) } });
       } catch (e) {
         set({ error: message(e) });
       }
@@ -696,14 +764,84 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async deleteRoute(routeId, force, keepWorktree) {
-      try {
-        const r = await window.bw.deleteRoute(routeId, force, keepWorktree);
-        return r.status === "has-unsynced" ? r.files : null;
-      } catch (e) {
-        set({ error: message(e) });
+    async deleteRoute(routeId, force, keepWorktree = false) {
+      const route = get().routes[routeId];
+      if (!route) return null;
+      if (route.status === "answering" || route.status === "awaiting_permission") {
+        set({ error: "这一路正在回答，到站或停车后才能删除" });
         return null;
       }
+      const files = await window.bw.changes(routeId).catch(() => []);
+      if (!force && !keepWorktree && files.length > 0) return files.map((f) => ({ path: f.path, note: f.kind }));
+      await get().flushDelete();
+      const label = route.express ? `快${route.express}` : `${route.number}路`;
+      const waiting = (get().queue[route.projectId] ?? []).filter((q) => q.routeId === routeId);
+      const children = Object.values(get().routes).filter((r) => r.parentRouteId === routeId);
+      // 界面上先拿掉；过几秒才真的删，这期间可以撤销
+      set((s) => {
+        const routes = { ...s.routes };
+        delete routes[routeId];
+        for (const c of children) routes[c.id] = { ...c, orphanOf: label };
+        return {
+          routes,
+          queue: { ...s.queue, [route.projectId]: (s.queue[route.projectId] ?? []).map((q) => (q.routeId === routeId ? { ...q, routeId: null, mode: "unassigned" as const } : q)) },
+          pendingDelete: { route, force: force || files.length > 0, keep: keepWorktree, children, queue: s.queue[route.projectId] ?? [] },
+        };
+      });
+      if (get().selectedRouteId === routeId) get().selectProject(route.projectId);
+      const parts = ["Local 的代码没动"];
+      if (keepWorktree) parts.push(files.length > 0 ? `${files.length} 个没同步的文件留在工作区` : "工作区留着，在“同步记录”里能找到");
+      else if (files.length > 0) parts.push(`${files.length} 个没进 Local 的文件一起删了`);
+      if (waiting.length > 0) parts.push(`${waiting.length} 条候车回到未派车`);
+      get().showToast({ title: `已删除 ${label} ${route.name}`, detail: parts.join("；"), action: { label: "撤销", run: () => get().undoDelete() }, countdown: UNDO_MS }, UNDO_MS);
+      clearTimeout(deleteTimer);
+      deleteTimer = setTimeout(() => void get().flushDelete(), UNDO_MS);
+      return null;
+    },
+
+    undoDelete() {
+      const p = get().pendingDelete;
+      if (!p) return;
+      clearTimeout(deleteTimer);
+      set((s) => {
+        const routes = { ...s.routes, [p.route.id]: p.route };
+        for (const c of p.children) if (routes[c.id]) routes[c.id] = { ...routes[c.id]!, orphanOf: c.orphanOf };
+        return { routes, queue: { ...s.queue, [p.route.projectId]: p.queue }, pendingDelete: null, toast: null };
+      });
+      if (p.route.status !== "archived") get().selectRoute(p.route.id);
+    },
+
+    async flushDelete() {
+      const p = get().pendingDelete;
+      if (!p) return;
+      clearTimeout(deleteTimer);
+      set({ pendingDelete: null });
+      const back = (why: string) => set((s) => ({ routes: { ...s.routes, [p.route.id]: p.route }, queue: { ...s.queue, [p.route.projectId]: p.queue }, error: why }));
+      try {
+        const r = await window.bw.deleteRoute(p.route.id, p.force, p.keep);
+        if (r.status === "has-unsynced") back("这一路又有了没进 Local 的改动，没有删");
+      } catch (e) {
+        back(message(e));
+      }
+    },
+
+    showToast(toast, ms = 6000) {
+      const id = ++toastSeq;
+      clearTimeout(toastTimer);
+      set({ toast: { ...toast, id } });
+      toastTimer = setTimeout(() => set((s) => (s.toast?.id === id ? { toast: null } : {})), ms);
+    },
+
+    dismissToast() {
+      clearTimeout(toastTimer);
+      set({ toast: null });
+    },
+
+    async setRouteFlags(routeId, flags) {
+      await window.bw.setRouteFlags(routeId, flags).then(
+        (route) => set((s) => ({ routes: { ...s.routes, [route.id]: route } })),
+        (e) => set({ error: message(e) }),
+      );
     },
 
     stop(routeId) {

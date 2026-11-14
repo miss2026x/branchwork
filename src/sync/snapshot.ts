@@ -63,7 +63,13 @@ async function ensureIndex(indexFile: string, seedIndex: string): Promise<void> 
   } catch {
     // 第一次：从仓库现有索引起步，省掉重新计算全部文件的时间
     await fs.mkdir(path.dirname(indexFile), { recursive: true });
-    await fs.copyFile(seedIndex, indexFile).catch(() => {});
+    // 复制出来的索引要沿用原来的修改时间：git 靠“文件的修改时间不早于索引”来判断要不要重新比内容。
+    // 复制会把时间变成现在，同一秒内改过、大小又没变的文件就会被当成没改过
+    const seed = await fs.stat(seedIndex).catch(() => null);
+    if (seed) {
+      await fs.copyFile(seedIndex, indexFile);
+      await fs.utimes(indexFile, seed.atime, seed.mtime);
+    }
   }
 }
 

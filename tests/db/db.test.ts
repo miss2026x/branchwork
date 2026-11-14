@@ -19,7 +19,7 @@ const route = (id: string, number: number): Route => ({
   forkStopId: null,
   model: null,
   color: null,
-  contextTokens: null,
+  contextTokens: null, pinned: false, folded: false, orphanOf: null,
   createdAt: number,
   archivedAt: null,
 });

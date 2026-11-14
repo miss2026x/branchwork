@@ -113,6 +113,9 @@ export function openDb(file: string): Db {
       model: "model",
       color: "color",
       contextTokens: "context_tokens",
+      pinned: "pinned",
+      folded: "folded",
+      orphanOf: "orphan_of",
       createdAt: "created_at",
       archivedAt: "archived_at",
     },
@@ -130,6 +133,9 @@ export function openDb(file: string): Db {
       model: (r.model as string | null) ?? null,
       color: (r.color as number | null) ?? null,
       contextTokens: (r.context_tokens as number | null) ?? null,
+      pinned: !!r.pinned,
+      folded: !!r.folded,
+      orphanOf: (r.orphan_of as string | null) ?? null,
       createdAt: r.created_at as number,
       archivedAt: r.archived_at as number | null,
     }),
@@ -246,6 +252,7 @@ export function openDb(file: string): Db {
 
 function encode(v: unknown): unknown {
   if (v === undefined) return null;
+  if (typeof v === "boolean") return v ? 1 : 0;
   if (v !== null && typeof v === "object") return JSON.stringify(v);
   return v;
 }

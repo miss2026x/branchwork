@@ -87,6 +87,8 @@ export interface Core {
   renameRoute(routeId: string, name: string): Route;
   /** 换线路颜色（1–8）；null 回到按路号自动取 */
   setRouteColor(routeId: string, color: number | null): Route;
+  /** 置顶到左栏、在线路图上折叠 */
+  setRouteFlags(routeId: string, flags: { pinned?: boolean; folded?: boolean }): Route;
   /** 改站名；改过的不再被自动起的名字覆盖 */
   renameStop(stopId: string, name: string): Stop;
   /** 这一路以后用哪个模型（别名或完整名字）；null 用默认的。下一站起生效 */
@@ -660,6 +662,9 @@ export function createCore(opts: CoreOptions): Core {
         model: null,
         color: null,
         contextTokens: null,
+        pinned: false,
+        folded: false,
+        orphanOf: null,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -717,6 +722,11 @@ export function createCore(opts: CoreOptions): Core {
       mustRoute(routeId);
       if (color !== null && !(Number.isInteger(color) && color >= 1 && color <= 8)) throw new CoreError("NOT_FOUND", "没有这个颜色");
       return setRoute(routeId, { color });
+    },
+
+    setRouteFlags(routeId, flags) {
+      mustRoute(routeId);
+      return setRoute(routeId, { ...(flags.pinned === undefined ? {} : { pinned: !!flags.pinned }), ...(flags.folded === undefined ? {} : { folded: !!flags.folded }) });
     },
 
     renameStop(stopId, name) {
@@ -789,6 +799,9 @@ export function createCore(opts: CoreOptions): Core {
         model: parent.model,
         color: null,
         contextTokens: null,
+        pinned: false,
+        folded: false,
+        orphanOf: null,
         createdAt: Date.now(),
         archivedAt: null,
       };
@@ -841,6 +854,8 @@ export function createCore(opts: CoreOptions): Core {
       if (removed.status === "has-unsynced") return { status: "has-unsynced", files: removed.files.map((f) => ({ path: f.path, note: f.kind })) };
       if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
       releaseQueue(route);
+      // 从它分出去的路：记下父路当时的叫法，线路图上好标“从已删除的 2路 开出”
+      for (const child of db.routes.listByProject(route.projectId)) if (child.parentRouteId === routeId) setRoute(child.id, { orphanOf: route.express ? `快${route.express}` : `${route.number}路` });
       db.routes.delete(routeId);
       emit({ type: "route.deleted", routeId, projectId: route.projectId });
       return { status: "deleted" };
@@ -903,6 +918,9 @@ export function createCore(opts: CoreOptions): Core {
         model: source.model,
         color: null,
         contextTokens: null,
+        pinned: false,
+        folded: false,
+        orphanOf: null,
         createdAt: Date.now(),
         archivedAt: null,
       };

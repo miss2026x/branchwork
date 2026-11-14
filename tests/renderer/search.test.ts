@@ -3,7 +3,7 @@ import type { Project, QueueItem, Route, Stop } from "../../src/shared";
 import { dayLabel, excerpt, highlight, search, type SearchInput } from "../../src/renderer/palette/search";
 
 const project = (id: string): Project => ({ id, name: id, localDir: "", permissionMode: "ask", createdAt: 0 });
-const route = (id: string, projectId: string, patch: Partial<Route> = {}): Route => ({ id, projectId, number: 1, express: null, name: id, status: "idle", sessionId: null, worktreePath: "", parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, createdAt: 0, archivedAt: null, ...patch });
+const route = (id: string, projectId: string, patch: Partial<Route> = {}): Route => ({ id, projectId, number: 1, express: null, name: id, status: "idle", sessionId: null, worktreePath: "", parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: 0, archivedAt: null, ...patch });
 const stop = (id: string, routeId: string, prompt: string, startedAt: number, name = prompt.slice(0, 6)): Stop => ({ id, routeId, seq: 1, kind: "normal", name, nameState: "final", prompt, status: "done", syncState: "synced", messageId: null, lastMessageId: null, error: null, startedAt, endedAt: 0 });
 const queued = (id: string, projectId: string, text: string): QueueItem => ({ id, projectId, text, mode: "unassigned", routeId: null, createdAt: 0 });
 

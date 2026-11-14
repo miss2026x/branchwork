@@ -378,3 +378,60 @@
   border-color: transparent;
   color: var(--text-3);
 }
+
+/* 底部的深色提示条：刚做完的一件事 */
+.done {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: min(440px, calc(100% - 48px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-12, 12px);
+  background: var(--text-1);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(22, 27, 34, 0.28);
+  overflow: hidden;
+  z-index: 10;
+}
+.done > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.done b {
+  font-size: 14px;
+}
+.done span {
+  font-size: 12px;
+  line-height: 18px;
+  color: rgba(255, 255, 255, 0.78);
+}
+.done button {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-8);
+  background: #fff;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+.done > i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 100%;
+  background: var(--route-2);
+  transform-origin: left;
+  animation: doneCountdown linear forwards;
+}
+@keyframes doneCountdown {
+  to {
+    transform: scaleX(0);
+  }
+}

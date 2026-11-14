@@ -1,0 +1,242 @@
+/* 还没开出来的快线：虚线框的路牌 */
+.dashedPlate {
+  flex: none;
+  max-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding-right: 10px;
+  border: 1.5px dashed;
+  border-radius: var(--r-6);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+}
+.dashedPlate b {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding: 0 8px;
+  color: #fff;
+  font-size: 13px;
+}
+.range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.range i {
+  font-style: normal;
+  color: var(--text-4);
+}
+.range select {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface-0);
+  font-size: 13px;
+}
+.range small {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.optional {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.after label {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  cursor: pointer;
+}
+.after label[data-on="true"] {
+  border-color: var(--text-1);
+  box-shadow: 0 0 0 1px var(--text-1);
+}
+.after label input {
+  flex: none;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--text-1);
+}
+.after b {
+  display: block;
+  font-size: 13px;
+}
+.after small {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.head small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.items {
+  margin-bottom: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 6px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  background: var(--surface-1);
+}
+.items h3 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+.item > i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 50%;
+}
+.item > span {
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
+  border-radius: var(--r-6);
+  outline: none;
+  overflow-wrap: anywhere;
+}
+.item > span:hover {
+  background: var(--surface-2);
+}
+.item > span:focus {
+  background: var(--surface-0);
+  box-shadow: 0 0 0 1.5px var(--route-1);
+}
+.item > button {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+  color: var(--text-4);
+}
+.item > button:hover {
+  background: var(--surface-2);
+  color: var(--red);
+}
+.add {
+  margin-top: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-8);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.addInput {
+  width: 100%;
+  height: 32px;
+  margin-top: 8px;
+  padding: 0 10px;
+  border: 1.5px solid var(--route-1);
+  border-radius: var(--r-8);
+  font-size: 13px;
+  outline: none;
+}
+.pick {
+  position: relative;
+}
+.pick > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 12px;
+  font-weight: 400;
+}
+.pick ul {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 2;
+  width: 320px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: var(--r-10);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+}
+.pick li button {
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--r-6);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 400;
+}
+.pick li button:hover {
+  background: var(--surface-2);
+}
+.discard {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  font-size: 13px;
+  color: var(--red);
+}
+.discard:hover {
+  background: var(--surface-2);
+}
+
+.inline b {
+  display: inline;
+}
+.range > span {
+  flex: none;
+}

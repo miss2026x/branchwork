@@ -114,6 +114,7 @@
 .nameColor {
   display: flex;
   flex-wrap: wrap;
+  gap: 0 12px;
 }
 .nameColor > :first-child {
   flex: 1 1 200px;
@@ -424,4 +425,64 @@
   border-radius: var(--r-6);
   background: var(--surface-0);
   font-size: 12px;
+}
+
+/* 分叉弹窗：编号和颜色、代码说明、开好后切过去 */
+.numberColor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+}
+.numberColor > button {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  font-size: 12px;
+}
+.numberColor [data-pop] {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 2;
+  padding: 10px;
+  border-radius: var(--r-10);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+}
+.codeNote {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-2);
+}
+.codeNote svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-3);
+}
+.codeNote b {
+  display: block;
+  color: var(--text-1);
+}
+.switchTo {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.switchTo input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text-1);
 }

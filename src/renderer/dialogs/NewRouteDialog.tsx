@@ -83,8 +83,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
               <div className={css.field}>
                 <span>颜色</span>
                 <div className={own.swatches} role="radiogroup" aria-label="颜色">
-                  {ROUTE_COLORS.map((c, i) => (
-                    <button key={c} type="button" role="radio" aria-checked={c === colors.line} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => setColor(i + 1)} />
+                  {ROUTE_COLORS.map(([n, c], i) => (
+                    <button key={n} type="button" role="radio" aria-checked={c === colors.line} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => setColor(n)} />
                   ))}
                 </div>
               </div>

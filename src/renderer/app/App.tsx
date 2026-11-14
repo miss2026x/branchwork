@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
+import type { Building } from "../panels/WaitingArea";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
 import { AddProjectDialog } from "../dialogs/AddProjectDialog";
 import { ChangesDialog } from "../dialogs/ChangesDialog";
@@ -56,6 +57,8 @@ export function App() {
   const dropDistill = useStore((s) => s.dropDistill);
   const compressFrom = compressStopId ? allStops[compressStopId] : undefined;
   const notices = useStore((s) => s.notices);
+  const toast = useStore((s) => s.toast);
+  const dismissToast = useStore((s) => s.dismissToast);
   const dismissNotice = useStore((s) => s.dismissNotice);
   const jumpToStop = useStore((s) => s.jumpToStop);
   const focus = useStore((s) => s.focus);
@@ -151,6 +154,15 @@ export function App() {
   const isMac = /Mac/.test(navigator.platform);
 
   const projectStops = Object.values(allStops).filter((s) => routes.some((r) => r.id === s.routeId));
+  /** 这个项目里在建的快线：正在提炼的，和摘要好了还没开出的。编号接着已有的快线往下排 */
+  const expressBase = Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === projectId).map((r) => r.express ?? 0));
+  const building: Building[] = Object.entries(distills)
+    .filter(([stopId, d]) => allStops[stopId] && routes.some((r) => r.id === d.routeId) && (d.status === "running" || !!d.summary))
+    .sort((a, b) => a[1].startedAt - b[1].startedAt)
+    .map(([stopId, d], i) => {
+      const source = allRoutes[d.routeId]!;
+      return { stopId, express: expressBase + 1 + i, name: d.name.trim() || `${source.name} · 续`, ready: d.status !== "running", source, upto: stopNumber(allStops[stopId]!), startedAt: d.startedAt, direct: d.direct };
+    });
 
   return (
     <div className={css.app}>
@@ -285,10 +297,17 @@ export function App() {
                 }}
                 onQueueRemove={(item) => void queueRemove(item.id)}
                 dragging={dragging}
-                onDropItem={(item, id, mode) => (setDragging(null), void queueAssign(item.id, id, mode))} focus={focus} />
+                onDropItem={(item, id, mode) => (setDragging(null), void queueAssign(item.id, id, mode))} focus={focus}
+                range={compressFrom && !distills[compressFrom.id]?.summary ? { stopId: compressFrom.id, kind: "compress" } : forkFrom ? { stopId: forkFrom.id, kind: "fork" } : null}
+                building={building.map((b) => ({ stopId: b.stopId, express: b.express, name: b.name, ready: b.ready }))}
+                onOpenBuilding={(stopId) => openCompress(stopId)}
+                onJumpStop={goToStop} />
               <WaitingArea
-                items={queue}
-                routes={routes}
+                items={Object.values(allQueues).flat()}
+                routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
+                project={{ id: projectId!, name: projects.find((p) => p.id === projectId)?.name ?? "" }}
+                projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
+                selectedRoute={route ?? undefined}
                 onAdd={(text) => projectId && void queueAdd(projectId, text)}
                 onAssign={(itemId, toRoute, mode) => void queueAssign(itemId, toRoute, mode)}
                 onRemove={(itemId) => void queueRemove(itemId)}
@@ -296,6 +315,9 @@ export function App() {
                 onStartNew={(itemId) => void queueStartNew(itemId)}
                 openSignal={waitingSignal}
                 onDrag={setDragging}
+                building={building}
+                onOpenBuilding={(stopId) => openCompress(stopId)}
+                onCancelBuilding={(stopId) => dropDistill(stopId)}
               />
               {tier === "narrow" && route && !drawer && (
                 <button className={css.drawerButton} onClick={() => setDrawer(true)}>
@@ -355,22 +377,28 @@ export function App() {
 
       {compressFrom && allRoutes[compressFrom.routeId] && (
         <CompressDialog
-          key={compressFrom.id}
+          key={compressFrom.routeId}
           source={allRoutes[compressFrom.routeId]!}
           stop={compressFrom}
           stopNumber={stopNumber(compressFrom)}
-          nextExpress={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[compressFrom.routeId]!.projectId).map((r) => r.express ?? 0)) + 1}
+          nextExpress={building.find((b) => b.stopId === compressFrom.id)?.express ?? expressBase + building.length + 1}
           distill={distills[compressFrom.id]}
-          onStart={(keep) => startDistill(compressFrom.routeId, compressFrom.id, keep)}
-          onCancel={() => cancelDistill(compressFrom.id)}
+          choices={projectStops
+            .filter((s) => s.routeId === compressFrom.routeId && s.status !== "answering" && !!s.lastMessageId)
+            .sort((a, b) => a.seq - b.seq)
+            .map((s) => ({ stop: s, number: stopNumber(s) }))}
+          contextTokens={allRoutes[compressFrom.routeId]!.contextTokens}
+          waiting={queue.filter((q) => !q.routeId)}
+          onRange={(id) => openCompress(id)}
+          onStart={(keep, name, direct) => startDistill(compressFrom.routeId, compressFrom.id, keep, name, direct)}
           onSummaryChange={(text) => setSummary(compressFrom.id, text)}
           onDiscard={() => {
             dropDistill(compressFrom.id);
             openCompress(null);
           }}
           onClose={() => openCompress(null)}
-          onCreate={(summary, name, question) => {
-            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question);
+          onCreate={(summary, name, question, itemId) => {
+            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question, itemId);
             openCompress(null);
           }}
         />
@@ -382,9 +410,11 @@ export function App() {
           stop={forkFrom}
           stopNumber={stopNumber(forkFrom)}
           nextNumber={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[forkFrom.routeId]!.projectId).map((r) => r.number)) + 1}
+          contextTokens={projectStops.filter((s) => s.routeId === forkFrom.routeId).every((s) => s.seq <= forkFrom.seq) ? allRoutes[forkFrom.routeId]!.contextTokens : null}
+          waiting={queue.filter((q) => !q.routeId)}
           onCancel={() => setForkFrom(null)}
-          onConfirm={(name, question) => {
-            void fork(forkFrom.routeId, forkFrom.id, name, question);
+          onConfirm={(name, question, opts) => {
+            void fork(forkFrom.routeId, forkFrom.id, name, question, opts);
             setForkFrom(null);
           }}
         />
@@ -479,6 +509,27 @@ export function App() {
           }}
           onClose={() => setPalette(false)}
         />
+      )}
+
+      {toast && !error && (
+        <div key={toast.id} className={css.done} role="status">
+          {toast.route && <Plate route={toast.route} />}
+          <div>
+            <b>{toast.title}</b>
+            {toast.detail && <span>{toast.detail}</span>}
+          </div>
+          {toast.action && (
+            <button
+              onClick={() => {
+                toast.action!.run();
+                dismissToast();
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
+          {toast.countdown && <i style={{ animationDuration: `${toast.countdown}ms` }} />}
+        </div>
       )}
 
       {error && (

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Route } from "../../shared";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
-import { IconCopy } from "../ui/icons";
+import { IconCopy, IconArchive, IconCompress, IconDownload, IconFold, IconPin, IconTrash } from "../ui/icons";
 import css from "./RouteMenu.module.css";
 
 interface Props {
@@ -18,6 +18,8 @@ interface Props {
   onCompressAll?: () => void;
   onExport(): void;
   onDelete(): void;
+  onPin(pinned: boolean): void;
+  onFold(folded: boolean): void;
   onClose(): void;
   /** 菜单左上角在窗口里的位置（左栏会裁掉超出去的部分，所以菜单浮在窗口这一层） */
   at: { top: number; left: number };
@@ -26,7 +28,7 @@ interface Props {
 export const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** 路的菜单：改名、换颜色、看会话信息、归档、删除。只收数据、发事件 */
-export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onColor, onArchive, onCompressAll, onExport, onDelete, onClose, at }: Props) {
+export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onColor, onArchive, onCompressAll, onExport, onDelete, onPin, onFold, onClose, at }: Props) {
   const [name, setName] = useState(route.name);
   const [copied, setCopied] = useState(false);
   const commit = () => {
@@ -39,7 +41,7 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
   return (
     <>
       <div className={css.backdrop} onClick={() => (commit(), onClose())} />
-      <div className={css.menu} role="dialog" aria-label={`${route.name} 的设置`} style={{ top: Math.max(8, Math.min(at.top, window.innerHeight - 470)), left: at.left }}>
+      <div className={css.menu} role="dialog" aria-label={`${route.name} 的设置`} style={{ top: Math.max(8, Math.min(at.top, window.innerHeight - 560)), left: at.left }}>
         <label htmlFor={`rn-${route.id}`}>线路名称</label>
         <input
           id={`rn-${route.id}`}
@@ -67,24 +69,42 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
             <hr />
             <span className={css.label}>线路颜色</span>
             <div className={css.colors} role="radiogroup" aria-label="线路颜色">
-              {ROUTE_COLORS.map((c, i) => (
-                <button key={c} role="radio" aria-checked={c === current} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => onColor(i + 1)} />
+              {ROUTE_COLORS.map(([n, c], i) => (
+                <button key={n} role="radio" aria-checked={c === current} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => onColor(n)} />
               ))}
             </div>
           </>
         )}
 
         <hr />
+        <button role="menuitem" className={css.item} onClick={() => (onClose(), onPin(!route.pinned))}>
+          <IconPin />
+          <span>{route.pinned ? "取消置顶" : "置顶到左栏"}</span>
+        </button>
+        <button role="menuitem" className={css.item} onClick={() => (onClose(), onFold(!route.folded))}>
+          <IconFold />
+          <span>
+            {route.folded ? "展开" : "折叠"}
+            <small>{route.folded ? "把图上的站画回来" : "只收起图上的站，线路还在"}</small>
+          </span>
+        </button>
         <button role="menuitem" className={css.item} onClick={() => (onClose(), onArchive())}>
-          归档
-          <small>收进“已归档”，对话和工作区都留着</small>
+          <IconArchive />
+          <span>
+            归档
+            <small>收进“已归档”，对话和工作区都留着</small>
+          </span>
         </button>
         <button role="menuitem" className={css.item} disabled={!onCompressAll} onClick={() => (onClose(), onCompressAll?.())}>
-          压缩整路成快线…
-          <small>{onCompressAll ? "提炼到最新一站，开出一条上下文更短的快线" : "这一路还没有答完的站"}</small>
+          <IconCompress />
+          <span>
+            压缩整路，开快线
+            {!onCompressAll && <small>这一路还没有答完的站</small>}
+          </span>
         </button>
         <button role="menuitem" className={css.item} onClick={() => (onClose(), onExport())}>
-          导出为 Markdown…
+          <IconDownload />
+          <span>导出为 Markdown</span>
         </button>
         {resume && (
           <div className={css.resume}>
@@ -104,8 +124,11 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
         )}
         <hr />
         <button role="menuitem" className={`${css.item} ${css.danger}`} onClick={() => (onClose(), onDelete())}>
-          删除…
-          <small>删掉整条线，其他线路不受影响</small>
+          <IconTrash />
+          <span>
+            删除这一路
+            <small>删掉整条线，其他线路不受影响</small>
+          </span>
         </button>
       </div>
     </>
