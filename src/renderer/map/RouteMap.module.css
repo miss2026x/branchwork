@@ -734,6 +734,12 @@
   white-space: nowrap;
   pointer-events: none;
 }
+.stop[data-status="answering"] .naming {
+  /* 回答中站上方是公交车，起名标记挪到车的右边 */
+  left: 24px;
+  top: -48px;
+  transform: none;
+}
 .naming i {
   width: 9px;
   height: 9px;

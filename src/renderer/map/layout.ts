@@ -67,12 +67,15 @@ export function layoutMap(routes: Route[], stops: Stop[]): MapLayout {
   const lanes: Lane[] = [];
   const pending = [...ordered];
   let row = 0;
+  // 第一行的路如果标着“从已删除的某路开出”，那个标记画在线上方，整张图往下挪一点给它让位
+  let top = MAP.top;
   // 父路要先排好，子路才知道从哪出发；排不出来的（父路不在了）当作独立的路
   while (pending.length > 0) {
     const i = pending.findIndex((r) => !r.forkStopId || spots.has(r.forkStopId) || !pending.some((p) => p.id === r.parentRouteId));
     const route = pending.splice(i < 0 ? 0 : i, 1)[0]!;
-    const y = MAP.top + row++ * MAP.row;
     const origin = route.forkStopId ? spots.get(route.forkStopId) : undefined;
+    if (row === 0 && route.orphanOf && !origin) top += 50;
+    const y = top + row++ * MAP.row;
 
     let from: Lane["from"];
     let firstX: number;
