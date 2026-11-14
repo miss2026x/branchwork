@@ -119,6 +119,16 @@ export interface ProjectSnapshot {
   queue: QueueItem[];
 }
 
+/** 删掉对话时留下来的工作区：对话没了，文件夹还在，可以打开看或者以后删掉 */
+export interface KeptWorktree {
+  id: string;
+  projectId: string;
+  path: string;
+  /** 原来是哪一路，比如“3路 Cookie 方案” */
+  label: string;
+  at: number;
+}
+
 /** 添加项目前看一眼这个文件夹 */
 export interface DirectoryInfo {
   dir: string;

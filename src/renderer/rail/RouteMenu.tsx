@@ -14,6 +14,9 @@ interface Props {
   onRename(name: string): void;
   onColor(color: number | null): void;
   onArchive(): void;
+  /** 压缩整路成快线；这一路还没有能压缩的站时不给 */
+  onCompressAll?: () => void;
+  onExport(): void;
   onDelete(): void;
   onClose(): void;
   /** 菜单左上角在窗口里的位置（左栏会裁掉超出去的部分，所以菜单浮在窗口这一层） */
@@ -23,7 +26,7 @@ interface Props {
 export const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** 路的菜单：改名、换颜色、看会话信息、归档、删除。只收数据、发事件 */
-export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onColor, onArchive, onDelete, onClose, at }: Props) {
+export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onColor, onArchive, onCompressAll, onExport, onDelete, onClose, at }: Props) {
   const [name, setName] = useState(route.name);
   const [copied, setCopied] = useState(false);
   const commit = () => {
@@ -75,6 +78,13 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
         <button role="menuitem" className={css.item} onClick={() => (onClose(), onArchive())}>
           归档
           <small>收进“已归档”，对话和工作区都留着</small>
+        </button>
+        <button role="menuitem" className={css.item} disabled={!onCompressAll} onClick={() => (onClose(), onCompressAll?.())}>
+          压缩整路成快线…
+          <small>{onCompressAll ? "提炼到最新一站，开出一条上下文更短的快线" : "这一路还没有答完的站"}</small>
+        </button>
+        <button role="menuitem" className={css.item} onClick={() => (onClose(), onExport())}>
+          导出为 Markdown…
         </button>
         {resume && (
           <div className={css.resume}>

@@ -9,6 +9,7 @@ import type {
   ChatItem,
   DirectoryInfo,
   FileStat,
+  KeptWorktree,
   StopContent,
   PermissionDecision,
   PermissionMode,
@@ -128,7 +129,11 @@ export interface Core {
    * 删除一路：工作区、对话记录一起删，不能恢复。
    * 工作区里还有没进 Local 的改动时不删，返回这些文件；force 为 true 才会连它们一起删。
    */
-  deleteRoute(routeId: string, force?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
+  /** keepWorktree：只删对话，工作区的文件夹留着 */
+  deleteRoute(routeId: string, force?: boolean, keepWorktree?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
+  keptWorktrees(projectId: string): KeptWorktree[];
+  /** 彻底删掉一个留下的工作区 */
+  removeKept(id: string): Promise<void>;
   // ── 候车区：准备好的问题先放着 ──
   /** 放一个问题进候车区。给了 routeId 就是派给那一路（默认自动登车）；那一路空着的话自动登车的会马上发出 */
   queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): QueueItem;
@@ -141,7 +146,11 @@ export interface Core {
   queueStartNew(itemId: string): Promise<Route>;
   /** 停车：中止这一路正在进行的回答 */
   stop(routeId: string): void;
-  answerPermission(requestId: string, decision: PermissionDecision): void;
+  answerPermission(requestId: string, decision: PermissionDecision, note?: string): void;
+  /** 丢掉这一路工作区里还没进 Local 的改动 */
+  discardChanges(routeId: string): Promise<void>;
+  /** 这一路的对话写成 Markdown */
+  exportMarkdown(routeId: string): Promise<string>;
   /** 重新同步一次（比如你手工处理了冲突之后）。成功则解除这一路的冲突状态 */
   resync(routeId: string): Promise<SyncLogEntry[]>;
   syncLog(routeId: string): SyncLogEntry[];
@@ -163,7 +172,7 @@ export function createCore(opts: CoreOptions): Core {
   /** 各路正在回答的是哪一站 */
   const runningStop = new Map<string, string>();
   const distilling = new Map<string, AbortController>();
-  const pendingPermissions = new Map<string, { routeId: string; tool: string; resolve: (d: PermissionDecision) => void }>();
+  const pendingPermissions = new Map<string, { routeId: string; tool: string; resolve: (d: PermissionDecision | { deny: string }) => void }>();
 
   const emit = (e: BwEvent) => {
     for (const l of listeners) l(e);
@@ -394,7 +403,9 @@ export function createCore(opts: CoreOptions): Core {
       .then((raw) => {
         const name = raw && clampWidth(raw, 20);
         const stop = db.stops.get(stopId);
-        if (!name || !stop || stop.nameState !== "temp") return;
+        if (!stop || stop.nameState !== "temp") return;
+        // 起不出来：就用提问的开头当正式的名字
+        if (!name) return void setStop(stopId, { nameState: "final" });
         setStop(stopId, { name, nameState: "final" });
         // 这一路的名字如果是跟着这一站的临时名字起的，也一起换
         if (db.routes.get(routeId)?.name === tempName) setRoute(routeId, { name });
@@ -484,7 +495,7 @@ export function createCore(opts: CoreOptions): Core {
             else if (e.type === "tool") emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail: toolDetail(e.input, route.worktreePath), ...toolStat(e.input) });
           },
           onPermission: (req) =>
-            new Promise<PermissionDecision>((resolve) => {
+            new Promise<PermissionDecision | { deny: string }>((resolve) => {
               const requestId = id("q");
               // 这个项目设了自动批准：不问，直接放行
               if (autoApproves(mustProject(route.projectId).permissionMode, req.tool)) return resolve("allow");
@@ -538,7 +549,7 @@ export function createCore(opts: CoreOptions): Core {
       return { kind: "answered", stop, text: result.text, sync: pushed };
   };
 
-  return {
+  const self: Core = {
     on(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -808,13 +819,25 @@ export function createCore(opts: CoreOptions): Core {
       return restored;
     },
 
-    async deleteRoute(routeId, force = false) {
+    keptWorktrees: (projectId) => db.kept.listByProject(projectId),
+
+    async removeKept(keptId) {
+      const k = db.kept.get(keptId);
+      if (!k) return;
+      const engine = await engineFor(mustProject(k.projectId));
+      await engine.removeFolder(k.path);
+      db.kept.delete(keptId);
+    },
+
+    async deleteRoute(routeId, force = false, keepWorktree = false) {
       const route = mustRoute(routeId);
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能删除");
       const engine = await engineFor(mustProject(route.projectId));
       claude.cool(route.worktreePath); // 提前启动好的 Claude 占着这个目录，先关掉才删得了
       if (force || (await engine.status(routeId).then((s) => s.unsynced.length === 0, () => false))) await terminals.removeAll({ routeId }); // 后台终端也占着目录
-      const removed = await engine.removeWorktree(routeId, { force });
+      if (keepWorktree) await terminals.removeAll({ routeId });
+      const removed = await engine.removeWorktree(routeId, { force: force || keepWorktree, keep: keepWorktree });
+      if (keepWorktree) db.kept.insert({ id: id("k"), projectId: route.projectId, path: route.worktreePath, label: `${route.express ? `快${route.express}` : `${route.number}路`} ${route.name}`, at: Date.now() });
       if (removed.status === "has-unsynced") return { status: "has-unsynced", files: removed.files.map((f) => ({ path: f.path, note: f.kind })) };
       if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
       releaseQueue(route);
@@ -957,12 +980,39 @@ export function createCore(opts: CoreOptions): Core {
       dropPermissions(routeId); // 正在等批准的话，按拒绝处理，让回答能结束
     },
 
-    answerPermission(requestId, decision) {
+    answerPermission(requestId, decision, note) {
       const p = pendingPermissions.get(requestId);
       if (!p) return;
       pendingPermissions.delete(requestId);
       setRoute(p.routeId, { status: "answering" });
-      p.resolve(decision);
+      p.resolve(decision === "deny" && note?.trim() ? { deny: note.trim().slice(0, 500) } : decision);
+    },
+
+    async discardChanges(routeId) {
+      const route = mustRoute(routeId);
+      if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能丢掉改动");
+      const engine = await engineFor(mustProject(route.projectId));
+      claude.cool(route.worktreePath);
+      await engine.discard(routeId);
+      // 没进 Local 的改动都没了：相关的站不再标“没同步”，这一路也不再卡在冲突上
+      for (const s of db.stops.listByRoute(routeId)) if (s.syncState === "unsynced" || s.syncState === "conflict") setStop(s.id, { syncState: "none" });
+      const next = setRoute(routeId, { status: route.status === "conflict" ? "idle" : route.status });
+      warmRoute(next);
+      if (next.status === "idle") setImmediate(() => dispatchNext(routeId));
+    },
+
+    async exportMarkdown(routeId) {
+      const route = mustRoute(routeId);
+      const content = await self.history(routeId).catch(() => [] as StopContent[]);
+      const byStop = new Map(content.map((c) => [c.stopId, c.items]));
+      const label = route.express ? `快${route.express}` : `${route.number}路`;
+      const out = [`# ${label} ${route.name}`, ""];
+      for (const s of db.stops.listByRoute(routeId)) {
+        out.push(`## ${s.kind === "summary" ? "摘要站" : `第 ${s.seq} 站：${s.name}`}`, "", s.kind === "summary" ? s.prompt : s.prompt.split("\n").map((l) => `> ${l}`).join("\n"), "");
+        for (const it of byStop.get(s.id) ?? []) out.push(it.kind === "text" ? it.text : `- \`${it.tool}\` ${it.detail}`, "");
+        if (s.status === "interrupted") out.push("_（这一站没答完）_", "");
+      }
+      return out.join("\n");
     },
 
     async resync(routeId) {
@@ -1027,6 +1077,7 @@ export function createCore(opts: CoreOptions): Core {
       void terminals.dispose();
     },
   };
+  return self;
 }
 
 function pushText(items: ChatItem[], text: string): void {

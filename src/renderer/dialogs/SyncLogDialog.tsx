@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Project, Route, Stop, SyncLogEntry } from "../../shared";
+import type { KeptWorktree, Project, Route, Stop, SyncLogEntry } from "../../shared";
 import { IconClose, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./Dialog.module.css";
@@ -12,6 +12,10 @@ interface Props {
   routes: Record<string, Route>;
   stops: Record<string, Stop>;
   stopNumber(stop: Stop): number;
+  /** 删掉对话时留下来的工作区 */
+  kept: KeptWorktree[];
+  onOpenKept(id: string): void;
+  onRemoveKept(id: string): void;
   onViewRoute(routeId: string): void;
   onClose(): void;
 }
@@ -20,7 +24,7 @@ const time = (at: number) => new Date(at).toLocaleTimeString("zh-CN", { hour: "2
 const day = (at: number) => new Date(at).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 
 /** Local 同步记录：哪一路哪一站把哪些文件带进了 Local，哪一路从 Local 拿了更新，哪次冲突了 */
-export function SyncLogDialog({ project, entries, routes, stops, stopNumber, onViewRoute, onClose }: Props) {
+export function SyncLogDialog({ project, entries, routes, stops, stopNumber, kept, onOpenKept, onRemoveKept, onViewRoute, onClose }: Props) {
   const [filter, setFilter] = useState<"all" | "conflict" | string>("all");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -106,7 +110,27 @@ export function SyncLogDialog({ project, entries, routes, stops, stopNumber, onV
             );
           })}
         </ul>
-        <p className={own.logNote}>删掉站点或对话，不会删掉这里的记录。</p>
+        {kept.length > 0 && (
+          <section className={own.kept} aria-label="留下的工作区">
+            <h3>留下的工作区</h3>
+            <p>删掉对话时选了“留下工作区”的在这里。它们不会再同步进 Local。</p>
+            <ul>
+              {kept.map((k) => (
+                <li key={k.id}>
+                  <span>
+                    <b className="ell">{k.label}</b>
+                    <code className="ell" title={k.path}>
+                      {k.path}
+                    </code>
+                  </span>
+                  <button onClick={() => onOpenKept(k.id)}>打开文件夹</button>
+                  <button onClick={() => onRemoveKept(k.id)}>删掉</button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <p className={own.logNote}>截线删掉的站，记录还在；删掉一整路时，它的同步记录会一起删掉。</p>
       </div>
     </div>
   );

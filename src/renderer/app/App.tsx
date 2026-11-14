@@ -87,12 +87,19 @@ export function App() {
   const overview = useStore((s) => s.overview);
   const setOverview = useStore((s) => s.setOverview);
   const selectProject = useStore((s) => s.selectProject);
+  const discardChanges = useStore((s) => s.discardChanges);
+  const requestArchive = useStore((s) => s.requestArchive);
+  const openKept = useStore((s) => s.openKept);
+  const removeKept = useStore((s) => s.removeKept);
+  const archiveAsk = useStore((s) => s.archiveAsk);
+  const archiveBusy = useStore((s) => s.archiveBusy);
   const viewing = useStore((s) => s.viewing);
   const viewStop = useStore((s) => s.viewStop);
   const truncate = useStore((s) => s.truncate);
   const [truncating, setTruncating] = useState<{ stop: Stop; requeue: boolean } | null>(null);
   /** 正从候车区拖出来的问题 */
   const [dragging, setDragging] = useState<QueueItem | null>(null);
+  const [firstQuestion, setFirstQuestion] = useState("");
   const [palette, setPalette] = useState(false);
   const [waitingSignal, setWaitingSignal] = useState(0);
   const tier = useTier();
@@ -204,14 +211,55 @@ export function App() {
               </button>
             </div>
           ) : routes.length === 0 ? (
-            <div className={css.empty}>
-              <BusMark size={56} />
-              <h1>开出第一路</h1>
-              <p>一路就是一条和 Claude 的对话，每问一次是一站。</p>
-              <button className={css.primary} onClick={() => openNewRoute()}>
-                新对话
-              </button>
-            </div>
+            <form
+              className={css.first}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (projectId) void startRoute({ projectId, question: firstQuestion });
+                setFirstQuestion("");
+              }}
+            >
+              <div className={css.firstLine} aria-hidden>
+                <span>
+                  <b>1路</b>
+                  <i>等你发车</i>
+                </span>
+                <em />
+              </div>
+              <h1>{project?.name} 还没有车</h1>
+              <p>问第一个问题，就开出 1路。之后从任何一站都能分出新的一路。</p>
+              <div className={css.firstCard}>
+                <label htmlFor="first-stop">第一站</label>
+                <textarea
+                  id="first-stop"
+                  rows={3}
+                  value={firstQuestion}
+                  onChange={(e) => setFirstQuestion(e.target.value)}
+                  placeholder="比如：先帮我梳理一下现在的认证结构"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                />
+                <div>
+                  <span>{project?.permissionMode === "all" ? "动手前不问" : project?.permissionMode === "edits" ? "改文件不问，运行命令前问我" : "动手前每次问我"}</span>
+                  <button type="button" className={css.firstMore} onClick={() => openNewRoute()}>
+                    更多选项…
+                  </button>
+                  <button type="submit" className={css.firstGo}>
+                    {firstQuestion.trim() ? "发车" : "开出 1路"}
+                  </button>
+                </div>
+              </div>
+              <p className={css.firstNote}>
+                <IconFolder size={16} />
+                <span>
+                  1路 在自己的工作区里改代码，每站答完，改动自动同步进 <code>{project?.localDir}</code>。
+                </span>
+              </p>
+            </form>
           ) : (
             <>
               <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} onRenameStop={(stop, name) => void renameStop(stop.id, name)}
@@ -285,7 +333,7 @@ export function App() {
           />
         </main>
 
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model) => void setRouteModel(route.id, model)} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -294,8 +342,12 @@ export function App() {
           stopCount={Object.values(allStops).filter((s) => s.routeId === deleting.routeId).length}
           unsynced={deleting.unsynced}
           onCancel={() => setDeleting(null)}
-          onConfirm={async (force) => {
-            const left = await deleteRoute(deleting.routeId, force);
+          onArchive={() => {
+            requestArchive(deleting.routeId);
+            setDeleting(null);
+          }}
+          onConfirm={async (force, keep) => {
+            const left = await deleteRoute(deleting.routeId, force, keep);
             setDeleting(left ? { routeId: deleting.routeId, unsynced: left } : null);
           }}
         />
@@ -351,7 +403,27 @@ export function App() {
         />
       )}
       {dialog?.kind === "log" && projects.find((p) => p.id === dialog.projectId) && (
-        <SyncLogDialog project={projects.find((p) => p.id === dialog.projectId)!} entries={dialog.entries} routes={allRoutes} stops={allStops} stopNumber={stopNumber} onViewRoute={goToRoute} onClose={closeDialog} />
+        <SyncLogDialog project={projects.find((p) => p.id === dialog.projectId)!} entries={dialog.entries} kept={dialog.kept} onOpenKept={openKept} onRemoveKept={(id) => void removeKept(id)} routes={allRoutes} stops={allStops} stopNumber={stopNumber} onViewRoute={goToRoute} onClose={closeDialog} />
+      )}
+
+      {archiveAsk && allRoutes[archiveAsk] && (
+        <div className={css.askScrim} onMouseDown={(e) => e.target === e.currentTarget && useStore.setState({ archiveAsk: null })}>
+          <div className={css.askBox} role="alertdialog" aria-modal aria-label="这一路还在回答">
+            <h2>「{allRoutes[archiveAsk]!.name}」还在回答</h2>
+            <p>归档会把这一路收进“已归档”。它正在回答，你想怎么办？</p>
+            <button onClick={() => archiveBusy(archiveAsk, "later")}>
+              <b>答完再归档</b>
+              <small>让这一站正常答完、改动进 Local，然后自动归档</small>
+            </button>
+            <button onClick={() => archiveBusy(archiveAsk, "now")}>
+              <b>现在停下并归档</b>
+              <small>这一站算没答完，它的改动留在工作区，不进 Local</small>
+            </button>
+            <button className={css.askCancel} onClick={() => useStore.setState({ archiveAsk: null })}>
+              不归档了
+            </button>
+          </div>
+        </div>
       )}
 
       {truncating && allRoutes[truncating.stop.routeId] && (

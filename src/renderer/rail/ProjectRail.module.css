@@ -338,3 +338,46 @@
   top: 34px;
   right: 2px;
 }
+
+/* 分叉出来的路：缩进一格，前面一个拐角；快线的拐角是虚线 */
+.branch {
+  flex: none;
+  width: 10px;
+  height: 12px;
+  margin-top: -8px;
+  border-left: 1.5px solid var(--line-strong);
+  border-bottom: 1.5px solid var(--line-strong);
+  border-bottom-left-radius: 5px;
+}
+.branch[data-express="true"] {
+  border-style: dotted;
+}
+.term {
+  flex: none;
+  display: grid;
+  color: var(--text-3);
+}
+.count {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--text-1);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.board {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--route-2-tag);
+  color: #fff;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}

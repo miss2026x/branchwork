@@ -221,6 +221,11 @@ export function installMockBw(): void {
       emit({ type: "stops.removed", routeId, stopIds: gone });
       return { prompt: target.prompt };
     },
+    keptWorktrees: async (projectId) => (projectId === "p1" ? [{ id: "k1", projectId, path: "/Users/demo/.branchwork/worktrees/p1/r9", label: "5路 试试 Passkey", at: Date.now() - 86_400_000 }] : []),
+    openKept: async () => {},
+    removeKept: async () => {},
+    discardChanges: async () => {},
+    exportRoute: async () => null,
     renameRoute: async (routeId, name) => setRoute(routeId, { name }),
     setRouteColor: async (routeId, color) => setRoute(routeId, { color }),
     async renameStop(stopId, name) {

@@ -36,6 +36,8 @@ interface Props {
   onStopTerminal(terminalId: string): void;
   /** 看这一路的工作区里有哪些改动还没进 Local */
   onViewChanges(): void;
+  /** 丢掉这一路工作区里没进 Local 的改动 */
+  onDiscard(): void;
   /** 候车区里派给这一路的问题有几个 */
   waiting: QueueItem[];
   /** 打开候车区 */
@@ -59,7 +61,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -107,6 +109,25 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const [queueMode, setQueueMode] = useState<QueueMode>("auto");
   const queued = waiting.length;
   const total = offset + stops.length;
+  const [discarding, setDiscarding] = useState(false);
+  const denyNote = useRef<HTMLInputElement>(null);
+  // 等你批准时：按 1、2、3 直接选（正在打字时不抢）
+  useEffect(() => {
+    if (!permission) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "1") answerPermission(route.id, "allow");
+      else if (e.key === "2" && permission.canRemember) answerPermission(route.id, "allow-always");
+      else if (e.key === "3") denyNote.current?.focus();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permission?.requestId, route.id]);
+
   const send = () => {
     if (blocked || !draft.trim()) return;
     if (busy) {
@@ -252,6 +273,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               <Items items={items} streaming={l?.phase === "answering"} />
               {l && items.length === 0 && <p className={css.waiting}>{l.phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>}
               {s.status === "interrupted" && (
+                <>
                 <p className={css.noteAmber}>
                   没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（已停车）"}。这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。{" "}
                   {s.syncState === "unsynced" && (
@@ -260,6 +282,26 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                     </button>
                   )}
                 </p>
+                {s.id === stops.at(-1)?.id && route.status === "interrupted" && (
+                  <div className={css.afterBreak}>
+                    <button className={css.primaryBtn} onClick={() => void ask(route.id, "接着上一站没做完的地方继续，把它做完。")}>
+                      让 Claude 接着做完
+                    </button>
+                    {s.syncState === "unsynced" &&
+                      (discarding ? (
+                        <>
+                          <span>丢掉后找不回来，确定？</span>
+                          <button className={css.dangerBtn} onClick={() => (setDiscarding(false), onDiscard())}>
+                            丢掉
+                          </button>
+                          <button onClick={() => setDiscarding(false)}>不丢</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setDiscarding(true)}>丢掉这些改动</button>
+                      ))}
+                  </div>
+                )}
+                </>
               )}
               {s.status === "done" && s.syncState === "synced" && <p className={css.synced}>改动已进 Local</p>}
               {s.syncState === "conflict" && (
@@ -283,14 +325,24 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
 
       {permission && (
         <div className={css.permission} role="alertdialog" aria-label="等你批准">
-          <b>等你批准：{permission.tool}</b>
+          <b>
+            <IconWarn size={16} /> Claude 想{/bash|终端|command/i.test(permission.tool) ? "运行一条命令" : /write|edit/i.test(permission.tool) ? "改一个文件" : `用 ${permission.tool}`}
+          </b>
           <code>{permission.detail}</code>
-          <div>
+          <div className={css.choices}>
             <button className={css.allow} onClick={() => answerPermission(route.id, "allow")}>
-              允许
+              <kbd>1</kbd> 允许这一次
             </button>
-            {permission.canRemember && <button onClick={() => answerPermission(route.id, "allow-always")}>这一路以后都允许</button>}
-            <button onClick={() => answerPermission(route.id, "deny")}>拒绝</button>
+            {permission.canRemember && (
+              <button onClick={() => answerPermission(route.id, "allow-always")}>
+                <kbd>2</kbd> 这一路以后都允许
+              </button>
+            )}
+            <div className={css.denyRow}>
+              <kbd>3</kbd>
+              <input ref={denyNote} aria-label="告诉 Claude 换个做法" placeholder="不允许，告诉 Claude 换个做法（可以不写）" maxLength={500} onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && answerPermission(route.id, "deny", e.currentTarget.value)} />
+              <button onClick={() => answerPermission(route.id, "deny", denyNote.current?.value)}>拒绝</button>
+            </div>
           </div>
         </div>
       )}

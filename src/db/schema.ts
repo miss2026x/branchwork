@@ -66,4 +66,6 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE route ADD COLUMN model TEXT;`,
   // 5：线路颜色、会话占用的上下文
   `ALTER TABLE route ADD COLUMN color INTEGER; ALTER TABLE route ADD COLUMN context_tokens INTEGER;`,
+  // 6：删掉对话时留下来的工作区
+  `CREATE TABLE kept_worktree (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE, path TEXT NOT NULL, label TEXT NOT NULL, at INTEGER NOT NULL);`,
 ];

@@ -114,10 +114,15 @@ export interface SyncEngine {
   mergeForResolve(routeId: string): Promise<ResolveResult>;
   /** 这一路现在的同步情况 */
   status(routeId: string): Promise<RouteStatus>;
+  /** 丢掉工作区里还没进 Local 的改动：工作区回到上次和 Local 对齐时的样子 */
+  discard(routeId: string): Promise<void>;
   /** 工作区里还没进 Local 的改动，带每个文件增删的行数 */
   changes(routeId: string): Promise<FileStat[]>;
   /** 删除一路的工作区；有未同步改动时默认不删 */
-  removeWorktree(routeId: string, opts?: { force?: boolean }): Promise<RemoveResult>;
+  /** keep：文件夹留着不删，只是不再由引擎管它 */
+  removeWorktree(routeId: string, opts?: { force?: boolean; keep?: boolean }): Promise<RemoveResult>;
+  /** 彻底删掉一个不再由引擎管的工作区文件夹（删掉对话时留下来的那种） */
+  removeFolder(dir: string): Promise<void>;
   /** 应用启动时调：检查上次有没有写到一半的同步 */
   recover(): Promise<RecoverResult>;
   worktreePath(routeId: string): string;

@@ -206,3 +206,175 @@
   background: var(--surface-2);
   color: var(--text-1);
 }
+
+/* 空项目：地图上一条等着发车的虚线，下面直接写第一站 */
+.first {
+  position: relative;
+  width: min(640px, calc(100% - 48px));
+  margin: 64px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.firstLine {
+  position: relative;
+  height: 88px;
+  margin: 0 -400px 28px;
+  padding: 0 400px;
+  border-bottom: 4px dashed var(--line-strong);
+}
+.firstLine span {
+  position: absolute;
+  left: 356px;
+  top: 28px;
+  display: flex;
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--r-6);
+  background: var(--surface-0);
+  font-size: 13px;
+  color: var(--text-3);
+}
+.firstLine b,
+.firstLine i {
+  padding: 3px 8px;
+  font-style: normal;
+}
+.firstLine i {
+  border-left: 2px dashed var(--line-strong);
+}
+.firstLine em {
+  position: absolute;
+  left: 400px;
+  bottom: -17px;
+  width: 30px;
+  height: 30px;
+  border: 3px dashed var(--line-strong);
+  border-radius: 50%;
+  background: var(--canvas);
+}
+.first h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 38px;
+  font-weight: 800;
+}
+.first > p {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-3);
+}
+.firstCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 16px;
+  border-radius: var(--r-16);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+}
+.firstCard label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.firstCard textarea {
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  font: inherit;
+  line-height: 22px;
+}
+.firstCard textarea:focus {
+  outline: none;
+  border-color: var(--route-1);
+}
+.firstCard > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.firstCard > div span {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.firstMore {
+  height: 40px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.firstGo {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: var(--r-10);
+  background: var(--route-1);
+  color: #fff;
+  font-weight: 700;
+}
+.firstNote {
+  display: flex;
+  gap: 8px;
+  font-size: 13px !important;
+  line-height: 20px;
+}
+.firstNote svg {
+  flex: none;
+  margin-top: 2px;
+}
+.firstNote code {
+  font: 12px var(--mono);
+}
+
+/* 两三个选项的小弹窗 */
+.askScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(22, 27, 34, 0.42);
+}
+.askBox {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: var(--r-16);
+  background: var(--surface-0);
+  box-shadow: 0 24px 60px rgba(22, 27, 34, 0.28);
+}
+.askBox h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.askBox p {
+  margin: 0 0 6px;
+  color: var(--text-2);
+}
+.askBox button {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  text-align: left;
+}
+.askBox button:hover {
+  border-color: var(--text-1);
+}
+.askBox button b,
+.askBox button small {
+  display: block;
+}
+.askBox button small {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.askBox .askCancel {
+  align-self: flex-end;
+  border-color: transparent;
+  color: var(--text-3);
+}

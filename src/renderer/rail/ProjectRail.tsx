@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Route } from "../../shared";
 import { useStore } from "../stores/store";
-import { IconChevron, IconMore, IconPlus, IconWarn } from "../ui/icons";
+import { IconChevron, IconMore, IconPlus, IconWarn, IconTerminal } from "../ui/icons";
 import { RouteMenu } from "./RouteMenu";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
@@ -24,6 +24,11 @@ export function ProjectRail({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [menuAt, setMenuAt] = useState({ top: 0, left: 0 });
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
+  const requestArchive = useStore((s) => s.requestArchive);
+  const openCompress = useStore((s) => s.openCompress);
+  const exportRoute = useStore((s) => s.exportRoute);
+  const terminals = useStore((s) => s.terminals);
+  const queue = useStore((s) => s.queue);
   const openNewRoute = useStore((s) => s.openNewRoute);
   const openAddProject = useStore((s) => s.openAddProject);
   const viewLog = useStore((s) => s.viewLog);
@@ -171,7 +176,7 @@ export function ProjectRail({
                   </>
                 )}
                 {open &&
-                  list.map((r) => (
+                  asTree(list).map(({ route: r, depth }) => (
                     <div
                       key={r.id}
                       className={css.row}
@@ -186,9 +191,21 @@ export function ProjectRail({
                         className={css.route}
                         onClick={() => selectRoute(r.id)}
                       >
+                        {depth > 0 && <i className={css.branch} data-express={!!r.express} style={{ marginLeft: (depth - 1) * 14 }} aria-hidden />}
                         <Plate route={r} />
                         <span className={`ell ${css.label}`}>{r.name}</span>
+                        {Object.values(terminals).some((t) => t.routeId === r.id && t.status === "running") && (
+                          <span className={css.term} title="有后台终端在跑">
+                            <IconTerminal size={13} />
+                          </span>
+                        )}
                         <RouteBadge route={r} />
+                        {(() => {
+                          const mine = (queue[p.id] ?? []).filter((q) => q.routeId === r.id);
+                          if (mine.length === 0) return null;
+                          const boardable = (r.status === "idle" || r.status === "interrupted") && mine.some((q) => q.mode === "manual");
+                          return boardable ? <em className={css.board}>可登车</em> : <b className={css.count} title={`候车 ${mine.length} 条`}>{mine.length}</b>;
+                        })()}
                       </button>
                       <button
                         className={css.more}
@@ -210,7 +227,12 @@ export function ProjectRail({
                           syncTone={r.status === "conflict" || r.status === "interrupted" ? "warn" : "ok"}
                           onRename={(name) => void renameRoute(r.id, name)}
                           onColor={(color) => void setRouteColor(r.id, color)}
-                          onArchive={() => void archiveRoute(r.id)}
+                          onArchive={() => requestArchive(r.id)}
+                          onCompressAll={(() => {
+                            const last = Object.values(stops).filter((x) => x.routeId === r.id).sort((x, y) => y.seq - x.seq)[0];
+                            return last && last.status !== "answering" && last.lastMessageId ? () => openCompress(last.id) : undefined;
+                          })()}
+                          onExport={() => void exportRoute(r.id)}
                           onDelete={() => onDelete(r.id)}
                           onClose={() => setMenuFor(null)}
                           at={menuAt}
@@ -267,6 +289,22 @@ export function ProjectRail({
       </aside>
     </>
   );
+}
+
+/** 把路排成树：分叉出来的路跟在它的父路后面，记下深了几层 */
+function asTree(list: Route[]): { route: Route; depth: number }[] {
+  const ids = new Set(list.map((r) => r.id));
+  const out: { route: Route; depth: number }[] = [];
+  const walk = (parentId: string | null, depth: number) => {
+    for (const r of list) {
+      const parent = r.parentRouteId && ids.has(r.parentRouteId) ? r.parentRouteId : null;
+      if (parent !== parentId) continue;
+      out.push({ route: r, depth });
+      walk(r.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return out;
 }
 
 function RouteBadge({ route }: { route: Route }) {

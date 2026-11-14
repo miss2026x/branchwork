@@ -563,7 +563,7 @@ describe("压缩成快线", () => {
     const before = await core.history(route.id);
     let seen: { prompts: string[]; decision: string; cwd: string; prompt: string } | undefined;
     claude.script = async (t) => {
-      seen = { prompts: t.earlierPrompts, decision: await t.askPermission("Write", { file_path: "x" }), cwd: t.cwd, prompt: t.prompt };
+      seen = { prompts: t.earlierPrompts, decision: (await t.askPermission("Write", { file_path: "x" })) as string, cwd: t.cwd, prompt: t.prompt };
       t.say("## 做完了\n- 一和二");
     };
     events.length = 0;
@@ -635,8 +635,8 @@ describe("等你批准", () => {
     const route = await core.createRoute(project.id);
     const decisions: string[] = [];
     claude.script = async (t) => {
-      decisions.push(await t.askPermission("Bash", { command: "npm test" }));
-      decisions.push(await t.askPermission("Write", { file_path: "x" }, false));
+      decisions.push((await t.askPermission("Bash", { command: "npm test" })) as string);
+      decisions.push((await t.askPermission("Write", { file_path: "x" }, false)) as string);
     };
     core.on((e) => {
       if (e.type !== "permission.request") return;
@@ -660,7 +660,7 @@ describe("等你批准", () => {
     const route = await core.createRoute(project.id);
     const decisions: string[] = [];
     claude.script = async (t) => {
-      decisions.push(await t.askPermission("Bash", { command: "rm -rf dist" }), await t.askPermission("Write", { file_path: "x" }));
+      decisions.push((await t.askPermission("Bash", { command: "rm -rf dist" })) as string, (await t.askPermission("Write", { file_path: "x" })) as string);
     };
     await core.ask(route.id, "随便做");
     expect(decisions).toEqual(["allow", "allow"]);
@@ -675,7 +675,7 @@ describe("等你批准", () => {
     const route = await core.createRoute(project.id);
     const decisions: string[] = [];
     claude.script = async (t) => {
-      decisions.push(await t.askPermission("Edit", { file_path: "a.ts" }), await t.askPermission("Bash", { command: "npm test" }));
+      decisions.push((await t.askPermission("Edit", { file_path: "a.ts" })) as string, (await t.askPermission("Bash", { command: "npm test" })) as string);
     };
     core.on((e) => {
       if (e.type === "permission.request") core.answerPermission(e.requestId, "deny");
@@ -689,7 +689,7 @@ describe("等你批准", () => {
     const route = await core.createRoute(project.id);
     let decision = "";
     claude.script = async (t) => {
-      decision = await t.askPermission("Bash", { command: "npm test" });
+      decision = (await t.askPermission("Bash", { command: "npm test" })) as string;
     };
     events.length = 0;
     const asking = core.ask(route.id, "跑测试");
@@ -708,7 +708,7 @@ describe("等你批准", () => {
     const route = await core.createRoute(project.id);
     let decision = "";
     claude.script = async (t) => {
-      decision = await t.askPermission("Bash", { command: "rm -rf build" });
+      decision = (await t.askPermission("Bash", { command: "rm -rf build" })) as string;
     };
     core.on((e) => {
       if (e.type === "permission.request") setTimeout(() => core.stop(route.id), 10);
@@ -954,7 +954,7 @@ describe("给站起名", () => {
     claude.namer = async () => null;
     const route = await core.createRoute(project.id, "我起的名字");
     await core.ask(route.id, "随便问问");
-    expect(stopsOf(route.id)[0]).toMatchObject({ name: "随便问问", nameState: "temp" });
+    expect(stopsOf(route.id)[0]).toMatchObject({ name: "随便问问", nameState: "final" });
 
     claude.namer = async () => "新名字";
     await core.ask(route.id, "再问一个问题");
@@ -1157,5 +1157,80 @@ describe("截线", () => {
     await expect(core.truncate(route.id, stopsOf(route.id)[0]!.id)).rejects.toThrow(/还在回答/);
     release();
     await pending;
+  });
+});
+
+describe("没答完之后丢掉改动、拒绝时带一句话、导出", () => {
+  it("丢掉工作区里没进 Local 的改动：工作区回到和 Local 对齐时的样子，Local 不动", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      write(t.cwd, "half.txt", "写到一半\n");
+      write(t.cwd, "b.txt", "改到一半\n");
+      return "interrupted";
+    };
+    await core.ask(route.id, "改到一半");
+    expect(await core.changes(route.id)).toHaveLength(2);
+    const localBefore = dump(lab.local);
+
+    await core.discardChanges(route.id);
+    expect(await core.changes(route.id)).toEqual([]);
+    expect(has(route.worktreePath, "half.txt")).toBe(false);
+    expect(read(route.worktreePath, "b.txt")).toBe(read(lab.local, "b.txt"));
+    expect(dump(lab.local)).toEqual(localBefore);
+    expect(stopsOf(route.id)[0]!.syncState).toBe("none");
+    // 还能接着问，改动照常进 Local
+    claude.script = (t) => write(t.cwd, "done.txt", "ok\n");
+    await core.ask(route.id, "重新来");
+    expect(has(lab.local, "done.txt")).toBe(true);
+    expect(has(lab.local, "half.txt")).toBe(false);
+  });
+
+  it("不批准时可以带一句话给 Claude", async () => {
+    const route = await core.createRoute(project.id);
+    let got: unknown;
+    claude.script = async (t) => {
+      got = await t.askPermission("Bash", { command: "npm i x" });
+    };
+    const done = core.ask(route.id, "装个库");
+    await until("permission.request");
+    const req = events.find((e) => e.type === "permission.request") as Extract<BwEvent, { type: "permission.request" }>;
+    core.answerPermission(req.requestId, "deny", " 别装新库，用自带的 ");
+    await done;
+    expect(got).toEqual({ deny: "别装新库，用自带的" });
+  });
+
+  it("导出成 Markdown：每一站的提问和回答", async () => {
+    const route = await core.createRoute(project.id, "导出试试");
+    claude.script = (t) => {
+      t.say("第一段回答");
+      t.tool("Bash", { command: "ls" });
+    };
+    await core.ask(route.id, "列一下文件");
+    const md = await core.exportMarkdown(route.id);
+    expect(md).toContain("# 1路 导出试试");
+    expect(md).toContain("## 第 1 站：列一下文件");
+    expect(md).toContain("> 列一下文件");
+    expect(md).toContain("第一段回答");
+  });
+});
+
+describe("删掉对话，留下工作区", () => {
+  it("对话没了，文件夹和里面没进 Local 的改动还在；之后可以彻底删掉", async () => {
+    const route = await core.createRoute(project.id, "试试看");
+    claude.script = (t) => {
+      write(t.cwd, "draft.txt", "草稿\n");
+      return "interrupted";
+    };
+    await core.ask(route.id, "写个草稿");
+    expect(await core.deleteRoute(route.id, false, true)).toEqual({ status: "deleted" });
+    expect(core.snapshot(project.id).routes).toEqual([]);
+    const [kept] = core.keptWorktrees(project.id);
+    expect(kept).toMatchObject({ projectId: project.id, path: route.worktreePath, label: "1路 试试看" });
+    expect(read(route.worktreePath, "draft.txt")).toBe("草稿\n");
+    expect(has(lab.local, "draft.txt")).toBe(false);
+
+    await core.removeKept(kept!.id);
+    expect(core.keptWorktrees(project.id)).toEqual([]);
+    expect(fs.existsSync(route.worktreePath)).toBe(false);
   });
 });

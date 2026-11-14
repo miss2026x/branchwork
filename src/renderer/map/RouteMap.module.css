@@ -616,3 +616,14 @@
   font-size: 11px;
   opacity: 0.85;
 }
+
+.stop[data-name="temp"] .name {
+  font-style: italic;
+  color: var(--text-4);
+}
+.selectBar .solve {
+  border-color: #e9c98a;
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-weight: 700;
+}

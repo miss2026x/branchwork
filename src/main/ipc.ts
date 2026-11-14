@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { Core } from "../core";
 import type { BwApi } from "../shared";
@@ -45,7 +46,18 @@ export function registerIpc(core: Core): void {
     history: (routeId) => core.history(routeId),
     syncLog: async (routeId) => core.syncLog(routeId),
     stop: async (routeId) => core.stop(routeId),
-    answerPermission: async (requestId, decision) => core.answerPermission(requestId, decision),
+    answerPermission: async (requestId, decision, note) => core.answerPermission(requestId, decision, note),
+    discardChanges: (routeId) => core.discardChanges(routeId),
+    async exportRoute(routeId) {
+      const text = await core.exportMarkdown(routeId);
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const name = text.split("\n")[0]!.replace(/^#\s*/, "").replace(/[\\/:*?"<>|]/g, "-").trim() || "对话";
+      const options = { title: "导出为 Markdown", defaultPath: `${name}.md`, filters: [{ name: "Markdown", extensions: ["md"] }] };
+      const r = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+      if (r.canceled || !r.filePath) return null;
+      await fs.promises.writeFile(r.filePath, text, "utf8");
+      return r.filePath;
+    },
     warm: async (routeId) => core.warm(routeId),
 
     fork: (routeId, stopId, name) => core.fork(routeId, stopId, name),
@@ -59,7 +71,13 @@ export function registerIpc(core: Core): void {
     queueStartNew: (itemId) => core.queueStartNew(itemId),
     archiveRoute: async (routeId) => core.archiveRoute(routeId),
     unarchiveRoute: async (routeId) => core.unarchiveRoute(routeId),
-    deleteRoute: (routeId, force) => core.deleteRoute(routeId, force),
+    deleteRoute: (routeId, force, keepWorktree) => core.deleteRoute(routeId, force, keepWorktree),
+    keptWorktrees: async (projectId) => core.keptWorktrees(projectId),
+    removeKept: (id) => core.removeKept(id),
+    async openKept(id) {
+      const k = core.listProjects().flatMap((p) => core.keptWorktrees(p.id)).find((x) => x.id === id);
+      if (k) await shell.openPath(k.path);
+    },
     resync: async (routeId) => void (await core.resync(routeId)),
     resolveConflict: (routeId) => fire(core.resolveConflict(routeId)),
 

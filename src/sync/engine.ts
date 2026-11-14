@@ -208,6 +208,15 @@ class Engine implements SyncEngine {
     });
   }
 
+  discard(routeId: string): Promise<void> {
+    return this.serial(async () => {
+      await this.requireWorktree(routeId);
+      const base = await this.getBase(routeId);
+      const work = await this.snapRoute(routeId, true);
+      if (work !== base) await this.switchRoute(routeId, work, base);
+    });
+  }
+
   changes(routeId: string): Promise<FileStat[]> {
     return this.serial(async () => {
       await this.requireWorktree(routeId);
@@ -218,10 +227,18 @@ class Engine implements SyncEngine {
     });
   }
 
-  removeWorktree(routeId: string, opts: { force?: boolean } = {}): Promise<RemoveResult> {
+  removeFolder(dir: string): Promise<void> {
+    return this.serial(async () => {
+      await git(this.localDir, ["worktree", "remove", "--force", dir], { anyCode: true });
+      await fs.rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
+      await git(this.localDir, ["worktree", "prune"], { anyCode: true });
+    });
+  }
+
+  removeWorktree(routeId: string, opts: { force?: boolean; keep?: boolean } = {}): Promise<RemoveResult> {
     return this.serial(async () => {
       const wt = this.worktreePath(routeId);
-      if (await exists(wt)) {
+      if (!opts.keep && (await exists(wt))) {
         // 上一次删除如果半途失败，工作区可能已经残缺（连 .git 都没了），这时没法也不必再检查改动
         const intact = await exists(path.join(wt, ".git"));
         if (!opts.force && intact) {

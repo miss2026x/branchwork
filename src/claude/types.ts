@@ -30,7 +30,8 @@ export interface AskOptions {
   signal?: AbortSignal;
   onEvent?: (e: ClaudeEvent) => void;
   /** 等你批准。不传则一律拒绝 */
-  onPermission?: (req: PermissionRequest) => Promise<PermissionDecision>;
+  /** 返回 { deny: "…" } 表示不批准，并把这句话带给 Claude（比如“换个做法”） */
+  onPermission?: (req: PermissionRequest) => Promise<PermissionDecision | { deny: string }>;
 }
 
 export type AskOutcome =

@@ -215,6 +215,11 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                       <>
                         {/* 快线不是原来那段对话的延续：从来源站过来的这一段画成虚线 */}
                         <path d={lane.link} fill="none" stroke={c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" />
+                        {on && detail === "full" && (
+                          <text x={lane.from.x + 12} y={(lane.from.y + lane.y) / 2 + 4} fontSize={12} fontWeight={700} fill={c}>
+                            压缩后发车
+                          </text>
+                        )}
                         <path d={lane.run} fill="none" stroke={c} strokeWidth={on ? 10 : 8} strokeLinecap="round" />
                       </>
                     ) : (
@@ -425,6 +430,15 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         )}
       </div>
 
+      {!viewing && selected?.route.status === "conflict" && (
+        <div className={css.selectBar}>
+          <Plate route={selected.route} />
+          <span className={css.spacer}>先解决{conflictStop(selected) ? `第 ${stopNumber(conflictStop(selected)!)} 站的` : ""}同步冲突，再接着问</span>
+          <button className={css.solve} onClick={() => onSelectRoute(selected.route.id)}>
+            去解决
+          </button>
+        </div>
+      )}
       {viewing && (
         <div className={css.selectBar} role="toolbar" aria-label="选中的站">
           <Plate route={viewing.route} />
@@ -448,6 +462,8 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
     </div>
   );
 }
+
+const conflictStop = (lane: Lane) => lane.stops.find((s) => s.stop.syncState === "conflict")?.stop;
 
 const clip = (text: string, n: number) => {
   const t = text.replace(/\s+/g, " ").trim();
@@ -524,7 +540,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
         const answering = stop.status === "answering";
         const latest = i === lane.stops.length - 1;
         return (
-          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id}>
+          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id}>
             {answering && (
               <span className={css.bus}>
                 <em>{lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}</em>

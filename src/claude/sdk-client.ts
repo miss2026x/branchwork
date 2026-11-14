@@ -73,6 +73,7 @@ function processOptions(cwd: string, sessionId: string | undefined, model: strin
     if (mine?.readonly) return { behavior: "allow", updatedInput: input };
     if (mine) toolName = mine.title;
     const decision = turn.onPermission ? await turn.onPermission({ tool: toolName, input, canRemember: suggestions.length > 0 }) : "deny";
+    if (typeof decision === "object") return { behavior: "deny", message: `用户没有批准这个操作，并且说：${decision.deny}` };
     if (decision === "deny") return { behavior: "deny", message: "用户没有批准这个操作" };
     // “以后都允许”：把 SDK 给的建议原样交回去
     return decision === "allow-always" ? { behavior: "allow", updatedInput: input, updatedPermissions: suggestions } : { behavior: "allow", updatedInput: input };

@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Project, QueueItem, Route, Stop, SyncLogEntry } from "../shared";
+import type { Project, QueueItem, Route, Stop, SyncLogEntry, KeptWorktree } from "../shared";
 import { MIGRATIONS } from "./schema";
 
 type Row = Record<string, unknown>;
@@ -44,6 +44,12 @@ export interface Db {
     insert(e: SyncLogEntry): void;
     listByRoute(routeId: string, limit?: number): SyncLogEntry[];
     listByRoutes(routeIds: string[], limit?: number): SyncLogEntry[];
+  };
+  kept: {
+    insert(k: KeptWorktree): void;
+    get(id: string): KeptWorktree | undefined;
+    listByProject(projectId: string): KeptWorktree[];
+    delete(id: string): void;
   };
   close(): void;
 }
@@ -174,6 +180,7 @@ export function openDb(file: string): Db {
     createdAt: r.created_at as number,
   }));
 
+  const kept = table<KeptWorktree>("kept_worktree", { id: "id", projectId: "project_id", path: "path", label: "label", at: "at" }, (r) => ({ id: r.id as string, projectId: r.project_id as string, path: r.path as string, label: r.label as string, at: r.at as number }));
   const syncLog = table<SyncLogEntry>(
     "sync_log",
     { id: "id", routeId: "route_id", stopId: "stop_id", direction: "direction", status: "status", files: "files", message: "message", at: "at" },
@@ -226,6 +233,12 @@ export function openDb(file: string): Db {
       insert: syncLog.insert,
       listByRoute: (rid, limit = 100) => syncLog.where("route_id = ? ORDER BY at DESC, rowid DESC LIMIT ?", rid, limit),
       listByRoutes: (rids, limit = 200) => (rids.length ? syncLog.where(`route_id IN (${rids.map(() => "?").join(",")}) ORDER BY at DESC, rowid DESC LIMIT ?`, ...rids, limit) : []),
+    },
+    kept: {
+      insert: kept.insert,
+      get: (id) => kept.where("id = ?", id)[0],
+      listByProject: (pid) => kept.where("project_id = ? ORDER BY at DESC", pid),
+      delete: (id) => run("DELETE FROM kept_worktree WHERE id = ?", id),
     },
     close: () => sql.close(),
   };

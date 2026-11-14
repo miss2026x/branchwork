@@ -11,7 +11,7 @@ export interface FakeTurn {
   signal: AbortSignal;
   say(text: string): void;
   tool(name: string, input?: Record<string, unknown>): void;
-  askPermission(tool: string, input?: Record<string, unknown>, canRemember?: boolean): Promise<PermissionDecision>;
+  askPermission(tool: string, input?: Record<string, unknown>, canRemember?: boolean): Promise<PermissionDecision | { deny: string }>;
   /** 调用应用提供的工具（不经过批准），返回它给 Claude 看的文字 */
   callTool(name: string, input?: Record<string, unknown>): Promise<string>;
 }
@@ -83,8 +83,8 @@ export class FakeClaude implements ClaudeClient {
   useTools(tools: ClaudeTool[]): void {
     this.tools = tools;
   }
-  /** 起名：默认起不出来（返回 null）。测试里换掉它 */
-  namer: (prompt: string) => Promise<string | null> = async () => null;
+  /** 起名：默认一直不回来（站名停在临时名字上）。测试里换掉它 */
+  namer: (prompt: string) => Promise<string | null> = () => new Promise(() => {});
   name(prompt: string): Promise<string | null> {
     return this.namer(prompt);
   }

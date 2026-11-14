@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, Terminal } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -42,7 +42,11 @@ interface State {
   queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
   /** 正开着的整块弹窗：添加项目、开一路新车、同步记录 */
-  dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null };
+  dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] };
+  /** 正在问“这一路还在回答，怎么归档”的那一路 */
+  archiveAsk: string | null;
+  /** 等到站后要归档的路 */
+  archiveWhenDone: string[];
   /** 正在看“全部项目”页 */
   overview: boolean;
   /** 正在看的以前的某一站（不是最新的）；空表示跟着最新 */
@@ -122,9 +126,19 @@ interface State {
   archiveRoute(routeId: string): Promise<void>;
   unarchiveRoute(routeId: string): Promise<void>;
   /** 返回 null 表示已删除；返回文件列表表示还有没进 Local 的改动，没有删 */
-  deleteRoute(routeId: string, force: boolean): Promise<SyncFile[] | null>;
+  deleteRoute(routeId: string, force: boolean, keepWorktree?: boolean): Promise<SyncFile[] | null>;
+  /** 同步记录窗口里：打开或彻底删掉一个留下的工作区 */
+  openKept(id: string): void;
+  removeKept(id: string): Promise<void>;
   stop(routeId: string): void;
-  answerPermission(routeId: string, decision: PermissionDecision): void;
+  /** note：不批准时带给 Claude 的一句话 */
+  answerPermission(routeId: string, decision: PermissionDecision, note?: string): void;
+  discardChanges(routeId: string): Promise<void>;
+  exportRoute(routeId: string): Promise<void>;
+  /** 归档；这一路正在回答时先问：答完再归档，还是现在停下并归档 */
+  requestArchive(routeId: string): void;
+  /** mode：later 答完再归档；now 现在停下，停稳后归档 */
+  archiveBusy(routeId: string, mode: "later" | "now"): void;
   setPermissionMode(projectId: string, mode: PermissionMode): Promise<void>;
   queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): Promise<void>;
   queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): Promise<void>;
@@ -158,6 +172,11 @@ export const useStore = create<State>((set, get) => {
       }
       return notices === s.notices && boarded === s.boarded ? {} : { notices, boarded };
     });
+    // 说好“答完再归档”的路：一停下来就归档
+    if (e.type === "route.updated" && e.route.status !== "answering" && e.route.status !== "awaiting_permission" && e.route.status !== "archived" && get().archiveWhenDone.includes(e.route.id)) {
+      set((s) => ({ archiveWhenDone: s.archiveWhenDone.filter((id) => id !== e.route.id) }));
+      setTimeout(() => void get().archiveRoute(e.route.id), 0);
+    }
     switch (e.type) {
       case "route.updated": {
         const idle = e.route.status !== "answering" && e.route.status !== "awaiting_permission";
@@ -308,6 +327,8 @@ export const useStore = create<State>((set, get) => {
     queue: {},
     drafts: {},
     dialog: null,
+    archiveAsk: null,
+    archiveWhenDone: [],
     overview: false,
     viewing: null,
     terminals: {},
@@ -406,9 +427,9 @@ export const useStore = create<State>((set, get) => {
 
     viewLog(projectId) {
       if (!projectId) return set({ dialog: null });
-      set({ dialog: { kind: "log", projectId, entries: null } });
-      void window.bw.projectLog(projectId).then(
-        (entries) => set((s) => (s.dialog?.kind === "log" && s.dialog.projectId === projectId ? { dialog: { kind: "log", projectId, entries } } : {})),
+      set({ dialog: { kind: "log", projectId, entries: null, kept: [] } });
+      void Promise.all([window.bw.projectLog(projectId), window.bw.keptWorktrees(projectId).catch(() => [])]).then(
+        ([entries, kept]) => set((s) => (s.dialog?.kind === "log" && s.dialog.projectId === projectId ? { dialog: { kind: "log", projectId, entries, kept } } : {})),
         (e) => set({ error: message(e), dialog: null }),
       );
     },
@@ -662,9 +683,22 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async deleteRoute(routeId, force) {
+    openKept(id) {
+      void window.bw.openKept(id).catch((e) => set({ error: message(e) }));
+    },
+
+    async removeKept(id) {
       try {
-        const r = await window.bw.deleteRoute(routeId, force);
+        await window.bw.removeKept(id);
+        set((s) => (s.dialog?.kind === "log" ? { dialog: { ...s.dialog, kept: s.dialog.kept.filter((k) => k.id !== id) } } : {}));
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    async deleteRoute(routeId, force, keepWorktree) {
+      try {
+        const r = await window.bw.deleteRoute(routeId, force, keepWorktree);
         return r.status === "has-unsynced" ? r.files : null;
       } catch (e) {
         set({ error: message(e) });
@@ -676,7 +710,27 @@ export const useStore = create<State>((set, get) => {
       void window.bw.stop(routeId);
     },
 
-    answerPermission(routeId, decision) {
+    async discardChanges(routeId) {
+      await window.bw.discardChanges(routeId).catch((e) => set({ error: message(e) }));
+    },
+
+    async exportRoute(routeId) {
+      await window.bw.exportRoute(routeId).catch((e) => set({ error: message(e) }));
+    },
+
+    requestArchive(routeId) {
+      const route = get().routes[routeId];
+      if (!route) return;
+      if (route.status === "answering" || route.status === "awaiting_permission") set({ archiveAsk: routeId });
+      else void get().archiveRoute(routeId);
+    },
+
+    archiveBusy(routeId, mode) {
+      set((s) => ({ archiveAsk: null, archiveWhenDone: [...s.archiveWhenDone.filter((id) => id !== routeId), routeId] }));
+      if (mode === "now") get().stop(routeId);
+    },
+
+    answerPermission(routeId, decision, note) {
       const p = get().permissions[routeId];
       if (!p) return;
       set((s) => {
@@ -684,7 +738,7 @@ export const useStore = create<State>((set, get) => {
         delete permissions[routeId];
         return { permissions };
       });
-      void window.bw.answerPermission(p.requestId, decision);
+      void window.bw.answerPermission(p.requestId, decision, note);
     },
 
     async setPermissionMode(projectId, mode) {

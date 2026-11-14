@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { DirectoryInfo, FileStat, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
+import type { DirectoryInfo, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -34,6 +34,10 @@ export interface BwApi {
   renameStop(stopId: string, name: string): Promise<void>;
   /** 这一路以后用哪个模型；null 表示用默认的。下一站起生效 */
   setRouteModel(routeId: string, model: string | null): Promise<Route>;
+  /** 丢掉这一路工作区里还没进 Local 的改动（Local 本来就没有它们） */
+  discardChanges(routeId: string): Promise<void>;
+  /** 把这一路的对话导出成 Markdown 文件；用户取消返回 null，否则返回保存的位置 */
+  exportRoute(routeId: string): Promise<string | null>;
   /** 这一路的工作区里有哪些改动还没进 Local，各增删了多少行 */
   changes(routeId: string): Promise<FileStat[]>;
   /** 这个项目里所有的后台终端（跑着的和已退出还没清掉的） */
@@ -68,10 +72,18 @@ export interface BwApi {
   archiveRoute(routeId: string): Promise<Route>;
   unarchiveRoute(routeId: string): Promise<Route>;
   /** 删除一路。有没进 Local 的改动时不删并返回这些文件；force 才连它们一起删 */
-  deleteRoute(routeId: string, force?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
+  /** keepWorktree：只删对话，工作区的文件夹留着（记在“留下的工作区”里） */
+  deleteRoute(routeId: string, force?: boolean, keepWorktree?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
+  /** 这个项目留下的工作区 */
+  keptWorktrees(projectId: string): Promise<KeptWorktree[]>;
+  /** 在文件管理器里打开一个留下的工作区 */
+  openKept(id: string): Promise<void>;
+  /** 把一个留下的工作区彻底删掉 */
+  removeKept(id: string): Promise<void>;
   /** 停车 */
   stop(routeId: string): Promise<void>;
-  answerPermission(requestId: string, decision: PermissionDecision): Promise<void>;
+  /** note：不批准时带给 Claude 的一句话，比如“别装新库，用自带的” */
+  answerPermission(requestId: string, decision: PermissionDecision, note?: string): Promise<void>;
   /** 这一路各站的回答内容（从 Claude 的会话文件读） */
   history(routeId: string): Promise<StopContent[]>;
   syncLog(routeId: string): Promise<SyncLogEntry[]>;
