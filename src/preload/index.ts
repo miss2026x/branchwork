@@ -30,6 +30,7 @@ const api: BwApi = {
   importSessions: call("importSessions"),
   projectLog: call("projectLog"),
   openLocal: call("openLocal"),
+  openSystemTerminal: call("openSystemTerminal"),
   createRoute: call("createRoute"),
   truncate: call("truncate"),
   keptWorktrees: call("keptWorktrees"),

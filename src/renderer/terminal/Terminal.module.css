@@ -18,7 +18,23 @@
 }
 .stripHead span {
   flex: 1;
-  text-align: left;
+  text-align: right;
+}
+.stripHead span[data-running="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  vertical-align: middle;
+}
+.stripHead b {
+  font-weight: 500;
+}
+li[data-status="exited"] .row {
+  opacity: 0.6;
 }
 .strip ul {
   margin: 0;
@@ -97,10 +113,12 @@ li[data-status="exited"] .rowText b {
 }
 .rowStop {
   flex: none;
-  width: 30px;
+  min-width: 30px;
   height: 30px;
+  padding: 0 8px;
   display: grid;
   place-items: center;
+  font-size: 12px;
   border-radius: var(--r-6);
   color: var(--text-3);
 }

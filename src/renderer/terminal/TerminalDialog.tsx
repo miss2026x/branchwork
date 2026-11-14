@@ -11,11 +11,13 @@ interface Props {
   output: string;
   stopLabel: string | null;
   onStop(): void;
+  /** 在系统自带的终端里打开这个文件夹 */
+  onOpenSystem(): void;
   onClose(): void;
 }
 
 /** 一个后台终端的输出。只能看，不能往里打字 */
-export function TerminalDialog({ terminal: t, route, output, stopLabel, onStop, onClose }: Props) {
+export function TerminalDialog({ terminal: t, route, output, stopLabel, onStop, onOpenSystem, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const box = useRef<HTMLPreElement>(null);
   const stick = useRef(true);
@@ -80,6 +82,7 @@ export function TerminalDialog({ terminal: t, route, output, stopLabel, onStop, 
           >
             {copied ? "已复制" : "复制输出"}
           </button>
+          <button onClick={onOpenSystem}>在系统终端里打开</button>
           <button className={running ? css.stop : undefined} onClick={onStop}>
             {running ? (
               <>

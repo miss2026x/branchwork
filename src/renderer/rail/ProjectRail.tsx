@@ -28,6 +28,7 @@ export function ProjectRail({
   const openCompress = useStore((s) => s.openCompress);
   const exportRoute = useStore((s) => s.exportRoute);
   const setRouteFlags = useStore((s) => s.setRouteFlags);
+  const pendingAsk = useStore((s) => s.pendingAsk);
   const openImport = useStore((s) => s.openImport);
   const lastSync = useStore((s) => s.lastSync);
   /** 已归档里点开看详情的那一路 */
@@ -212,7 +213,7 @@ export function ProjectRail({
                             <IconTerminal size={13} />
                           </span>
                         )}
-                        <RouteBadge route={r} />
+                        <RouteBadge route={r} syncing={pendingAsk[r.id] !== undefined} />
                         {(() => {
                           const mine = (queue[p.id] ?? []).filter((q) => q.routeId === r.id);
                           if (mine.length === 0) return null;
@@ -351,7 +352,9 @@ function asTree(list: Route[]): { route: Route; depth: number }[] {
   return out;
 }
 
-function RouteBadge({ route }: { route: Route }) {
+function RouteBadge({ route, syncing }: { route: Route; syncing?: boolean }) {
+  // 站前同步中：还没开始回答，正在从 Local 拿更新
+  if (syncing) return <i className={css.syncing} title="同步中" role="img" aria-label="同步中" />;
   if (route.status === "answering")
     return (
       <i
@@ -362,8 +365,7 @@ function RouteBadge({ route }: { route: Route }) {
     );
   if (route.status === "awaiting_permission")
     return <em className={css.amber}>等你批准</em>;
-  if (route.status === "interrupted")
-    return <em className={css.amber}>没答完</em>;
+  if (route.status === "interrupted") return <i className={css.halfDark} title="没答完" role="img" aria-label="没答完" />;
   if (route.status === "conflict")
     return (
       <em className={css.red}>

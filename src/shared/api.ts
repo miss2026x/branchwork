@@ -25,6 +25,8 @@ export interface BwApi {
   projectLog(projectId: string): Promise<SyncLogEntry[]>;
   /** 在系统的文件管理器里打开这个项目的 Local */
   openLocal(projectId: string): Promise<void>;
+  /** 在系统自带的终端里打开一个后台终端所在的文件夹（那一路的工作区） */
+  openSystemTerminal(terminalId: string): Promise<void>;
   snapshot(projectId: string): Promise<ProjectSnapshot>;
   /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
   setPermissionMode(projectId: string, mode: PermissionMode): Promise<Project>;

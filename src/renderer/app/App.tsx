@@ -86,6 +86,7 @@ export function App() {
   const dismissToast = useStore((s) => s.dismissToast);
   const importSessions = useStore((s) => s.importSessions);
   const lastSync = useStore((s) => s.lastSync);
+  const openSystemTerminal = useStore((s) => s.openSystemTerminal);
   const resolveConflict = useStore((s) => s.resolveConflict);
   const environment = useStore((s) => s.environment);
   const terminalSessions = useStore((s) => s.terminalSessions);
@@ -151,6 +152,13 @@ export function App() {
   const queueBoard = useStore((s) => s.queueBoard);
   const queueStartNew = useStore((s) => s.queueStartNew);
   const [settings, setSettings] = useState(false);
+  const [hintGone, setHintGone] = useState(() => {
+    try {
+      return localStorage.getItem("bw.hint.first") === "1";
+    } catch {
+      return false;
+    }
+  });
   /** 拖出来的左栏、对话栏宽度；没拖过就用默认的。只记在这台机器上 */
   const [widths, setWidths] = useState<{ rail: number | null; panel: number | null }>(() => {
     try {
@@ -377,7 +385,16 @@ export function App() {
                 onJumpStop={goToStop}
                 conflicts={Object.fromEntries(routes.filter((r) => r.status === "conflict" && lastSync[r.id]?.status === "conflict").map((r) => [r.id, lastSync[r.id]!.files]))}
                 whoChanged={whoChanged}
-                onResolve={(id) => void resolveConflict(id)} />
+                onResolve={(id) => void resolveConflict(id)}
+                hint={!hintGone && routes.length === 1 && projectStops.length <= 3}
+                onDismissHint={() => {
+                  setHintGone(true);
+                  try {
+                    localStorage.setItem("bw.hint.first", "1");
+                  } catch {
+                    // 记不住就下次再提示一次
+                  }
+                }} />
               <WaitingArea
                 items={Object.values(allQueues).flat()}
                 routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
@@ -559,6 +576,7 @@ export function App() {
           output={terminalView.output}
           stopLabel={viewed.stopId && allStops[viewed.stopId] ? `第 ${stopNumber(allStops[viewed.stopId]!)} 站` : null}
           onStop={() => void stopTerminal(viewed.id)}
+          onOpenSystem={() => void openSystemTerminal(viewed.id)}
           onClose={() => viewTerminal(null)}
         />
       )}

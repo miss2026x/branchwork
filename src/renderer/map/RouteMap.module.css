@@ -173,8 +173,9 @@
 .stop[data-kind="summary"] .node {
   border-radius: 6px;
 }
+/* 没答完：半实心 */
 .stop[data-status="interrupted"] .node {
-  border-style: dashed;
+  border-style: solid;
 }
 .name {
   position: absolute;
@@ -783,4 +784,49 @@
   font-weight: 400;
   line-height: 17px;
   color: rgba(255, 255, 255, 0.78);
+}
+
+/* 刚开始用时地图下面的一条说明 */
+.hint {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 48px));
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-12, 12px);
+  background: var(--surface-0);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-2);
+}
+.hint i {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--route-1) 14%, white);
+  color: var(--route-1);
+  font-style: normal;
+  font-weight: 800;
+}
+.hint span {
+  flex: 1;
+}
+.hint button {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-6);
+  color: var(--text-3);
+}
+.hint button:hover {
+  background: var(--surface-2);
 }

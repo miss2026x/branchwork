@@ -384,6 +384,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
       )}
 
       <TerminalStrip
+        route={route}
         terminals={terminals}
         stopLabel={(id) => {
           const s = id ? stops.find((x) => x.id === id) : undefined;

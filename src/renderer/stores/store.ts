@@ -119,6 +119,7 @@ interface State {
   closeDialog(): void;
   setOverview(on: boolean): void;
   openLocal(projectId: string): Promise<void>;
+  openSystemTerminal(terminalId: string): Promise<void>;
   /** 让用户选一个文件夹；取消返回 null */
   pickDirectory(): Promise<string | null>;
   inspectDirectory(dir: string): Promise<DirectoryInfo>;
@@ -516,6 +517,9 @@ export const useStore = create<State>((set, get) => {
       set({ dialog: null });
     },
 
+    async openSystemTerminal(terminalId) {
+      await window.bw.openSystemTerminal(terminalId).catch((e) => set({ error: message(e) }));
+    },
     async openLocal(projectId) {
       await window.bw.openLocal(projectId).catch((e) => set({ error: message(e) }));
     },

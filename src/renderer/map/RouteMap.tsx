@@ -55,6 +55,9 @@ interface Props {
   conflicts?: Record<string, SyncFile[]>;
   whoChanged?: (by: NonNullable<SyncFile["by"]>) => string;
   onResolve?(routeId: string): void;
+  /** 刚开始用：地图下面放一条说明 */
+  hint?: boolean;
+  onDismissHint?(): void;
 }
 
 const MIN = 0.3;
@@ -65,7 +68,7 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -337,6 +340,12 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                 onSelectRoute(lane.route.id);
                 setMenuStopId((cur) => (cur === stop.id ? null : stop.id));
               }}
+              onRename={(stop) => {
+                setHover(null);
+                onSelectRoute(lane.route.id);
+                setMenuStopId(stop.id);
+                setRenaming(stop.name);
+              }}
               onHover={hoverOn}
               dragging={dragging}
               onDropItem={onDropItem}
@@ -581,6 +590,15 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         )}
       </div>
 
+      {hint && !viewing && selected?.route.status !== "conflict" && (
+        <div className={css.hint} role="note">
+          <i>i</i>
+          <span>每问一个问题就多一站。想换个思路时，右键任意一站可以从那里分出新的一路；答着的时候写下的问题会先进候车区。</span>
+          <button aria-label="不再提示" onClick={onDismissHint}>
+            ×
+          </button>
+        </div>
+      )}
       {!viewing && selected?.route.status === "conflict" && (
         <div className={css.selectBar}>
           <Plate route={selected.route} />
@@ -669,12 +687,14 @@ interface LaneProps {
   onSelect(): void;
   onStop(stop: Stop): void;
   onStopMenu(stop: Stop): void;
+  /** 双击站名：直接改名 */
+  onRename(stop: Stop): void;
   onHover(next: { kind: "stop" | "queue"; id: string } | null): void;
   dragging: QueueItem | null;
   onDropItem(item: QueueItem, routeId: string, mode: QueueMode): void;
 }
 
-function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, onSelect, onStop, onStopMenu, onHover, dragging, onDropItem }: LaneProps) {
+function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, onSelect, onStop, onStopMenu, onRename, onHover, dragging, onDropItem }: LaneProps) {
   const [over, setOver] = useState<QueueMode | null>(null);
   const colors = routeColors(lane.route);
   const line = on ? colors.line : colors.faded;
@@ -707,7 +727,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
               </span>
             )}
             {stop.status === "interrupted" && <em className={css.flagAmber}>没答完</em>}
-            <button className={css.node} style={{ borderColor: stop.status === "interrupted" ? "var(--amber)" : answering || junction ? "var(--text-1)" : line }} onClick={() => onStop(stop)}
+            <button className={css.node} style={{ borderColor: answering || junction ? "var(--text-1)" : line, ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, var(--text-1) 50%, var(--surface-0) 50%)` } : {}) }} onClick={() => onStop(stop)}
               onContextMenu={(e) => (e.preventDefault(), onStopMenu(stop))}
               onPointerEnter={() => onHover({ kind: "stop", id: stop.id })}
               onPointerLeave={() => onHover(null)}
@@ -723,7 +743,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
                 <i /> 起名中
               </em>
             )}
-            <span className={css.name} data-command={stop.name.startsWith("/")}>
+            <span className={css.name} data-command={stop.name.startsWith("/")} title={stop.kind === "normal" ? "双击改名" : undefined} onDoubleClick={() => stop.kind === "normal" && detail === "full" && onRename(stop)}>
               {stop.kind === "minor" ? "" : detail === "dots" && stop.kind !== "summary" ? number(stop) : stop.name + repeatMark(nameRepeat(stop, laneStops))}
             </span>
           </div>

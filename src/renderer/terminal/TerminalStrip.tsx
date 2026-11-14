@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { Terminal } from "../../shared";
+import type { Route, Terminal } from "../../shared";
+import { Plate } from "../ui/Plate";
 import { IconChevron, IconClose, IconStop, IconTerminal } from "../ui/icons";
 import css from "./Terminal.module.css";
 
 interface Props {
+  route: Route;
   /** 这一路的后台终端 */
   terminals: Terminal[];
   /** 是第几站开的，显示用；不知道就不显示 */
@@ -23,17 +25,16 @@ export function since(from: number, to = Date.now()): string {
 }
 
 /** 输入框上面的一条：这一路开着哪些后台终端。只收数据、发事件 */
-export function TerminalStrip({ terminals, stopLabel, onOpen, onStop }: Props) {
+export function TerminalStrip({ route, terminals, stopLabel, onOpen, onStop }: Props) {
   const running = terminals.filter((t) => t.status === "running").length;
   const [open, setOpen] = useState(true);
   if (terminals.length === 0) return null;
   return (
     <section className={css.strip} aria-label="后台终端">
       <button className={css.stripHead} aria-expanded={open} onClick={() => setOpen(!open)}>
-        <IconTerminal size={14} />
-        <b>后台终端</b>
-        <span>{running > 0 ? `${running} 个在跑` : "都已退出"}</span>
         <IconChevron size={12} open={open} />
+        <b>{terminals.length} 个后台终端</b>
+        <span data-running={running > 0}>{running > 0 ? "运行中" : "都已退出"}</span>
       </button>
       {open && (
         <ul>
@@ -42,19 +43,19 @@ export function TerminalStrip({ terminals, stopLabel, onOpen, onStop }: Props) {
             return (
               <li key={t.id} data-status={t.status}>
                 <button className={css.row} onClick={() => onOpen(t.id)} title="看输出">
-                  <i className={css.dot} />
+                  <IconTerminal size={14} />
+                  <Plate route={route} />
                   <span className={css.rowText}>
                     <b className="ell">{t.name}</b>
                     <small className="ell">
-                      <code>{t.command}</code>
-                      {from && <> · {from}开的</>}
+                      <code>{t.command}</code> · {route.express ? `快${route.express}` : `${route.number}路`} 的工作区{from && <>，{from}开的</>}
                     </small>
                   </span>
                   {t.port !== null && t.status === "running" && <em>{`:${t.port}`}</em>}
                   <span className={css.state}>{t.status === "running" ? since(t.startedAt) : t.exitCode === 0 ? "已结束" : `已退出${t.exitCode !== null ? `（${t.exitCode}）` : ""}`}</span>
                 </button>
                 <button className={css.rowStop} onClick={() => onStop(t.id)} aria-label={t.status === "running" ? `停止 ${t.name}` : `清掉 ${t.name}`} title={t.status === "running" ? "停止" : "从列表里清掉"}>
-                  {t.status === "running" ? <IconStop size={12} /> : <IconClose size={14} />}
+                  {t.status === "running" ? "停止" : <IconClose size={14} />}
                 </button>
               </li>
             );

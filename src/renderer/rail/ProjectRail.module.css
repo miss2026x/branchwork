@@ -421,3 +421,27 @@
   font-weight: 700;
   line-height: 18px;
 }
+
+/* 没答完：半实心圆；同步中：转圈 */
+.halfDark {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-2);
+  background: linear-gradient(90deg, var(--text-2) 50%, transparent 50%);
+}
+.syncing {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--text-2);
+  animation: railSpin 900ms linear infinite;
+}
+@keyframes railSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

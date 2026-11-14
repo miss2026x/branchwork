@@ -225,6 +225,7 @@ export function installMockBw(): void {
       ]);
     },
     openLocal: async () => {},
+    openSystemTerminal: async () => {},
     async truncate(routeId, stopId) {
       const target = stops.get(stopId)!;
       const gone = [...stops.values()].filter((s) => s.routeId === routeId && s.seq >= target.seq).map((s) => s.id);

@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { Core } from "../core";
@@ -35,6 +36,21 @@ export function registerIpc(core: Core): void {
     async openLocal(projectId) {
       const project = core.listProjects().find((p) => p.id === projectId);
       if (project) await shell.openPath(project.localDir);
+    },
+    async openSystemTerminal(terminalId) {
+      const cwd = core
+        .listProjects()
+        .flatMap((p) => core.terminals(p.id))
+        .find((t) => t.id === terminalId)?.cwd;
+      if (!cwd || !fs.existsSync(cwd)) throw new Error("这个终端所在的文件夹已经不在了");
+      // 各系统自带的终端；启动之后就不管它了
+      const [cmd, args]: [string, string[]] =
+        process.platform === "win32" ? ["cmd.exe", ["/c", "start", "", "cmd.exe", "/K", "cd", "/d", cwd]] : process.platform === "darwin" ? ["open", ["-a", "Terminal", cwd]] : ["x-terminal-emulator", [`--working-directory=${cwd}`]];
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(cmd, args, { cwd, detached: true, stdio: "ignore", windowsHide: false });
+        child.once("error", () => reject(new Error("没能打开系统终端。文件夹在：" + cwd)));
+        child.once("spawn", () => (child.unref(), resolve()));
+      });
     },
     createRoute: (projectId, name) => core.createRoute(projectId, name),
     truncate: (routeId, stopId) => core.truncate(routeId, stopId),
