@@ -60,6 +60,7 @@ const api: BwApi = {
   archiveRoute: call("archiveRoute"),
   unarchiveRoute: call("unarchiveRoute"),
   deleteRoute: call("deleteRoute"),
+  removeProject: call("removeProject"),
   resolveConflict: call("resolveConflict"),
   resync: call("resync"),
   stop: call("stop"),

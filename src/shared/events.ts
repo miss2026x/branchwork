@@ -5,6 +5,8 @@ export type PermissionDecision = "allow" | "allow-always" | "deny";
 /** 主进程推给界面的事件 */
 export type BwEvent =
   | { type: "project.updated"; project: Project }
+  /** 项目从 Branchwork 里移除了（Local 文件夹不动） */
+  | { type: "project.removed"; projectId: string }
   | { type: "route.updated"; route: Route }
   | { type: "route.deleted"; routeId: string; projectId: string }
   | { type: "stop.created"; stop: Stop }

@@ -12,6 +12,8 @@ export interface Db {
     byLocalDir(localDir: string): Project | null;
     list(): Project[];
     update(id: string, patch: Partial<Omit<Project, "id">>): Project;
+    /** 连同它的路、站、候车、记录一起删（外键级联） */
+    delete(id: string): void;
   };
   routes: {
     insert(r: Route): void;
@@ -209,6 +211,7 @@ export function openDb(file: string): Db {
       byLocalDir: (d) => projects.where("local_dir = ?", d)[0] ?? null,
       list: () => projects.where("1 = 1 ORDER BY created_at"),
       update: (id, patch) => projects.update(id, patch),
+      delete: (id) => run("DELETE FROM project WHERE id = ?", id),
     },
     routes: {
       insert: routes.insert,

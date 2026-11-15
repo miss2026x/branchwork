@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -66,7 +66,14 @@ interface State {
   queue: Record<string, QueueItem[]>;
   drafts: Record<string, string>;
   /** 正开着的整块弹窗：添加项目、开一路新车、同步记录 */
-  dialog: null | { kind: "add-project"; dir: string } | { kind: "new-route" } | { kind: "import"; projectId: string } | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] };
+  dialog:
+    | null
+    | { kind: "add-project"; dir: string }
+    | { kind: "new-route" }
+    | { kind: "import"; projectId: string }
+    | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] }
+    /** 移除项目；blocked 是第一次确认后发现的没进 Local 的改动和留下的工作区 */
+    | { kind: "remove-project"; projectId: string; blocked: Extract<RemoveProjectResult, { status: "has-unsynced" }> | null; error: string | null };
   /** 正在问“这一路还在回答，怎么归档”的那一路 */
   archiveAsk: string | null;
   /** 等到站后要归档的路 */
@@ -110,6 +117,10 @@ interface State {
   addProjectAt(dir: string, name: string, importIds?: string[]): Promise<void>;
   /** 项目菜单里的“导入终端里的会话” */
   openImport(projectId: string): void;
+  /** 打开“移除项目”的确认 */
+  openRemoveProject(projectId: string): void;
+  /** 确认移除；force：连没进 Local 的改动和留下的工作区一起删 */
+  removeProject(force: boolean): Promise<void>;
   importSessions(projectId: string, sessionIds: string[]): Promise<void>;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
@@ -250,6 +261,27 @@ export const useStore = create<State>((set, get) => {
       case "project.updated":
         set((s) => ({ projects: s.projects.map((p) => (p.id === e.project.id ? e.project : p)) }));
         break;
+      case "project.removed": {
+        const routeIds = new Set(Object.values(get().routes).filter((r) => r.projectId === e.projectId).map((r) => r.id));
+        set((s) => {
+          const queue = { ...s.queue };
+          delete queue[e.projectId];
+          return {
+            projects: s.projects.filter((p) => p.id !== e.projectId),
+            routes: Object.fromEntries(Object.entries(s.routes).filter(([id]) => !routeIds.has(id))),
+            stops: Object.fromEntries(Object.entries(s.stops).filter(([, x]) => !routeIds.has(x.routeId))),
+            notices: s.notices.filter((n) => !routeIds.has(n.routeId)),
+            viewing: s.viewing && s.stops[s.viewing] && routeIds.has(s.stops[s.viewing]!.routeId) ? null : s.viewing,
+            queue,
+          };
+        });
+        if (get().selectedProjectId === e.projectId) {
+          const next = get().projects[0];
+          if (next) get().selectProject(next.id);
+          else set({ selectedProjectId: null, selectedRouteId: null });
+        }
+        break;
+      }
       case "route.deleted":
         set((s) => {
           const routes = { ...s.routes };
@@ -468,6 +500,26 @@ export const useStore = create<State>((set, get) => {
 
     openImport(projectId) {
       set({ dialog: { kind: "import", projectId } });
+    },
+
+    openRemoveProject(projectId) {
+      set({ dialog: { kind: "remove-project", projectId, blocked: null, error: null } });
+    },
+
+    async removeProject(force) {
+      const d = get().dialog;
+      if (d?.kind !== "remove-project") return;
+      const project = get().projects.find((p) => p.id === d.projectId);
+      // 还在等撤销的删除如果是这个项目的，先做掉，免得它过几秒再去删一个已经没了的路
+      if (get().pendingDelete?.route.projectId === d.projectId) await get().flushDelete();
+      try {
+        const r = await window.bw.removeProject(d.projectId, force);
+        if (r.status === "has-unsynced") return set({ dialog: { ...d, blocked: r, error: null } });
+        set({ dialog: null });
+        get().showToast({ title: `已移除 ${project?.name ?? "项目"}`, detail: "Local 文件夹没动；想再用时重新添加就行" });
+      } catch (e) {
+        set({ dialog: { ...d, error: message(e) } });
+      }
     },
 
     async importSessions(projectId, sessionIds) {

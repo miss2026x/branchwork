@@ -351,6 +351,23 @@ export function installMockBw(): void {
       emit({ type: "route.deleted", routeId, projectId });
       return { status: "deleted" };
     },
+    async removeProject(projectId, force) {
+      const mine = [...routes.values()].filter((r) => r.projectId === projectId);
+      const busy = mine.find((r) => r.status === "answering" || r.status === "awaiting_permission");
+      if (busy) throw new Error("有路正在回答，到站或停车后才能移除这个项目");
+      const dirty = mine.filter((r) => [...stops.values()].some((s) => s.routeId === r.id && (s.syncState === "unsynced" || s.syncState === "conflict")));
+      if (!force && dirty.length) {
+        return { status: "has-unsynced", routes: dirty.map((r) => ({ routeId: r.id, label: `${r.number}路 ${r.name}`, files: [{ path: "src/auth/session.ts", note: "modified" }] })), kept: [] };
+      }
+      for (const r of mine) {
+        for (const s of [...stops.values()]) if (s.routeId === r.id) stops.delete(s.id);
+        routes.delete(r.id);
+      }
+      queue = queue.filter((q) => q.projectId !== projectId);
+      projects.splice(projects.findIndex((p) => p.id === projectId), 1);
+      emit({ type: "project.removed", projectId });
+      return { status: "removed" };
+    },
     async resolveConflict(routeId) {
       void run(routeId, "解决同步冲突").then(() => {
         for (const s of stops.values()) if (s.routeId === routeId && s.syncState === "conflict") setStop(s.id, { syncState: "synced" });

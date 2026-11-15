@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -609,5 +609,21 @@ describe("应用", () => {
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByText("已到第 5 站").isVisible(), { timeout: 60000 }).toBe(true);
     await shot("34-imported");
+  });
+
+  it("从 Branchwork 移除项目：先列出没进 Local 的改动，确认后回到欢迎页，Local 文件夹不动", async () => {
+    const before = fs.readdirSync(local).sort();
+    await page.getByRole("button", { name: "my-project 的菜单" }).click();
+    await page.getByRole("menuitem", { name: /从 Branchwork 移除/ }).click();
+    const dialog = page.getByRole("alertdialog", { name: "移除 my-project" });
+    expect(await dialog.getByText("Local 文件夹不会动").isVisible()).toBe(true);
+    await shot("35-remove-project");
+    await dialog.getByRole("button", { name: "移除项目" }).click();
+    // 前面的测试留下过没答完的站：改动还在工作区里，要再确认一次
+    const again = dialog.getByRole("button", { name: "不要这些了，移除" });
+    await expect.poll(async () => (await again.isVisible()) || (await page.getByText("先加一个项目").isVisible()), { timeout: 30000 }).toBe(true);
+    if (await again.isVisible()) await again.click();
+    await expect.poll(() => page.getByText("先加一个项目").isVisible(), { timeout: 30000 }).toBe(true);
+    expect(fs.readdirSync(local).sort()).toEqual(before);
   });
 });

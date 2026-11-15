@@ -92,6 +92,7 @@ export function registerIpc(core: Core): void {
     archiveRoute: async (routeId) => core.archiveRoute(routeId),
     unarchiveRoute: async (routeId) => core.unarchiveRoute(routeId),
     deleteRoute: (routeId, force, keepWorktree) => core.deleteRoute(routeId, force, keepWorktree),
+    removeProject: (projectId, force) => core.removeProject(projectId, force),
     keptWorktrees: async (projectId) => core.keptWorktrees(projectId),
     removeKept: (id) => core.removeKept(id),
     async openKept(id) {

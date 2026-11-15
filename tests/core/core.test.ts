@@ -5,7 +5,7 @@ import { createCore, stopName, type Core } from "../../src/core";
 import { openDb, type Db } from "../../src/db";
 import type { BwEvent, Project } from "../../src/shared";
 import { FakeClaude } from "../support/fake-claude";
-import { dump, has, LINES, makeLab, read, replaceLine, write, type Lab } from "../sync/helpers";
+import { dump, has, LINES, sh, makeLab, read, replaceLine, write, type Lab } from "../sync/helpers";
 
 let lab: Lab;
 let db: Db;
@@ -905,6 +905,73 @@ describe("项目", () => {
     expect(claude.asks.at(-1)!.sessionId).toBe(session);
     expect(read(lab.local, "b.txt")).toBe("two\n");
     expect(has(lab.local, "b.txt")).toBe(true);
+  });
+});
+
+describe("移除项目", () => {
+  it("Local 一点不动；路、工作区、对话、候车、记录一起删；有没进 Local 的改动先拦下来", async () => {
+    const a = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, "b.txt", "from a\n");
+    await core.ask(a.id, "改 b");
+    const b = await core.createRoute(project.id);
+    claude.script = (t) => {
+      write(t.cwd, "half.txt", "half\n");
+      return "interrupted" as const;
+    };
+    await core.ask(b.id, "改到一半");
+    core.queueAdd(project.id, "以后再问");
+    const sessions = [routeOf(a.id).sessionId!, routeOf(b.id).sessionId!];
+    const before = dump(lab.local);
+    const worktrees = path.dirname(a.worktreePath);
+
+    const first = await core.removeProject(project.id);
+    expect(first).toEqual({ status: "has-unsynced", routes: [{ routeId: b.id, label: `2路 ${routeOf(b.id).name}`, files: [{ path: "half.txt", note: "added" }] }], kept: [] });
+    expect(core.listProjects()).toHaveLength(1); // 拦下来时什么都没删
+    expect(has(b.worktreePath, "half.txt")).toBe(true);
+
+    events.length = 0;
+    expect(await core.removeProject(project.id, true)).toEqual({ status: "removed" });
+    expect(events).toEqual([{ type: "project.removed", projectId: project.id }]);
+    expect(dump(lab.local)).toEqual(before); // Local 的文件一个没动
+    expect(core.listProjects()).toEqual([]);
+    expect(fs.existsSync(worktrees)).toBe(false);
+    for (const s of sessions) expect(claude.sessions.has(s)).toBe(false);
+    expect(sh(lab.local, "worktree", "list").trim().split("\n")).toHaveLength(1); // 只剩 Local 自己
+    expect(sh(lab.local, "for-each-ref", "refs/branchwork/").trim()).toBe("");
+
+    // 再加回来是一个干净的新项目
+    const again = await core.addProject(lab.local);
+    expect(again.id).not.toBe(project.id);
+    expect(core.snapshot(again.id)).toMatchObject({ routes: [], stops: [], queue: [] });
+  });
+
+  it("有路在回答时不能移除；留下的工作区也要先确认", async () => {
+    const busy = await core.createRoute(project.id);
+    claude.script = () => new Promise(() => {});
+    void core.ask(busy.id, "不结束");
+    await until("stop.created");
+    await expect(core.removeProject(project.id)).rejects.toMatchObject({ code: "ROUTE_BUSY" });
+
+    db.routes.update(busy.id, { status: "idle" }); // 当它停下了
+    const r = await core.createRoute(project.id);
+    claude.script = (t) => {
+      write(t.cwd, "keep.txt", "k\n");
+      return "interrupted" as const;
+    };
+    await core.ask(r.id, "留着");
+    await core.deleteRoute(r.id, false, true);
+    const res = await core.removeProject(project.id);
+    expect(res).toMatchObject({ status: "has-unsynced", kept: [expect.stringContaining("留着")] });
+  });
+
+  it("Local 文件夹已经不在了也能移除", async () => {
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "一");
+    boot();
+    fs.rmSync(lab.local, { recursive: true, force: true });
+    expect(await core.removeProject(project.id)).toEqual({ status: "removed" });
+    expect(core.listProjects()).toEqual([]);
+    expect(fs.existsSync(route.worktreePath)).toBe(false);
   });
 });
 

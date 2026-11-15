@@ -3,6 +3,7 @@ import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import type { Building } from "../panels/WaitingArea";
 import { DeleteDialog } from "../dialogs/DeleteDialog";
+import { RemoveProjectDialog } from "../dialogs/RemoveProjectDialog";
 import { AddProjectDialog, ImportDialog } from "../dialogs/AddProjectDialog";
 import { ChangesDialog } from "../dialogs/ChangesDialog";
 import { NewRouteDialog } from "../dialogs/NewRouteDialog";
@@ -85,6 +86,7 @@ export function App() {
   const toast = useStore((s) => s.toast);
   const dismissToast = useStore((s) => s.dismissToast);
   const importSessions = useStore((s) => s.importSessions);
+  const removeProject = useStore((s) => s.removeProject);
   const lastSync = useStore((s) => s.lastSync);
   const openSystemTerminal = useStore((s) => s.openSystemTerminal);
   const resolveConflict = useStore((s) => s.resolveConflict);
@@ -515,6 +517,22 @@ export function App() {
       )}
 
       {dialog?.kind === "add-project" && <AddProjectDialog dir={dialog.dir} onPick={pickDirectory} onInspect={inspectDirectory} loadSessions={terminalSessions} onAdd={(dir, name, ids) => void addProjectAt(dir, name, ids)} onCancel={closeDialog} />}
+      {dialog?.kind === "remove-project" && projects.some((p) => p.id === dialog.projectId) && (() => {
+        const mine = Object.values(allRoutes).filter((r) => r.projectId === dialog.projectId);
+        return (
+          <RemoveProjectDialog
+            project={projects.find((p) => p.id === dialog.projectId)!}
+            routeCount={mine.length}
+            archivedCount={mine.filter((r) => r.status === "archived").length}
+            queueCount={(allQueues[dialog.projectId] ?? []).length}
+            busy={mine.filter((r) => r.status === "answering" || r.status === "awaiting_permission").map((r) => `${r.express ? `快${r.express}` : `${r.number}路`} ${r.name}`)}
+            blocked={dialog.blocked}
+            error={dialog.error}
+            onCancel={closeDialog}
+            onConfirm={removeProject}
+          />
+        );
+      })()}
       {dialog?.kind === "import" && <ImportDialog project={projects.find((p) => p.id === dialog.projectId)!} load={terminalSessions} onImport={(ids) => void importSessions(dialog.projectId, ids)} onCancel={closeDialog} />}
       {dialog?.kind === "new-route" && projectId && (
         <NewRouteDialog

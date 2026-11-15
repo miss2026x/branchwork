@@ -30,6 +30,7 @@ export function ProjectRail({
   const setRouteFlags = useStore((s) => s.setRouteFlags);
   const pendingAsk = useStore((s) => s.pendingAsk);
   const openImport = useStore((s) => s.openImport);
+  const openRemoveProject = useStore((s) => s.openRemoveProject);
   const lastSync = useStore((s) => s.lastSync);
   /** 已归档里点开看详情的那一路 */
   const [archivedOpen, setArchivedOpen] = useState<string | null>(null);
@@ -180,6 +181,10 @@ export function ProjectRail({
                       )}
                       <button role="menuitem" onClick={() => (setProjectMenu(null), void openLocal(p.id))}>
                         在文件夹中打开 Local
+                      </button>
+                      <hr />
+                      <button role="menuitem" className={css.danger} onClick={() => (setProjectMenu(null), openRemoveProject(p.id))}>
+                        从 Branchwork 移除…
                       </button>
                     </div>
                   </>

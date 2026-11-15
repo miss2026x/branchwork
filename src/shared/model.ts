@@ -102,6 +102,11 @@ export interface QueueItem {
 export type SyncDirection = "pull" | "push" | "resolve" | "recover" | "local";
 export type SyncOutcomeStatus = "ok" | "noop" | "conflict" | "error";
 
+/** 移除项目的结果：还有没进 Local 的改动或留下的工作区时先不删，列出来让你再确认 */
+export type RemoveProjectResult =
+  | { status: "removed" }
+  | { status: "has-unsynced"; routes: { routeId: string; label: string; files: SyncFile[] }[]; kept: string[] };
+
 export interface SyncFile {
   path: string;
   /** added / modified / deleted，或冲突原因 */

@@ -18,6 +18,7 @@ import type {
   ProjectSnapshot,
   QueueItem,
   QueueMode,
+  RemoveProjectResult,
   Route,
   Stop,
   SyncDirection,
@@ -144,6 +145,11 @@ export interface Core {
    */
   /** keepWorktree：只删对话，工作区的文件夹留着 */
   deleteRoute(routeId: string, force?: boolean, keepWorktree?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
+  /**
+   * 从 Branchwork 里移除一个项目。Local 文件夹一个字节都不动；这个项目的路、工作区、对话记录、候车、同步记录一起删。
+   * 有路在回答时不能移除；有没进 Local 的改动或留下的工作区时先不删、列出来，force 为 true 才一起删。
+   */
+  removeProject(projectId: string, force?: boolean): Promise<RemoveProjectResult>;
   keptWorktrees(projectId: string): KeptWorktree[];
   /** 彻底删掉一个留下的工作区 */
   removeKept(id: string): Promise<void>;
@@ -996,6 +1002,40 @@ export function createCore(opts: CoreOptions): Core {
       db.routes.delete(routeId);
       emit({ type: "route.deleted", routeId, projectId: route.projectId });
       return { status: "deleted" };
+    },
+
+    async removeProject(projectId, force = false) {
+      const project = mustProject(projectId);
+      const routes = db.routes.listByProject(projectId);
+      if (routes.some((r) => r.status === "answering" || r.status === "awaiting_permission")) throw new CoreError("ROUTE_BUSY", "有路正在回答，到站或停车后才能移除这个项目");
+      // Local 文件夹被挪走或删掉了也要能移除：这时没法问 git，工作区直接整个删掉
+      const engine = await engineFor(project).catch(() => null);
+      const label = (r: Route) => `${r.express ? `快${r.express}` : `${r.number}路`} ${r.name}`;
+
+      if (!force) {
+        const blocked: Extract<RemoveProjectResult, { status: "has-unsynced" }>["routes"] = [];
+        for (const r of routes) {
+          const s = engine ? await engine.status(r.id).catch(() => null) : null;
+          if (s?.unsynced.length) blocked.push({ routeId: r.id, label: label(r), files: s.unsynced.map((f) => ({ path: f.path, note: f.kind })) });
+        }
+        const kept = db.kept.listByProject(projectId).map((k) => k.label);
+        if (blocked.length || kept.length) return { status: "has-unsynced", routes: blocked, kept };
+      }
+
+      for (const r of routes) {
+        distilling.get(r.id)?.abort();
+        claude.cool(r.worktreePath);
+        await terminals.removeAll({ routeId: r.id });
+        if (engine) await engine.removeWorktree(r.id, { force: true }).catch(() => {});
+        if (r.sessionId) await claude.deleteSession(r.sessionId).catch(() => {});
+      }
+      if (engine) for (const k of db.kept.listByProject(projectId)) await engine.removeFolder(k.path).catch(() => {});
+      engines.delete(projectId);
+      localEdits.delete(projectId);
+      await fs.rm(path.join(opts.worktreesRoot, projectId), { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
+      db.projects.delete(projectId);
+      emit({ type: "project.removed", projectId });
+      return { status: "removed" };
     },
 
     async distill(routeId, stopId, keep) {
