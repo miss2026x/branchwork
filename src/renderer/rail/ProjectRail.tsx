@@ -145,6 +145,7 @@ export function ProjectRail({
             const open = !closed[p.id];
             return (
               <section key={p.id} className={css.projectSection}>
+                <div className={css.projectHead}>
                 <button
                   className={css.project}
                   aria-expanded={open}
@@ -161,6 +162,7 @@ export function ProjectRail({
                 <button className={css.projectMore} aria-label={`${p.name} 的菜单`} aria-expanded={projectMenu === p.id} onClick={() => setProjectMenu(projectMenu === p.id ? null : p.id)}>
                   <IconMore />
                 </button>
+                </div>
                 {projectMenu === p.id && (
                   <>
                     <div className={css.backdrop} onClick={() => setProjectMenu(null)} />

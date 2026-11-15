@@ -129,6 +129,8 @@
   flex: 1;
   min-width: 0;
   position: relative;
+  /* 空项目那条虚线两头伸得很长，别画到左栏和对话栏上 */
+  overflow-x: clip;
   background: var(--canvas);
 }
 .empty {
