@@ -496,8 +496,9 @@ export function App() {
             openCompress(null);
           }}
           onClose={() => openCompress(null)}
-          onCreate={(summary, name, question, itemId) => {
-            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question, itemId);
+          claudeOptions={allOptions[allRoutes[compressFrom.routeId]!.projectId]}
+          onCreate={(summary, name, question, itemId, run) => {
+            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question, itemId, run);
             openCompress(null);
           }}
         />
@@ -511,6 +512,7 @@ export function App() {
           nextNumber={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[forkFrom.routeId]!.projectId).map((r) => r.number)) + 1}
           contextTokens={projectStops.filter((s) => s.routeId === forkFrom.routeId).every((s) => s.seq <= forkFrom.seq) ? allRoutes[forkFrom.routeId]!.contextTokens : null}
           waiting={queue.filter((q) => !q.routeId)}
+          claudeOptions={allOptions[allRoutes[forkFrom.routeId]!.projectId]}
           onCancel={() => setForkFrom(null)}
           onConfirm={(name, question, opts) => {
             void fork(forkFrom.routeId, forkFrom.id, name, question, opts);

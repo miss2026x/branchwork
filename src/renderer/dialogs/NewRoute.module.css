@@ -247,15 +247,9 @@
   flex: none;
   margin-top: 2px;
 }
-.under {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: -4px;
-  min-height: 26px;
-}
 .from {
+  align-self: flex-start;
+  margin-top: -4px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -276,10 +270,11 @@
   color: var(--text-4);
 }
 .workspace {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  margin: -2px 0 0;
   font-size: 12px;
   color: var(--text-4);
   white-space: nowrap;
@@ -328,4 +323,53 @@
   font-family: var(--mono);
   font-size: 11px;
   color: rgba(255, 255, 255, 0.8);
+}
+
+/* 提示里要强调的一句（从某站开新对话：代码不回到那一站） */
+.workspace b {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.sub {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 24px 0 64px;
+  font-size: 12.5px;
+  line-height: 19px;
+  color: var(--text-3);
+}
+.sub > span {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+.sub > :first-child {
+  flex: none;
+}
+.switchTo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* 内容可能很长的（压缩弹窗的摘要）：中间一段自己滚动，头和底不动 */
+.tall {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }

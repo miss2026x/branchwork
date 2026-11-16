@@ -240,3 +240,40 @@
 .range > span {
   flex: none;
 }
+
+/* 一栏的样子（和开新车同一套，见 NewRoute.module.css） */
+.rangeText {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.rangePick {
+  flex: 1;
+  min-width: 0;
+}
+.seg {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--r-8);
+  background: var(--surface-2);
+}
+.seg button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-6);
+  font-size: 13px;
+  color: var(--text-3);
+}
+.seg button[aria-checked="true"] {
+  background: var(--surface-0);
+  box-shadow: var(--e1);
+  color: var(--text-1);
+  font-weight: 700;
+}
+.cost {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-4);
+}

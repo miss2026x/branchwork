@@ -124,10 +124,10 @@ describe("应用", () => {
     await page.getByRole("menuitem", { name: /从这站开新对话/ }).click();
     const dialog = page.getByRole("dialog", { name: "从第 1 站开新对话" });
     await expect.poll(() => dialog.isVisible()).toBe(true);
-    await dialog.getByPlaceholder("新对话").fill("换个思路");
-    await dialog.getByPlaceholder("开好后马上问这个问题").fill("岔出去问");
+    await dialog.getByLabel("名称").fill("换个思路");
+    await dialog.getByLabel("第一个问题").fill("岔出去问");
     await shot("6-fork-dialog");
-    await dialog.getByRole("button", { name: "开出 2路" }).click();
+    await dialog.getByRole("button", { name: /^发车/ }).click(); // 写了第一个问题，按钮是“发车”
 
     await expect.poll(() => page.getByRole("heading", { name: "换个思路" }).isVisible(), { timeout: 30000 }).toBe(true);
     await expect.poll(() => page.getByRole("alertdialog", { name: "等你批准" }).isVisible(), { timeout: 30000 }).toBe(true);

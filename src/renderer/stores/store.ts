@@ -50,6 +50,21 @@ export interface Distill {
   startedAt: number;
 }
 
+/** 一路车按什么跑：开新车、分叉、开快线时在弹窗里选的 */
+export interface RunSettings {
+  model: string | null;
+  effort: Effort | null;
+  permissionMode: PermissionMode;
+}
+
+/** 新开出来的路如果和选的不一样（默认沿用来源那一路），按选的改过来 */
+async function applyRun(route: Route, run?: RunSettings): Promise<Route> {
+  if (!run) return route;
+  if (run.model !== route.model || run.effort !== route.effort) route = await window.bw.setRouteModel(route.id, run.model, run.effort);
+  if (run.permissionMode !== route.permissionMode) route = await window.bw.setRoutePermissionMode(route.id, run.permissionMode);
+  return route;
+}
+
 interface State {
   ready: boolean;
   projects: Project[];
@@ -174,9 +189,9 @@ interface State {
   /** 把这一路各站的回答读回来（已经读过就不再读） */
   ensureHistory(routeId: string): void;
   ask(routeId: string, text: string): Promise<void>;
-  fork(routeId: string, stopId: string, name: string, firstQuestion: string, opts?: { color?: number | null; itemId?: string; switchTo?: boolean }): Promise<void>;
+  fork(routeId: string, stopId: string, name: string, firstQuestion: string, opts?: { color?: number | null; itemId?: string; switchTo?: boolean; run?: RunSettings }): Promise<void>;
   /** itemId：第一个问题是从候车区挑的，开出后把它从候车区拿掉 */
-  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string, itemId?: string): Promise<void>;
+  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string, itemId?: string, run?: RunSettings): Promise<void>;
   resolveConflict(routeId: string): Promise<void>;
   resync(routeId: string): Promise<void>;
   archiveRoute(routeId: string): Promise<void>;
@@ -560,8 +575,7 @@ export const useStore = create<State>((set, get) => {
       try {
         let route = await window.bw.createRoute(projectId, name?.trim() || undefined);
         if (color) route = await window.bw.setRouteColor(route.id, color);
-        if (model || effort) route = await window.bw.setRouteModel(route.id, model ?? null, effort ?? null);
-        if (permissionMode && permissionMode !== route.permissionMode) route = await window.bw.setRoutePermissionMode(route.id, permissionMode);
+        route = await applyRun(route, { model: model ?? null, effort: effort ?? null, permissionMode: permissionMode ?? route.permissionMode });
         set((s) => ({ dialog: null, routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
@@ -653,6 +667,7 @@ export const useStore = create<State>((set, get) => {
       try {
         let route = await window.bw.fork(routeId, stopId, name);
         if (opts.color) route = await window.bw.setRouteColor(route.id, opts.color);
+        route = await applyRun(route, opts.run);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         if (opts.itemId) void window.bw.queueRemove(opts.itemId).catch(() => {});
         if (opts.switchTo === false) get().showToast({ title: `已开出 ${route.number}路 ${route.name}`, detail: firstQuestion.trim() ? "第一个问题已发出" : "停在分叉站，等你提问", route, action: { label: "去看看", run: () => get().selectRoute(route.id) } });
@@ -816,9 +831,9 @@ export const useStore = create<State>((set, get) => {
       set((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
     },
 
-    async createExpress(routeId, stopId, summary, name, firstQuestion, itemId) {
+    async createExpress(routeId, stopId, summary, name, firstQuestion, itemId, run) {
       try {
-        const route = await window.bw.createExpress(routeId, stopId, summary, name);
+        const route = await applyRun(await window.bw.createExpress(routeId, stopId, summary, name), run);
         if (itemId) void window.bw.queueRemove(itemId).catch(() => {});
         get().dropDistill(stopId);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));

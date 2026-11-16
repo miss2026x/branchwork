@@ -1,0 +1,140 @@
+import { useRef, useState } from "react";
+import type { Effort, PermissionMode, QueueItem } from "../../shared";
+import { EffortControl } from "../chat/EffortControl";
+import { ModelControl } from "../chat/ModelControl";
+import { PermissionModeControl } from "../chat/PermissionModeControl";
+import { currentModel, modeItems, type OptionsState } from "../ui/claude-options";
+import { IconClose, IconWait, IconWarn } from "../ui/icons";
+import { ROUTE_COLORS } from "../ui/route-color";
+import { useFit } from "../ui/useFit";
+import own from "./NewRoute.module.css";
+
+/** 一路车按什么跑：模型、思考强度、动手前 */
+export interface RunChoice {
+  model: string | null;
+  effort: Effort | null;
+  permissionMode: PermissionMode;
+}
+
+/** 选好的设置里，这个模型真能用的那部分（强度不支持就回默认，自动判断不支持就每次都问） */
+export function usableRun(run: RunChoice, options: OptionsState): RunChoice {
+  const model = currentModel(options, run.model);
+  const modes = modeItems(options, model).filter((m) => !m.disabled);
+  return {
+    model: run.model,
+    effort: run.effort && model.efforts.includes(run.effort) ? run.effort : null,
+    permissionMode: modes.some((m) => m.mode === run.permissionMode) ? run.permissionMode : "ask",
+  };
+}
+
+const CLI_MODE: Record<PermissionMode, string> = { ask: "default", edits: "acceptEdits", auto: "auto", plan: "plan", dontAsk: "dontAsk", all: "bypassPermissions" };
+/** 同样的设置在终端里怎么写（思考强度没有对应的参数，不写） */
+export const cliCommand = (run: RunChoice, extra = "") =>
+  ["claude", extra, run.model ? `--model ${run.model}` : "", run.permissionMode === "all" ? "--dangerously-skip-permissions" : run.permissionMode !== "ask" ? `--permission-mode ${CLI_MODE[run.permissionMode]}` : ""].filter(Boolean).join(" ");
+
+/** 名称一行：左边标签，中间输入框，右边颜色 */
+export function NameRow({ id, value, onChange, placeholder, color, onColor, autoFocus }: { id: string; value: string; onChange(v: string): void; placeholder: string; color: string; onColor(n: number): void; autoFocus?: boolean }) {
+  return (
+    <div className={own.row}>
+      <label className={own.label} htmlFor={id}>
+        名称
+      </label>
+      <input id={id} className={own.name} autoFocus={autoFocus} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={40} />
+      <div className={own.swatches} role="radiogroup" aria-label="颜色">
+        {ROUTE_COLORS.map(([n, c], i) => (
+          <button key={n} type="button" role="radio" aria-checked={c === color} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => onColor(n)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface Props {
+  /** 框左上角的小标题（“第一站”“第 4 站”） */
+  title: string;
+  value: string;
+  onChange(text: string): void;
+  placeholder: string;
+  /** Ctrl/⌘ + 回车 */
+  onSubmit(): void;
+  /** 这一路按什么跑；不给就不显示左下角的三个选择 */
+  run?: RunChoice;
+  onRun?(run: RunChoice): void;
+  options?: OptionsState;
+  /** 菜单里说“只对 4路 生效”用 */
+  routeLabel: string;
+  /** 候车区里还没派车的问题：可以挑一个 */
+  waiting: QueueItem[];
+  picked: QueueItem | null;
+  onPick(item: QueueItem | null): void;
+}
+
+/**
+ * 弹窗里“第一站”的输入框：和对话栏底下的输入框一个样子（设计稿 4-6、3-4）。
+ * 左下角是这一路的批准方式、模型、思考强度（就是对话栏那三个按钮），右下角从候车区选
+ */
+export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, onRun, options, routeLabel, waiting, picked, onPick }: Props) {
+  const [picking, setPicking] = useState(false);
+  const list = useRef<HTMLDivElement>(null);
+  useFit(list, [picking]);
+  const model = run ? currentModel(options, run.model) : null;
+  const fromQueue = picked && value.trim() === picked.text;
+  return (
+    <>
+      <div className={own.box}>
+        <label htmlFor={`fs-${title}`}>{title}</label>
+        <textarea
+          id={`fs-${title}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={4}
+          placeholder={placeholder}
+          aria-label="第一个问题"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) (e.preventDefault(), onSubmit());
+          }}
+        />
+        <div className={own.toolbar}>
+          <div className={own.controls}>
+            {run && onRun && model && (
+              <>
+                <PermissionModeControl mode={run.permissionMode} routeLabel={routeLabel} options={options} model={model} onChange={(permissionMode) => onRun({ ...run, permissionMode })} />
+                <ModelControl model={run.model} effort={run.effort} options={options} routeLabel={routeLabel} onChange={(m, effort) => onRun({ ...run, model: m, effort })} />
+                <EffortControl effort={run.effort} model={model} routeLabel={routeLabel} onChange={(effort) => onRun({ ...run, effort })} />
+              </>
+            )}
+          </div>
+          {waiting.length > 0 && (
+            <div className={own.pickWrap}>
+              <button type="button" className={own.pick} aria-expanded={picking} onClick={() => setPicking(!picking)}>
+                <IconWait size={13} /> 从候车区选 <span>{waiting.length}</span>
+              </button>
+              {picking && (
+                <div ref={list} className={own.pickList} role="listbox" aria-label="候车区里没派车的问题">
+                  {waiting.map((q) => (
+                    <button key={q.id} type="button" role="option" aria-selected={picked?.id === q.id} onClick={() => (onPick(q), onChange(q.text), setPicking(false))}>
+                      {q.text}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      {run?.permissionMode === "all" && (
+        <p className={own.warn}>
+          <IconWarn size={14} /> 全部不问：这一路运行命令、改文件、联网都不再问你，能碰到这台电脑上你能碰到的任何东西。
+        </p>
+      )}
+      {fromQueue && (
+        <span className={own.from}>
+          <IconWait size={13} /> 来自候车区 · 发车后从候车区移走
+          <button type="button" aria-label="改回自己写" onClick={() => (onPick(null), onChange(""))}>
+            <IconClose size={11} />
+          </button>
+        </span>
+      )}
+    </>
+  );
+}
