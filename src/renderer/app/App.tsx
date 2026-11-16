@@ -542,6 +542,7 @@ export function App() {
           parked={(id) => (allQueues[id] ?? []).filter((q) => !q.routeId)}
           onAddProject={() => void openAddProject()}
           onCreate={(o) => void startRoute(o)}
+          onPermissionMode={(id, mode) => void setPermissionMode(id, mode)}
           onCancel={closeDialog}
         />
       )}

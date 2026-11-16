@@ -1,0 +1,79 @@
+.select {
+  position: relative;
+}
+.button {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface-0);
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-1);
+  transition: border-color var(--t-fast) ease-out;
+}
+.button > span {
+  flex: 1;
+  min-width: 0;
+}
+.button svg {
+  flex: none;
+  color: var(--text-3);
+}
+.button:hover {
+  border-color: var(--line-strong);
+}
+.button[aria-expanded="true"],
+.button:focus-visible {
+  outline: none;
+  border-color: var(--text-1);
+}
+.list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--r-10);
+  background: var(--surface-0);
+  box-shadow: var(--e3);
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: var(--r-6);
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.list li > span {
+  flex: 1;
+  min-width: 0;
+}
+.list li small {
+  display: block;
+  font-weight: 400;
+  font-size: 11.5px;
+  line-height: 15px;
+  color: var(--text-3);
+}
+.list li[data-active="true"] {
+  background: var(--surface-2);
+}
+.list li[aria-selected="true"] {
+  font-weight: 600;
+}
+.list li svg {
+  flex: none;
+  color: var(--text-1);
+}

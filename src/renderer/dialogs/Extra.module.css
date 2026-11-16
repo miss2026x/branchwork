@@ -62,28 +62,83 @@
 .checks code {
   font: 12px var(--mono);
 }
+/* 两栏的弹窗（开一路新车）：头、底各一条通栏的分隔线，两栏各自留白，右栏浅底 */
 .two {
   width: min(960px, 100%);
+  padding: 0;
+  overflow: visible;
+}
+.two > header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--divider);
+}
+.two > footer {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--divider);
+  align-items: center;
 }
 .cols {
-  display: flex;
-  flex-wrap: wrap;
-  border-block: 1px solid var(--divider);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
 }
 .col {
-  flex: 1 1 400px;
   min-width: 0;
-  padding: 20px 0 6px;
+  padding: 18px 20px 6px;
 }
 .right {
   background: var(--surface-1);
   border-left: 1px solid var(--divider);
 }
+@media (max-width: 860px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .right {
+    border-left: 0;
+    border-top: 1px solid var(--divider);
+  }
+}
 .ghostPlate {
   padding: 2px 8px;
-  border: 2px dashed;
+  border: 2px dashed rgba(255, 255, 255, 0.6);
   border-radius: var(--r-6);
+  color: #fff;
   font-weight: 800;
+}
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+.pair > * {
+  margin-bottom: 6px;
+}
+.pairNote {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-3);
+}
+.note {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--divider);
+  border-radius: var(--r-10);
+  background: var(--surface-0);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-2);
+}
+.note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-3);
+}
+.note b {
+  color: var(--text-1);
+  font-weight: 600;
 }
 .chips {
   display: flex;
@@ -114,20 +169,22 @@
 .nameColor {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 12px;
+  gap: 0 14px;
 }
 .nameColor > :first-child {
-  flex: 1 1 200px;
+  flex: 1 1 180px;
+  min-width: 0;
 }
 .swatches {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  height: 40px;
+  min-height: 40px;
   align-items: center;
 }
 .swatches button {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid var(--surface-0);
 }

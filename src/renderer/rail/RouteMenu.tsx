@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { Route } from "../../shared";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
 import { IconCopy, IconArchive, IconCompress, IconDownload, IconFold, IconPin, IconTrash } from "../ui/icons";
@@ -38,10 +38,17 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
   };
   const current = routeColors(route).line;
   const resume = route.sessionId ? `claude --resume ${route.sessionId}` : null;
+  // 菜单比下面剩的地方高时往上挪，整个放进窗口；还放不下就在菜单里滚动
+  const box = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState(at.top);
+  useLayoutEffect(() => {
+    const h = box.current?.offsetHeight ?? 0;
+    setTop(Math.max(8, Math.min(at.top, window.innerHeight - h - 8)));
+  }, [at.top]);
   return (
     <>
       <div className={css.backdrop} onClick={() => (commit(), onClose())} />
-      <div className={css.menu} role="dialog" aria-label={`${route.name} 的设置`} style={{ top: Math.max(8, Math.min(at.top, window.innerHeight - 560)), left: at.left }}>
+      <div ref={box} className={css.menu} role="dialog" aria-label={`${route.name} 的设置`} style={{ top, left: at.left }}>
         <label htmlFor={`rn-${route.id}`}>线路名称</label>
         <input
           id={`rn-${route.id}`}
@@ -110,16 +117,18 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
           <div className={css.resume}>
             <span>在终端里接着这一路</span>
             <div>
-              <code className="ell">{resume}</code>
+              <code className="ell" title={resume}>
+                claude --resume {route.sessionId!.slice(0, 8)}
+              </code>
               <button
                 aria-label="复制命令"
-                title={copied ? "已复制" : "复制命令"}
+                title={copied ? "已复制" : "复制命令（会带上进入这一路工作区的命令）"}
                 onClick={() => void navigator.clipboard?.writeText(`cd "${route.worktreePath}" && ${resume}`).then(() => setCopied(true))}
               >
                 <IconCopy size={14} />
               </button>
             </div>
-            <small>{copied ? "已复制（带上了进入这一路工作区的命令）" : "要在这一路的工作区里运行；复制时会带上进入目录的命令"}</small>
+            {copied && <small>已复制，带上了进入这一路工作区的命令</small>}
           </div>
         )}
         <hr />

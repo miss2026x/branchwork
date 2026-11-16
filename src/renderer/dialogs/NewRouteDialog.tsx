@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { Project, QueueItem } from "../../shared";
+import type { PermissionMode, Project, QueueItem } from "../../shared";
 import { IconClose, IconFolder, IconSend, IconWait } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
+import { Select, type SelectOption } from "../ui/Select";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
 
@@ -15,18 +16,26 @@ interface Props {
   parked(projectId: string): QueueItem[];
   onAddProject(): void;
   onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; question: string; itemId?: string }): void;
+  /** “动手前”是整个项目的设置，这里改了就是改这个项目的 */
+  onPermissionMode(projectId: string, mode: PermissionMode): void;
   onCancel(): void;
 }
 
-const MODELS: [string, string][] = [
-  ["", "默认"],
-  ["opus", "Opus"],
-  ["sonnet", "Sonnet"],
-  ["haiku", "Haiku"],
+const MODELS: SelectOption<string>[] = [
+  { value: "", label: "默认", hint: "跟着 Claude Code 的设置" },
+  { value: "opus", label: "Opus", hint: "最强，适合难题" },
+  { value: "sonnet", label: "Sonnet", hint: "又快又好，日常用" },
+  { value: "haiku", label: "Haiku", hint: "最快，适合简单的事" },
+];
+
+const MODES: SelectOption<PermissionMode>[] = [
+  { value: "ask", label: "每次都问我" },
+  { value: "edits", label: "改文件不问", hint: "运行命令前还是问我" },
+  { value: "all", label: "都不问" },
 ];
 
 /** “开一路新车”：选项目、起名、挑颜色和模型，写第一个问题（可以从候车区选） */
-export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, onCreate, onCancel }: Props) {
+export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, onCreate, onPermissionMode, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
@@ -34,6 +43,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const [question, setQuestion] = useState("");
   const [from, setFrom] = useState<QueueItem | null>(null);
   const [picking, setPicking] = useState(false);
+  const projectMode = projects.find((p) => p.id === projectId)?.permissionMode ?? "ask";
+  const [mode, setMode] = useState<PermissionMode | null>(null);
   const number = nextNumber(projectId);
   const route = { number, express: null, color };
   const colors = routeColors(route);
@@ -45,6 +56,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   }, [onCancel]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (mode && mode !== projectMode) onPermissionMode(projectId, mode);
     onCreate({ projectId, name, color, model: model || null, question, itemId: from && question.trim() === from.text ? from.id : undefined });
   };
 
@@ -52,7 +64,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
     <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && !question && onCancel()}>
       <form className={`${css.dialog} ${own.two}`} role="dialog" aria-modal aria-label="开一路新车" onSubmit={submit}>
         <header>
-          <span className={own.ghostPlate} style={{ borderColor: colors.tag, color: colors.tag }}>
+          <span className={own.ghostPlate} style={{ background: colors.tag }}>
             {number}路
           </span>
           <h2>开一路新车</h2>
@@ -89,16 +101,17 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
                 </div>
               </div>
             </div>
-            <label className={css.field}>
-              <span>模型</span>
-              <select className={own.select} value={model} onChange={(e) => setModel(e.target.value)}>
-                {MODELS.map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className={own.pair}>
+              <div className={css.field}>
+                <span>模型</span>
+                <Select label="模型" value={model} options={MODELS} onChange={setModel} />
+              </div>
+              <div className={css.field}>
+                <span>动手前</span>
+                <Select<PermissionMode> label="动手前" value={mode ?? projectMode} options={MODES} onChange={(m) => setMode(m)} />
+              </div>
+            </div>
+            <p className={own.pairNote}>“动手前”是整个项目的设置，改了以后这个项目的每一路都一样。</p>
           </div>
           <div className={`${own.col} ${own.right}`}>
             <div className={css.field}>
@@ -131,7 +144,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
               />
               {from && question.trim() === from.text && <small className={own.from}>来自候车区，发车后从候车区移走</small>}
             </div>
-            <div className={css.note}>
+            <div className={own.note}>
               <IconFolder size={16} />
               <span>
                 <b>新对话有自己的工作区</b>，代码从 Local 的现在开始。每站答完，改动自动同步进 Local；下一站开始前，先拿到 Local 的最新代码。

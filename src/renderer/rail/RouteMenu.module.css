@@ -6,10 +6,10 @@
 .menu {
   position: fixed;
   z-index: 9;
-  width: 316px;
+  width: 340px;
   max-height: calc(100vh - 16px);
   overflow-y: auto;
-  padding: 14px 12px 8px;
+  padding: 14px 8px 8px 8px;
   border-radius: var(--r-16);
   background: var(--surface-0);
   box-shadow: var(--e3);
@@ -19,14 +19,15 @@
 .menu label,
 .label {
   display: block;
-  margin: 0 4px 6px;
+  margin: 0 8px 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-3);
 }
 .menu input {
-  width: 100%;
-  height: 40px;
+  width: calc(100% - 16px);
+  margin: 0 8px;
+  height: 38px;
   padding: 0 12px;
   border: 1.5px solid var(--border);
   border-radius: var(--r-8);
@@ -39,7 +40,7 @@
 }
 .info,
 .sync {
-  margin: 8px 4px 0;
+  margin: 8px 8px 0;
   font-size: 12px;
   line-height: 18px;
   color: var(--text-2);
@@ -60,14 +61,14 @@
   background: var(--amber);
 }
 .menu hr {
-  margin: 12px -4px;
+  margin: 10px 0;
   border: 0;
   border-top: 1px solid var(--divider);
 }
 .colors {
   display: flex;
   gap: 8px;
-  margin: 0 4px;
+  margin: 0 8px;
 }
 .colors button {
   width: 26px;
@@ -83,10 +84,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 7px 8px;
+  min-height: 34px;
+  padding: 5px 8px;
   border-radius: var(--r-8);
   text-align: left;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 18px;
 }
 .item svg {
   flex: none;
@@ -101,8 +104,9 @@
 .item small,
 .resume small {
   display: block;
-  font-size: 12px;
-  line-height: 16px;
+  font-weight: 400;
+  font-size: 11.5px;
+  line-height: 15px;
   color: var(--text-3);
 }
 .danger {
@@ -110,7 +114,7 @@
   font-weight: 600;
 }
 .resume {
-  margin-top: 8px;
+  margin: 6px 4px 0;
   padding: 10px;
   border-radius: var(--r-10);
   background: var(--surface-1);
@@ -124,7 +128,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 6px 0 4px;
+  margin-top: 6px;
+}
+.resume small {
+  margin-top: 4px;
 }
 .resume code {
   flex: 1;
