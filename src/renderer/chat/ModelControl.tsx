@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Effort, ModelChoice } from "../../shared";
 import { useFit } from "../ui/useFit";
-import { IconCheck, IconChevron } from "../ui/icons";
+import { IconCheck, IconChevron, IconDown, IconSpark } from "../ui/icons";
 import { currentModel, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
 import css from "./PermissionModeControl.module.css";
 
@@ -45,9 +45,10 @@ export function ModelControl({ model, effort, options, routeLabel, onChange }: P
 
   return (
     <div className={css.wrap}>
-      <button className={css.trigger} data-mode={model || effort ? "edits" : "ask"} aria-haspopup="menu" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))} title="这一路用哪个模型">
-        <span className="ell">模型：{short(current.label)}</span>
-        <IconChevron size={12} open={open} />
+      <button className={css.trigger} aria-haspopup="menu" aria-expanded={open} aria-label={`模型：${short(current.label)}`} onClick={() => (open ? close() : setOpen(true))} title={`这一路用的模型：${current.label}`}>
+        <IconSpark size={14} />
+        <span className="ell">{short(current.label)}</span>
+        <IconDown size={12} />
       </button>
       {open && (
         <>

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Effort, ModelChoice } from "../../shared";
 import { useFit } from "../ui/useFit";
-import { IconCheck, IconChevron } from "../ui/icons";
+import { IconCheck, IconDown, IconGauge } from "../ui/icons";
 import { EFFORT_HINT, EFFORT_LABEL } from "../ui/claude-options";
 import css from "./PermissionModeControl.module.css";
 
@@ -26,9 +26,10 @@ export function EffortControl({ effort, model, routeLabel, onChange }: Props) {
   };
   return (
     <div className={css.wrap}>
-      <button className={css.trigger} data-mode={shown ? "edits" : "ask"} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} title="这一路想得多深">
-        <span className="ell">强度：{shown ? EFFORT_LABEL[shown] : "默认"}</span>
-        <IconChevron size={12} open={open} />
+      <button className={css.trigger} aria-haspopup="menu" aria-expanded={open} aria-label={`强度：${shown ? EFFORT_LABEL[shown] : "默认"}`} onClick={() => setOpen(!open)} title="这一路想得多深（思考强度）">
+        <IconGauge size={14} />
+        <span className="ell">{shown ? EFFORT_LABEL[shown] : "默认"}</span>
+        <IconDown size={12} />
       </button>
       {open && (
         <>

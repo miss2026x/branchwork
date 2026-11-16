@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { ModelChoice, PermissionMode } from "../../shared";
 import { useFit } from "../ui/useFit";
-import { IconCheck, IconChevron, IconWarn } from "../ui/icons";
+import { IconCheck, IconDown, IconShield, IconWarn } from "../ui/icons";
 import { modeInfo, modeItems, type OptionsState } from "../ui/claude-options";
 import css from "./PermissionModeControl.module.css";
 
@@ -33,13 +33,21 @@ export function PermissionModeControl({ mode, routeLabel, options, model, onChan
 
   return (
     <div className={css.wrap}>
-      <button className={css.trigger} data-mode={mode} aria-haspopup="menu" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))} title="Claude 要做需要批准的事时怎么办">
-        {mode === "all" && <IconWarn size={14} />}
+      <button
+        className={css.trigger}
+        data-mode={mode}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`批准：${current.label}${fallback ? "（这一路按每次都问）" : ""}`}
+        onClick={() => (open ? close() : setOpen(true))}
+        title={fallback ? `动手前：${current.label}，但这一路的模型不支持，先按每次都问` : `动手前：${current.label}`}
+      >
+        {mode === "all" ? <IconWarn size={14} /> : <IconShield size={14} />}
         <span className="ell">
-          批准：{current.label}
-          {fallback && "（这一路按每次都问）"}
+          {current.label}
+          {fallback && "*"}
         </span>
-        <IconChevron size={12} open={open} />
+        <IconDown size={12} />
       </button>
 
       {open && (

@@ -383,71 +383,112 @@
   background: var(--surface-0);
   font-weight: 600;
 }
-.composer textarea {
+.box {
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface-0);
+  transition:
+    border-color var(--t-fast) ease-out,
+    box-shadow var(--t-fast) ease-out;
+}
+.box:hover {
+  border-color: var(--line-strong);
+}
+.box:focus-within {
+  border-color: var(--text-1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 201, 0.12);
+}
+.box[data-disabled="true"] {
+  background: var(--surface-2);
+}
+.box textarea {
   display: block;
   width: 100%;
   min-height: 76px;
   max-height: 240px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-10);
-  background: var(--surface-0);
-  resize: vertical;
-  line-height: 22px;
-  transition: border-color var(--t-fast) ease-out;
+  padding: 12px 14px 4px;
+  border: none;
+  border-radius: var(--r-12) var(--r-12) 0 0;
+  background: transparent;
+  resize: none;
+  font-size: 14px;
+  line-height: 21px;
 }
-.composer textarea:hover {
-  border-color: var(--line-strong);
-}
-.composer textarea:focus {
+.box textarea:focus {
   outline: none;
-  border-color: var(--text-1);
 }
-.composer textarea::placeholder {
+.box textarea::placeholder {
   color: var(--text-4);
 }
-.composer textarea:disabled {
-  background: var(--surface-2);
-}
-.actions {
+.toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
-}
-.afterStop {
-  margin: 8px 2px 0;
-  font-size: 12px;
-  color: var(--text-3);
+  gap: 4px;
+  padding: 6px 8px 8px 6px;
 }
 .controls {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
 }
-.actions > span {
-  flex: 1;
+/* 窄了先省掉三个选择前面的图标，再让模型名省略；批准和强度不缩，发车按钮不动 */
+.toolbar {
+  container-type: inline-size;
+}
+.controls > * {
+  flex: 0 0 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-3);
+}
+.controls > :nth-child(2) {
+  flex-shrink: 1;
+}
+@container (max-width: 360px) {
+  .controls button[aria-haspopup] > svg:first-child {
+    display: none;
+  }
 }
 .send {
   flex: none;
   white-space: nowrap;
-  height: 40px;
-  padding: 0 18px;
+  height: 32px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-8);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.send kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+}
+/* 框上方的一行：回答中写的先进候车 / 上一站没答完 */
+.statusRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-radius: var(--r-8);
-  color: #fff;
-  font-weight: 700;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.statusRow > span {
+  flex: 1;
+}
+.afterStop {
+  color: var(--amber-text);
+}
+.afterStop i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--text-1);
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--text-1) 50%, var(--surface-0) 50%);
 }
 .summary {
   margin-bottom: 24px;
@@ -660,25 +701,18 @@
 .waitBar svg:last-child {
   color: var(--text-3);
 }
-.queueHint {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: var(--text-3);
-}
 .seg {
-  align-self: flex-start;
+  flex: none;
   display: inline-flex;
-  margin-bottom: 8px;
-  padding: 3px;
-  border: 1px solid var(--border);
+  padding: 2px;
   border-radius: var(--r-8);
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 .seg button {
-  height: 30px;
+  height: 24px;
   padding: 0 8px;
   border-radius: var(--r-6);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-3);
   white-space: nowrap;
 }

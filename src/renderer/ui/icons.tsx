@@ -55,3 +55,7 @@ export function BusMark({ size = 28, color = "var(--route-2)" }: { size?: number
     </svg>
   );
 }
+export const IconShield = (p: P) => <Icon {...p}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></Icon>;
+export const IconSpark = (p: P) => <Icon {...p}><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></Icon>;
+export const IconGauge = (p: P) => <Icon {...p}><path d="M4 16a8 8 0 0116 0M12 16l4-5" /></Icon>;
+export const IconDown = (p: P) => <Icon {...p}><path d="M6 9l6 6 6-6" /></Icon>;

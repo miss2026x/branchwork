@@ -1,31 +1,40 @@
 .wrap {
   position: relative;
 }
+/* 输入框里左下角的三个选择：平时不加边框，悬停浅灰底，打开时深一点（设计稿 4-6） */
 .trigger {
-  max-width: 200px;
+  max-width: 100%;
   min-width: 0;
-  height: 32px;
+  height: 30px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid transparent;
   border-radius: var(--r-8);
   font-size: 12px;
+  font-weight: 500;
   color: var(--text-3);
   white-space: nowrap;
+}
+.trigger svg {
+  flex: none;
 }
 .trigger:hover {
   background: var(--surface-2);
 }
-.trigger[data-mode="edits"] {
+.trigger[aria-expanded="true"] {
+  background: var(--surface-3, #e9edf1);
   color: var(--text-1);
 }
 .trigger[data-mode="all"] {
-  border-color: var(--amber);
+  border-color: #f0c877;
   background: var(--amber-bg);
   color: var(--amber-text);
-  font-weight: 600;
+  font-weight: 700;
+}
+.wrap {
+  min-width: 0;
 }
 .backdrop {
   position: fixed;

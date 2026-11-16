@@ -420,34 +420,47 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             </button>
           </div>
         )}
-        {busy && current && <p className={css.queueHint}>第 {num(current)} 站还在回答，现在写的会进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${route.express ? `快${route.express}` : `${route.number}路`} 候车`}</p>}
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(route.id, e.target.value)}
-          onKeyDown={onKey}
-          placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，Enter 排队，到站后自动发" : "写下一个问题。Enter 发车，Shift+Enter 换行"}
-          disabled={blocked}
-          rows={3}
-        />
-        {busy && (
-          <div className={css.seg} role="radiogroup" aria-label="排队方式">
-            {(["auto", "manual", "unassigned"] as const).map((m) => (
-              <button key={m} role="radio" aria-checked={queueMode === m} onClick={() => setQueueMode(m)} title={m === "auto" ? "这一站正常答完就自动发出" : m === "manual" ? "到站后等你点“登车”再发" : "放进候车区，先不派给哪一路"}>
-                {m === "auto" ? "自动登车" : m === "manual" ? "手动登车" : "只放着"}
-              </button>
-            ))}
+        {busy && current && (
+          <div className={css.statusRow}>
+            <span className="ell">
+              第 {num(current)} 站还在回答，写好的先进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${route.express ? `快${route.express}` : `${route.number}路`} 候车`}
+            </span>
+            <div className={css.seg} role="radiogroup" aria-label="排队方式">
+              {(["auto", "manual", "unassigned"] as const).map((m) => (
+                <button key={m} role="radio" aria-checked={queueMode === m} onClick={() => setQueueMode(m)} title={m === "auto" ? "这一站正常答完就自动发出" : m === "manual" ? "到站后等你点“登车”再发" : "放进候车区，先不派给哪一路"}>
+                  {m === "auto" ? "自动登车" : m === "manual" ? "手动登车" : "只放着"}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        {route.status === "interrupted" && <p className={css.afterStop}>上一站没答完，可以接着问</p>}
-        <div className={css.actions}>
-          <div className={css.controls}>
-            <PermissionModeControl mode={permissionMode} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
-            <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
-            <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={(effort) => onModel(route.model, effort)} />
+        {route.status === "interrupted" && (
+          <p className={`${css.statusRow} ${css.afterStop}`}>
+            <i aria-hidden />
+            <span className="ell">上一站没答完，改动还在工作区。接着问，下一站答完一起进 Local</span>
+          </p>
+        )}
+        {/* 设计稿 4-6：输入框、这一路的三个选择、发车按钮在同一个框里 */}
+        <div className={css.box} data-disabled={blocked}>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(route.id, e.target.value)}
+            onKeyDown={onKey}
+            aria-label="下一个问题"
+            placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，到站后自动发" : route.status === "interrupted" ? "接着说，比如：继续，把测试也补上" : "写下一个问题。Enter 发车，Shift+Enter 换行"}
+            disabled={blocked}
+            rows={3}
+          />
+          <div className={css.toolbar}>
+            <div className={css.controls}>
+              <PermissionModeControl mode={permissionMode} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
+              <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
+              <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={(effort) => onModel(route.model, effort)} />
+            </div>
+            <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
+              {busy ? "排队" : route.status === "interrupted" ? "接着问" : "发车"} <kbd>↵</kbd>
+            </button>
           </div>
-          <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
-            {busy ? "排队" : "发车"} <IconSend size={14} />
-          </button>
         </div>
       </footer>
     </aside>

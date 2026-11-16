@@ -115,7 +115,7 @@ describe("应用", () => {
     await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
     await page.getByRole("button", { name: "停车" }).click();
     await expect.poll(() => page.getByText("第 3 站没答完").isVisible(), { timeout: 30000 }).toBe(true);
-    expect(await page.getByText("上一站没答完，可以接着问").isVisible()).toBe(true);
+    expect(await page.getByText(/上一站没答完，改动还在工作区/).isVisible()).toBe(true);
     await shot("5-interrupted");
   });
 
