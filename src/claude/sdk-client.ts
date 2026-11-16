@@ -44,6 +44,7 @@ export interface SdkFunctions {
 type SdkMode = NonNullable<Options["permissionMode"]>;
 interface RawModel {
   value: string;
+  resolvedModel?: string;
   displayName: string;
   description: string;
   supportsEffort?: boolean;
@@ -366,6 +367,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
           description: m.description ?? "",
           efforts: m.supportsEffort ? LEVELS.filter((l) => (m.supportedEffortLevels ?? []).includes(l)) : [],
           autoMode: m.supportsAutoMode === true,
+          ...(m.resolvedModel ? { resolved: m.resolvedModel } : {}),
         })),
         // “每次都问”总能用
         modes: ours.filter((m) => m === "ask" || r.modes.includes(PROBE_MODE[m])),

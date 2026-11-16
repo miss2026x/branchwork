@@ -129,7 +129,7 @@ interface State {
   importSessions(projectId: string, sessionIds: string[]): Promise<void>;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
-  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; question?: string; itemId?: string }): Promise<void>;
+  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; question?: string; itemId?: string }): Promise<void>;
   /** 看这个项目的同步记录；null 关掉 */
   viewLog(projectId: string | null): void;
   closeDialog(): void;
@@ -555,11 +555,11 @@ export const useStore = create<State>((set, get) => {
       if (get().projects.length > 0) set({ dialog: { kind: "new-route" } });
     },
 
-    async startRoute({ projectId, name, color, model, question, itemId }) {
+    async startRoute({ projectId, name, color, model, effort, question, itemId }) {
       try {
         let route = await window.bw.createRoute(projectId, name?.trim() || undefined);
         if (color) route = await window.bw.setRouteColor(route.id, color);
-        if (model) route = await window.bw.setRouteModel(route.id, model);
+        if (model || effort) route = await window.bw.setRouteModel(route.id, model ?? null, effort ?? null);
         set((s) => ({ dialog: null, routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         if (itemId) await window.bw.queueRemove(itemId).catch(() => {});

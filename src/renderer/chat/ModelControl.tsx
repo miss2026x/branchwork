@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { Effort, ModelChoice } from "../../shared";
 import { useFit } from "../ui/useFit";
 import { IconCheck, IconChevron } from "../ui/icons";
-import { currentModel, EFFORT_HINT, EFFORT_LABEL, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
+import { currentModel, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
 import css from "./PermissionModeControl.module.css";
 
 interface Props {
@@ -17,16 +17,14 @@ interface Props {
 /** 按钮上放不下“Default (recommended)”这样的长名字：去掉括号里的说明 */
 const short = (label: string) => label.replace(/\s*[(（][^)）]*[)）]\s*$/, "") || label;
 
-/** 这一路用哪个模型、思考强度多少。能选哪些是 Claude Code 给的；只收当前值、回传用户选的值 */
+/** 这一路用哪个模型。能选哪些是 Claude Code 给的；只收当前值、回传用户选的值。思考强度在旁边单独的 EffortControl */
 export function ModelControl({ model, effort, options, routeLabel, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [showMore, setShowMore] = useState(false);
-  const [hoverEffort, setHoverEffort] = useState<Effort | "default" | null>(null);
   const box = useRef<HTMLDivElement>(null);
   useFit(box, [open, showMore, typeof options === "object"]);
   const { common, more } = modelItems(options, model);
   const current = currentModel(options, model);
-  const shownEffort = effort && current.efforts.includes(effort) ? effort : null;
   const close = () => (setOpen(false), setShowMore(false));
 
   const pickModel = (m: ModelChoice) => {
@@ -44,15 +42,11 @@ export function ModelControl({ model, effort, options, routeLabel, onChange }: P
       </span>
     </button>
   );
-  const effortTip = hoverEffort === "default" || (!hoverEffort && !shownEffort) ? "跟着模型自己的设定" : EFFORT_HINT[(hoverEffort as Effort) ?? shownEffort!];
 
   return (
     <div className={css.wrap}>
-      <button className={css.trigger} data-mode={model || effort ? "edits" : "ask"} aria-haspopup="menu" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))} title="这一路用哪个模型、思考强度多少">
-        <span className="ell">
-          模型：{short(current.label)}
-          {shownEffort && ` · ${EFFORT_LABEL[shownEffort]}`}
-        </span>
+      <button className={css.trigger} data-mode={model || effort ? "edits" : "ask"} aria-haspopup="menu" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))} title="这一路用哪个模型">
+        <span className="ell">模型：{short(current.label)}</span>
         <IconChevron size={12} open={open} />
       </button>
       {open && (
@@ -70,22 +64,6 @@ export function ModelControl({ model, effort, options, routeLabel, onChange }: P
                 </button>
                 {showMore && more.map(row)}
               </>
-            )}
-            {current.efforts.length > 0 && (
-              <div className={css.effort} onMouseLeave={() => setHoverEffort(null)}>
-                <span>思考强度</span>
-                <div role="radiogroup" aria-label="思考强度">
-                  <button role="radio" aria-checked={!shownEffort} onMouseEnter={() => setHoverEffort("default")} onClick={() => (shownEffort && onChange(model, null), close())}>
-                    默认
-                  </button>
-                  {current.efforts.map((e) => (
-                    <button key={e} role="radio" aria-checked={shownEffort === e} title={EFFORT_HINT[e]} onMouseEnter={() => setHoverEffort(e)} onClick={() => (e !== shownEffort && onChange(model, e), close())}>
-                      {EFFORT_LABEL[e]}
-                    </button>
-                  ))}
-                </div>
-                <small>{effortTip}。越高想得越久、越贵</small>
-              </div>
             )}
           </div>
         </>

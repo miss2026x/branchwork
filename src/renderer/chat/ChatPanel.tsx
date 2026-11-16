@@ -5,6 +5,7 @@ import type { ChatItem, Effort, PermissionMode, QueueItem, QueueMode, Route, Sto
 import { currentModel, type OptionsState } from "../ui/claude-options";
 import { TerminalStrip } from "../terminal/TerminalStrip";
 import { ModelControl } from "./ModelControl";
+import { EffortControl } from "./EffortControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
@@ -438,10 +439,13 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             ))}
           </div>
         )}
+        {route.status === "interrupted" && <p className={css.afterStop}>上一站没答完，可以接着问</p>}
         <div className={css.actions}>
-          <PermissionModeControl mode={permissionMode} projectName={projectName} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
-          <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
-          <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : ""}</span>
+          <div className={css.controls}>
+            <PermissionModeControl mode={permissionMode} projectName={projectName} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
+            <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
+            <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={(effort) => onModel(route.model, effort)} />
+          </div>
           <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
             {busy ? "排队" : "发车"} <IconSend size={14} />
           </button>

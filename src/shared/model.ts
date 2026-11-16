@@ -119,6 +119,8 @@ export interface ModelChoice {
   efforts: Effort[];
   /** 能不能用“自动判断”（auto）批准方式 */
   autoMode: boolean;
+  /** 别名实际对应的型号（Claude Code 说的，比如 sonnet → claude-sonnet-5-5；接了别家网关时可能是别的模型） */
+  resolved?: string;
 }
 
 /** 从这台电脑上的 Claude Code 读到的：能选的模型、能用的批准方式（账号、管理员设置、项目设置都算进去了） */

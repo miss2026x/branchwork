@@ -114,7 +114,16 @@
 .pair > * {
   margin-bottom: 6px;
 }
+.na {
+  height: 40px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-4);
+}
 .pairNote {
+  align-self: end;
   margin: 0 0 14px;
   font-size: 12px;
   line-height: 17px;

@@ -377,9 +377,10 @@ describe("应用", () => {
     await page.getByRole("button", { name: /^模型：Default/ }).click();
     await page.getByRole("menuitemradio", { name: /Sonnet/ }).click();
     await expect.poll(() => page.getByRole("button", { name: /^模型：Sonnet/ }).isVisible()).toBe(true);
-    await page.getByRole("button", { name: /^模型：Sonnet/ }).click();
-    await page.getByRole("radio", { name: "高", exact: true }).click();
-    await expect.poll(() => page.getByRole("button", { name: "模型：Sonnet 5.5 · 高" }).isVisible()).toBe(true);
+    // 思考强度是单独一个选择；能调哪几档是 Claude Code 说的
+    await page.getByRole("button", { name: /^强度：默认/ }).click();
+    await page.getByRole("menuitemradio", { name: /^高/ }).click();
+    await expect.poll(() => page.getByRole("button", { name: "强度：高" }).isVisible()).toBe(true);
 
     await page.locator("textarea").fill("起名试试，再开一个终端");
     await page.keyboard.press("Enter");

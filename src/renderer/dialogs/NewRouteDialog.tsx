@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { PermissionMode, Project, QueueItem } from "../../shared";
+import type { Effort, PermissionMode, Project, QueueItem } from "../../shared";
 import { IconClose, IconFolder, IconSend, IconWait } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
 import { Select, type SelectOption } from "../ui/Select";
-import { modeItems, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
+import { EFFORT_HINT, EFFORT_LABEL, modeItems, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
 
@@ -19,7 +19,7 @@ interface Props {
   /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的）；没读过时 onLoadClaudeOptions 去读 */
   claudeOptions(projectId: string): OptionsState;
   onLoadClaudeOptions(projectId: string): void;
-  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; question: string; itemId?: string }): void;
+  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; question: string; itemId?: string }): void;
   /** “动手前”是整个项目的设置，这里改了就是改这个项目的 */
   onPermissionMode(projectId: string, mode: PermissionMode): void;
   onCancel(): void;
@@ -32,6 +32,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
   const [model, setModel] = useState("");
+  const [effort, setEffort] = useState("");
   const [question, setQuestion] = useState("");
   const [from, setFrom] = useState<QueueItem | null>(null);
   const [picking, setPicking] = useState(false);
@@ -46,6 +47,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const { common, more } = modelItems(modelState, null);
   const modelOptions: SelectOption<string>[] = [...common, ...more].map((m) => ({ value: m.value === "default" ? "" : m.value, label: m.label, hint: [modelHint(m), m.description].filter(Boolean).join(" · ") }));
   const picked = [...common, ...more].find((m) => m.value === (model || "default"));
+  const effortOptions: SelectOption<string>[] = [{ value: "", label: "默认", hint: "跟着模型自己的设定" }, ...(picked?.efforts ?? []).map((e) => ({ value: e, label: EFFORT_LABEL[e], hint: EFFORT_HINT[e] }))];
   const modeOptions: SelectOption<PermissionMode>[] = modeItems(modelState, picked)
     .filter((m) => !m.disabled)
     .map((m) => ({ value: m.mode, label: m.recommended ? `${m.label}（推荐）` : m.label, hint: m.hint }));
@@ -57,7 +59,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (mode && mode !== projectMode) onPermissionMode(projectId, mode);
-    onCreate({ projectId, name, color, model: model || null, question, itemId: from && question.trim() === from.text ? from.id : undefined });
+    const pickedEffort = picked?.efforts.find((e) => e === effort) ?? null;
+    onCreate({ projectId, name, color, model: model || null, effort: pickedEffort, question, itemId: from && question.trim() === from.text ? from.id : undefined });
   };
 
   return (
@@ -108,11 +111,21 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
                 {modelState === "loading" && <small className={own.from}>正在从 Claude Code 读取能用的模型…</small>}
               </div>
               <div className={css.field}>
+                <span>思考强度</span>
+                {effortOptions.length > 1 ? (
+                  <Select<string> label="思考强度" value={effortOptions.some((o) => o.value === effort) ? effort : ""} options={effortOptions} onChange={setEffort} />
+                ) : (
+                  <p className={own.na}>{picked ? "这个模型不能调" : "先等模型列表读好"}</p>
+                )}
+              </div>
+            </div>
+            <div className={own.pair}>
+              <div className={css.field}>
                 <span>动手前</span>
                 <Select<PermissionMode> label="动手前" value={mode ?? projectMode} options={modeOptions} onChange={(m) => setMode(m)} />
               </div>
+              <p className={own.pairNote}>“动手前”是整个项目的设置，改了以后这个项目的每一路都一样。</p>
             </div>
-            <p className={own.pairNote}>“动手前”是整个项目的设置，改了以后这个项目的每一路都一样。</p>
           </div>
           <div className={`${own.col} ${own.right}`}>
             <div className={css.field}>

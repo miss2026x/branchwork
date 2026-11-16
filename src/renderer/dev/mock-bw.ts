@@ -28,11 +28,11 @@ export function installMockBw(): void {
   const ALL: Effort[] = ["low", "medium", "high", "xhigh", "max"];
   const MOCK_OPTIONS: ClaudeOptions = {
     models: [
-      { value: "default", label: "Default (recommended)", description: "Opus 5.5 · Best for everyday, complex tasks", efforts: ALL, autoMode: true },
-      { value: "opus", label: "Opus 5.5", description: "Best for everyday, complex tasks", efforts: ALL, autoMode: true },
-      { value: "sonnet", label: "Sonnet 5.5", description: "Efficient for routine tasks", efforts: ALL, autoMode: true },
-      { value: "fable", label: "Fable 5.2", description: "Most capable for your hardest and longest-running tasks", efforts: ALL, autoMode: true },
-      { value: "haiku", label: "Haiku 5.5", description: "Fastest for quick answers", efforts: ALL, autoMode: true },
+      { value: "default", resolved: "claude-opus-5-5", label: "Default (recommended)", description: "Opus 5.5 · Best for everyday, complex tasks", efforts: ALL, autoMode: true },
+      { value: "opus", resolved: "claude-opus-5-5", label: "Opus 5.5", description: "Best for everyday, complex tasks", efforts: ALL, autoMode: true },
+      { value: "sonnet", resolved: "claude-sonnet-5-5", label: "Sonnet 5.5", description: "Efficient for routine tasks", efforts: ALL, autoMode: true },
+      { value: "fable", resolved: "claude-fable-5-2", label: "Fable 5.2", description: "Most capable for your hardest and longest-running tasks", efforts: ALL, autoMode: true },
+      { value: "haiku", resolved: "claude-haiku-5-5", label: "Haiku 5.5", description: "Fastest for quick answers", efforts: ALL, autoMode: true },
       { value: "claude-fable-5-1", label: "Fable 5.1", description: "Most capable for your hardest and longest-running tasks", efforts: ALL, autoMode: true },
       { value: "claude-sonnet-5", label: "Sonnet 5", description: "Efficient for routine tasks", efforts: ALL, autoMode: true },
       { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", description: "Fastest for quick answers", efforts: [], autoMode: false },

@@ -25,10 +25,14 @@ const FALLBACK: ModelChoice[] = [
   { value: "haiku", label: "Haiku", description: "", efforts: [], autoMode: false },
 ];
 
-export const modelHint = (m: ModelChoice) => MODEL_HINT[m.value] ?? "";
+/**
+ * 中文提示只配给真是 Claude 模型的别名。接了别家网关时，sonnet 这样的别名可能被设成了别的模型
+ * （比如 DeepSeek），那句“日常写代码”就不对了，只留 Claude Code 自己的说明
+ */
+export const modelHint = (m: ModelChoice) => (m.resolved && !m.resolved.startsWith("claude-") ? "" : (MODEL_HINT[m.value] ?? ""));
 
-/** 别名（opus、sonnet…）是常用的；claude- 开头的具体型号收在“更多型号”里 */
-const isCommon = (m: ModelChoice) => !m.value.startsWith("claude-");
+/** 别名（default、opus、sonnet…）是常用的；具体型号、自定义的、网关给的收在“更多型号”里 */
+const isCommon = (m: ModelChoice) => m.value in MODEL_HINT;
 
 /** 菜单里列哪些模型。这一路之前选的不在列表里（比如换了账号）时也列出来，免得看不到自己现在用的是什么 */
 export function modelItems(state: OptionsState, current: string | null): { common: ModelChoice[]; more: ModelChoice[] } {

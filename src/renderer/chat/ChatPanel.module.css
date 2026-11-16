@@ -416,6 +416,18 @@
   gap: 8px;
   margin-top: 10px;
 }
+.afterStop {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.controls {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .actions > span {
   flex: 1;
   min-width: 0;
