@@ -42,7 +42,7 @@ export function Select<T extends string>({ value, options, onChange, label }: Pr
 
   const show = () => {
     const r = root.current?.getBoundingClientRect();
-    const need = options.length * 44 + 16;
+    const need = Math.min(340, options.length * 56 + 16);
     setUp(!!r && r.bottom + need > window.innerHeight - 8 && r.top - need > 8);
     setActive(Math.max(0, options.indexOf(current)));
     setOpen(true);

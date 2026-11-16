@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "models", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -379,7 +379,7 @@ describe("应用", () => {
     await expect.poll(() => page.getByRole("button", { name: /^模型：Sonnet/ }).isVisible()).toBe(true);
     await page.getByRole("button", { name: /^模型：Sonnet/ }).click();
     await page.getByRole("radio", { name: "高", exact: true }).click();
-    await expect.poll(() => page.getByRole("button", { name: "模型：Sonnet · 高" }).isVisible()).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "模型：Sonnet 5.5 · 高" }).isVisible()).toBe(true);
 
     await page.locator("textarea").fill("起名试试，再开一个终端");
     await page.keyboard.press("Enter");
@@ -469,7 +469,7 @@ describe("应用", () => {
     await fresh.getByPlaceholder("不填就用第一个问题起名").fill("带着问题出发");
     await fresh.getByRole("radio", { name: "颜色 6" }).click();
     await fresh.getByRole("button", { name: /^模型：/ }).click();
-    await fresh.getByRole("option", { name: /^Haiku/ }).click();
+    await fresh.getByRole("option", { name: /^Haiku 5\.5/ }).click();
     await fresh.getByLabel("第一个问题").fill("新车的第一个问题");
     await fresh.getByRole("button", { name: /发车/ }).click();
     await expect.poll(() => page.getByRole("heading", { name: "带着问题出发" }).isVisible(), { timeout: 30000 }).toBe(true);

@@ -95,11 +95,15 @@ export function createDemoClaudeClient(): ClaudeClient {
       ];
     },
     environment: async () => ({ version: "演示模式", loggedIn: true }),
-    models: async () => [
-      { value: "default", label: "Default (recommended)", description: "Opus 5.5 · 账号的默认模型", efforts: ["low", "medium", "high", "xhigh", "max"] },
-      { value: "sonnet", label: "Sonnet", description: "Sonnet 5.5 · 日常写代码", efforts: ["low", "medium", "high", "xhigh", "max"] },
-      { value: "haiku", label: "Haiku", description: "Haiku 5.5 · 最快", efforts: ["low", "medium", "high", "xhigh", "max"] },
-    ],
+    options: async () => ({
+      models: [
+        { value: "default", label: "Default (recommended)", description: "Opus 5.5 · Best for everyday, complex tasks", efforts: ["low", "medium", "high", "xhigh", "max"], autoMode: true },
+        { value: "sonnet", label: "Sonnet 5.5", description: "Efficient for routine tasks", efforts: ["low", "medium", "high", "xhigh", "max"], autoMode: true },
+        { value: "haiku", label: "Haiku 5.5", description: "Fastest for quick answers", efforts: ["low", "medium", "high", "xhigh", "max"], autoMode: true },
+        { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", description: "Fastest for quick answers", efforts: [], autoMode: false },
+      ],
+      modes: ["ask", "edits", "auto", "plan", "dontAsk", "all"],
+    }),
     deleteSession: async (sessionId) => void sessions.delete(sessionId),
     useTools(list) {
       tools = list;

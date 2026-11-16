@@ -1,5 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
-import type { DirectoryInfo, Effort, Environment, ModelChoice, TerminalSession, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
+import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -46,8 +46,8 @@ export interface BwApi {
   renameStop(stopId: string, name: string): Promise<void>;
   /** 这一路以后用哪个模型；null 表示用默认的。下一站起生效 */
   setRouteModel(routeId: string, model: string | null, effort?: Effort | null): Promise<Route>;
-  /** 这个项目能选的模型：先给上次读到的（可能是 null），新读到的通过 models.updated 事件送来 */
-  models(projectId: string): Promise<ModelChoice[] | null>;
+  /** 这个项目能选的模型和批准方式：先给上次读到的（可能是 null），新读到的通过 claude-options.updated 事件送来 */
+  claudeOptions(projectId: string): Promise<ClaudeOptions | null>;
   /** 丢掉这一路工作区里还没进 Local 的改动（Local 本来就没有它们） */
   discardChanges(routeId: string): Promise<void>;
   /** 把这一路的对话导出成 Markdown 文件；用户取消返回 null，否则返回保存的位置 */

@@ -35,7 +35,7 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
       { sessionId: "s-new", summary: "摘要", lastModified: 2, firstPrompt: "看一下  过期问题" },
       { sessionId: "s-old", summary: "旧的", lastModified: 1, customTitle: "自己起的名" },
     ],
-    supportedModels: async () => [],
+    probe: async () => ({ models: [], modes: [] }),
     ...extra,
   };
   return fns;
@@ -348,32 +348,60 @@ describe("模型、应用自己的工具、起名", () => {
         startup: async () => ({ query: () => (log.push("warm"), (async function* () { yield init; yield success; })()), close: () => void (closed = true) }),
       }),
     );
-    client.warm("/wt", undefined, "opus", "low");
+    client.warm("/wt", undefined, { model: "opus", effort: "low" });
     await client.ask({ cwd: "/wt", prompt: "x", model: "opus", effort: "max" });
     expect(log).toEqual(["cold"]);
     await new Promise((r) => setImmediate(r));
     expect(closed).toBe(true);
   });
 
-  it("能选的模型：问 Claude Code 要，只启动不提问；字段换成界面用的样子", async () => {
+  it("能选什么：问这台电脑上的 Claude Code；模型字段换成界面用的样子，批准方式挨个试，它肯切过去的才算", async () => {
     let seen: Record<string, unknown> | undefined;
+    let tried: string[] = [];
     const client = createClaudeClient(
       fakeSdk([], {
-        supportedModels: async (o) => {
+        probe: async (o, modes) => {
           seen = o as Record<string, unknown>;
-          return [
-            { value: "default", displayName: "Default (recommended)", description: "Opus 5.5", supportsEffort: true, supportedEffortLevels: ["max", "low", "high"] },
-            { value: "haiku", displayName: "", description: "Haiku 5.5", supportsEffort: false, supportedEffortLevels: ["low"] },
-          ];
+          tried = modes;
+          return {
+            models: [
+              { value: "default", displayName: "Default (recommended)", description: "Opus 5.5", supportsEffort: true, supportedEffortLevels: ["max", "low", "high"], supportsAutoMode: true },
+              { value: "claude-haiku-4-5", displayName: "", description: "Haiku 4.5" },
+            ],
+            modes: ["acceptEdits", "plan", "bypassPermissions"], // 管理员关掉了 auto 和 dontAsk
+          };
         },
       }),
       { claudeExecutable: "/x/claude" },
     );
-    expect(await client.models("/proj")).toEqual([
-      { value: "default", label: "Default (recommended)", description: "Opus 5.5", efforts: ["low", "high", "max"] },
-      { value: "haiku", label: "haiku", description: "Haiku 5.5", efforts: [] },
-    ]);
+    expect(await client.options("/proj")).toEqual({
+      models: [
+        { value: "default", label: "Default (recommended)", description: "Opus 5.5", efforts: ["low", "high", "max"], autoMode: true },
+        { value: "claude-haiku-4-5", label: "claude-haiku-4-5", description: "Haiku 4.5", efforts: [], autoMode: false },
+      ],
+      modes: ["ask", "edits", "plan", "all"],
+    });
     expect(seen).toMatchObject({ cwd: "/proj", persistSession: false, tools: [], pathToClaudeCodeExecutable: "/x/claude" });
+    expect(tried.sort()).toEqual(["acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"]);
+  });
+
+  it("批准方式交给 SDK 启动；“全部不问”由我们放行，按 default 启动；方式变了提前启动的不能用", async () => {
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).toMatchObject({ permissionMode: "default" });
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x", permissionMode: "auto" }))).toMatchObject({ permissionMode: "auto" });
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x", permissionMode: "edits" }))).toMatchObject({ permissionMode: "acceptEdits" });
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x", permissionMode: "all" }))).toMatchObject({ permissionMode: "default" });
+    const log: string[] = [];
+    const client = createClaudeClient(
+      fakeSdk([], {
+        query: () => (log.push("cold"), (async function* () { yield init; yield success; })()),
+        startup: async () => ({ query: () => (log.push("warm"), (async function* () { yield init; yield success; })()), close: () => {} }),
+      }),
+    );
+    client.warm("/wt", undefined, { permissionMode: "ask" });
+    await client.ask({ cwd: "/wt", prompt: "x", permissionMode: "plan" });
+    client.warm("/wt", "S1", { permissionMode: "ask" });
+    await client.ask({ cwd: "/wt", prompt: "y", sessionId: "S1", permissionMode: "all" }); // 都按 default 启动：能用
+    expect(log).toEqual(["cold", "warm"]);
   });
 
   it("提前启动的进程用的是另一个模型：不能用，关掉后现启动", async () => {
@@ -391,13 +419,13 @@ describe("模型、应用自己的工具、起名", () => {
         startup: async (p) => ({ query: () => turn(`warm:${String((p.options as { model?: string }).model)}`), close: () => void (closed = true) }),
       }),
     );
-    client.warm("/wt", undefined, "sonnet");
+    client.warm("/wt", undefined, { model: "sonnet" });
     await client.ask({ cwd: "/wt", prompt: "x", model: "opus" });
     expect(log).toEqual(["cold:opus"]);
     await new Promise((r) => setImmediate(r));
     expect(closed).toBe(true);
     // 模型对得上就用提前启动的
-    client.warm("/wt", "S1", "opus");
+    client.warm("/wt", "S1", { model: "opus" });
     await client.ask({ cwd: "/wt", prompt: "y", sessionId: "S1", model: "opus" });
     expect(log).toEqual(["cold:opus", "warm:opus"]);
   });

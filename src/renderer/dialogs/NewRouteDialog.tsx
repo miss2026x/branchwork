@@ -4,7 +4,7 @@ import { IconClose, IconFolder, IconSend, IconWait } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
 import { Select, type SelectOption } from "../ui/Select";
-import { modelItems, type ModelsState } from "../ui/models";
+import { modeItems, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
 
@@ -16,23 +16,18 @@ interface Props {
   /** 这个项目候车区里还没派车的问题 */
   parked(projectId: string): QueueItem[];
   onAddProject(): void;
-  /** 这个项目能选的模型（从 Claude Code 读的）；没读过时 onLoadModels 去读 */
-  models(projectId: string): ModelsState;
-  onLoadModels(projectId: string): void;
+  /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的）；没读过时 onLoadClaudeOptions 去读 */
+  claudeOptions(projectId: string): OptionsState;
+  onLoadClaudeOptions(projectId: string): void;
   onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; question: string; itemId?: string }): void;
   /** “动手前”是整个项目的设置，这里改了就是改这个项目的 */
   onPermissionMode(projectId: string, mode: PermissionMode): void;
   onCancel(): void;
 }
 
-const MODES: SelectOption<PermissionMode>[] = [
-  { value: "ask", label: "每次都问我" },
-  { value: "edits", label: "改文件不问", hint: "运行命令前还是问我" },
-  { value: "all", label: "都不问" },
-];
 
 /** “开一路新车”：选项目、起名、挑颜色和模型，写第一个问题（可以从候车区选） */
-export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, models, onLoadModels, onCreate, onPermissionMode, onCancel }: Props) {
+export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, onPermissionMode, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
@@ -46,9 +41,14 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const route = { number, express: null, color };
   const colors = routeColors(route);
   const items = parked(projectId);
-  const modelState = models(projectId);
-  useEffect(() => onLoadModels(projectId), [projectId, onLoadModels]);
-  const modelOptions: SelectOption<string>[] = modelItems(modelState, null).map((m) => ({ value: m.value === "default" ? "" : m.value, label: m.label, hint: m.description }));
+  const modelState = claudeOptions(projectId);
+  useEffect(() => onLoadClaudeOptions(projectId), [projectId, onLoadClaudeOptions]);
+  const { common, more } = modelItems(modelState, null);
+  const modelOptions: SelectOption<string>[] = [...common, ...more].map((m) => ({ value: m.value === "default" ? "" : m.value, label: m.label, hint: [modelHint(m), m.description].filter(Boolean).join(" · ") }));
+  const picked = [...common, ...more].find((m) => m.value === (model || "default"));
+  const modeOptions: SelectOption<PermissionMode>[] = modeItems(modelState, picked)
+    .filter((m) => !m.disabled)
+    .map((m) => ({ value: m.mode, label: m.recommended ? `${m.label}（推荐）` : m.label, hint: m.hint }));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
     window.addEventListener("keydown", onKey);
@@ -109,7 +109,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
               </div>
               <div className={css.field}>
                 <span>动手前</span>
-                <Select<PermissionMode> label="动手前" value={mode ?? projectMode} options={MODES} onChange={(m) => setMode(m)} />
+                <Select<PermissionMode> label="动手前" value={mode ?? projectMode} options={modeOptions} onChange={(m) => setMode(m)} />
               </div>
             </div>
             <p className={own.pairNote}>“动手前”是整个项目的设置，改了以后这个项目的每一路都一样。</p>

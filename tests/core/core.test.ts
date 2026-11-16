@@ -999,7 +999,7 @@ describe("每一路用哪个模型", () => {
     expect(route.effort).toBeNull();
     const r1 = core.setRouteModel(route.id, "opus", "high");
     expect(r1).toMatchObject({ model: "opus", effort: "high" });
-    expect(claude.warmedEfforts.at(-1)).toBe("high");
+    expect(claude.warmedRuns.at(-1)).toMatchObject({ model: "opus", effort: "high", permissionMode: "ask" });
     await core.ask(route.id, "一");
     expect(claude.asks[0]).toMatchObject({ model: "opus", effort: "high" });
     expect(core.setRouteModel(route.id, "sonnet")).toMatchObject({ model: "sonnet", effort: "high" });
@@ -1008,26 +1008,42 @@ describe("每一路用哪个模型", () => {
     expect(forked.effort).toBeNull();
   });
 
-  it("能选的模型：先给上次读到的，同时再问一次 Claude Code；每次启动每个项目只问一次；读不到下次再试", async () => {
-    const updated = () => events.filter((e) => e.type === "models.updated");
-    expect(core.models(project.id)).toBeNull();
-    await until("models.updated");
-    expect(updated()).toEqual([{ type: "models.updated", projectId: project.id, models: claude.modelList }]);
-    expect(claude.modelCalls).toEqual([project.localDir]);
-    expect(core.models(project.id)).toEqual(claude.modelList); // 记下来了
-    expect(claude.modelCalls).toHaveLength(1);
+  it("能选什么：先给上次读到的，同时再问一次 Claude Code；每次启动每个项目只问一次；读不到下次再试", async () => {
+    const updated = () => events.filter((e) => e.type === "claude-options.updated");
+    expect(core.claudeOptions(project.id)).toBeNull();
+    await until("claude-options.updated");
+    expect(updated()).toEqual([{ type: "claude-options.updated", projectId: project.id, options: claude.optionList }]);
+    expect(claude.optionCalls).toEqual([project.localDir]);
+    expect(core.claudeOptions(project.id)).toEqual(claude.optionList); // 记下来了
+    expect(claude.optionCalls).toHaveLength(1);
 
     // 重新启动：先给记下的，再问一次；这次读不到
-    const saved = claude.modelList;
-    claude.modelList = new Error("连不上");
+    const saved = claude.optionList;
+    claude.optionList = new Error("连不上");
     boot();
-    expect(core.models(project.id)).toEqual(saved);
-    await until("models.updated");
-    expect(updated()).toEqual([{ type: "models.updated", projectId: project.id, models: null }]);
+    expect(core.claudeOptions(project.id)).toEqual(saved);
+    await until("claude-options.updated");
+    expect(updated()).toEqual([{ type: "claude-options.updated", projectId: project.id, options: null }]);
     events.length = 0;
-    core.models(project.id); // 上次没读到，再试
-    await until("models.updated");
-    expect(claude.modelCalls).toHaveLength(3);
+    core.claudeOptions(project.id); // 上次没读到，再试
+    await until("claude-options.updated");
+    expect(claude.optionCalls).toHaveLength(3);
+  });
+
+  it("批准方式交给 Claude：项目选“自动判断”，这一路的模型不支持（Claude Code 说的）就按每次都问", async () => {
+    core.claudeOptions(project.id);
+    await until("claude-options.updated");
+    core.setPermissionMode(project.id, "auto");
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "一");
+    expect(claude.asks.at(-1)).toMatchObject({ permissionMode: "auto" });
+    core.setRouteModel(route.id, "claude-haiku-4-5");
+    expect(claude.warmedRuns.at(-1)).toMatchObject({ model: "claude-haiku-4-5", permissionMode: "ask" });
+    await core.ask(route.id, "二");
+    expect(claude.asks.at(-1)).toMatchObject({ permissionMode: "ask" });
+    core.setPermissionMode(project.id, "plan");
+    await core.ask(route.id, "三");
+    expect(claude.asks.at(-1)).toMatchObject({ permissionMode: "plan" });
   });
 });
 

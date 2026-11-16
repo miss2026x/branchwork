@@ -59,7 +59,7 @@ export function registerIpc(core: Core): void {
     setRouteFlags: async (routeId, flags) => core.setRouteFlags(routeId, flags),
     renameStop: async (stopId, name) => void core.renameStop(stopId, name),
     setRouteModel: async (routeId, model, effort) => core.setRouteModel(routeId, model, effort),
-    models: async (projectId) => core.models(projectId),
+    claudeOptions: async (projectId) => core.claudeOptions(projectId),
     changes: (routeId) => core.changes(routeId),
     terminals: async (projectId) => core.terminals(projectId),
     terminalOutput: async (terminalId) => core.terminalOutput(terminalId),

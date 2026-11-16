@@ -97,8 +97,8 @@ export function App() {
   const jumpToStop = useStore((s) => s.jumpToStop);
   const focus = useStore((s) => s.focus);
   const allQueues = useStore((s) => s.queue);
-  const allModels = useStore((s) => s.models);
-  const loadModels = useStore((s) => s.loadModels);
+  const allOptions = useStore((s) => s.claudeOptions);
+  const loadClaudeOptions = useStore((s) => s.loadClaudeOptions);
   const content = useStore((s) => s.content);
   const ask = useStore((s) => s.ask);
   const stopRoute = useStore((s) => s.stop);
@@ -453,7 +453,7 @@ export function App() {
         </main>
 
         {route && tier !== "narrow" && !overview && <Divider label="拖动调整对话栏宽度" onDrag={(dx, start) => setWidth("panel", Math.min(680, Math.max(340, (start ?? (tier === "wide" ? 420 : 380)) - dx)))} current={widths.panel} onReset={() => setWidth("panel", null)} />}
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} models={allModels[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -543,8 +543,8 @@ export function App() {
           nextNumber={(id) => Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === id).map((r) => r.number)) + 1}
           parked={(id) => (allQueues[id] ?? []).filter((q) => !q.routeId)}
           onAddProject={() => void openAddProject()}
-          models={(id) => allModels[id]}
-          onLoadModels={loadModels}
+          claudeOptions={(id) => allOptions[id]}
+          onLoadClaudeOptions={loadClaudeOptions}
           onCreate={(o) => void startRoute(o)}
           onPermissionMode={(id, mode) => void setPermissionMode(id, mode)}
           onCancel={closeDialog}

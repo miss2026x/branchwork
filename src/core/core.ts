@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AskResult, ClaudeClient, ClaudeTool } from "../claude";
+import type { AskResult, ClaudeClient, ClaudeTool, RunSettings } from "../claude";
 import type { Db } from "../db";
 import type {
   BwEvent,
@@ -18,7 +18,7 @@ import type {
   Project,
   ProjectSnapshot,
   QueueItem,
-  ModelChoice,
+  ClaudeOptions,
   QueueMode,
   RemoveProjectResult,
   Route,
@@ -109,10 +109,10 @@ export interface Core {
   /** 换模型和思考强度。model 为空或 "default" 表示用账号的默认；effort 不传就不变 */
   setRouteModel(routeId: string, model: string | null, effort?: Effort | null): Route;
   /**
-   * 这个项目里能选哪些模型。先给上次读到的（没有就是 null），同时在后台再问一次 Claude Code，
-   * 读到了发 models.updated（读不到也发，models 为 null）。每个项目每次启动只问一次
+   * 这个项目里能选哪些模型、能用哪些批准方式。先给上次读到的（没有就是 null），同时在后台再问一次这台电脑上的 Claude Code，
+   * 读到了发 claude-options.updated（读不到也发，options 为 null）。每个项目每次启动只问一次
    */
-  models(projectId: string): ModelChoice[] | null;
+  claudeOptions(projectId: string): ClaudeOptions | null;
   /** 这一路的工作区里还没进 Local 的改动，带增删的行数 */
   changes(routeId: string): Promise<FileStat[]>;
   // ── 后台终端：Claude（通过应用提供的工具）开的长时间命令，跑在那一路的工作区里，不随一站结束而停 ──
@@ -370,10 +370,31 @@ export function createCore(opts: CoreOptions): Core {
   };
 
   const prewarm = opts.prewarm ?? true;
-  /** 这次启动以来已经去问过模型列表的项目 */
-  const modelAsks = new Set<string>();
+  /** 这次启动以来已经去问过 Claude Code 的项目 */
+  const optionAsks = new Set<string>();
+  const optionsKey = (projectId: string) => `claude-options:${projectId}`;
+  const savedOptions = (projectId: string): ClaudeOptions | null => {
+    try {
+      const raw = db.settings.get(optionsKey(projectId));
+      return raw ? (JSON.parse(raw) as ClaudeOptions) : null;
+    } catch {
+      return null;
+    }
+  };
+  /**
+   * 这一路的 Claude 按什么启动。批准方式是项目的；“自动判断”要这一路的模型支持，
+   * 不支持（Claude Code 说的）就按“每次都问”，免得它启动不了
+   */
+  const runFor = (route: Route): RunSettings => {
+    let permissionMode = mustProject(route.projectId).permissionMode;
+    if (permissionMode === "auto") {
+      const model = savedOptions(route.projectId)?.models.find((m) => m.value === (route.model ?? "default"));
+      if (model && !model.autoMode) permissionMode = "ask";
+    }
+    return { model: route.model ?? undefined, effort: route.effort ?? undefined, permissionMode };
+  };
   const warmRoute = (route: Route) => {
-    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined, route.model ?? undefined, route.effort ?? undefined);
+    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined, runFor(route));
   };
 
   // ── 后台终端 ──
@@ -550,8 +571,7 @@ export function createCore(opts: CoreOptions): Core {
           // 快线的第一个问题：连同交接摘要一起交给 Claude（这是个全新的会话，它看不到原来的对话）
           prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : text,
           sessionId: route.sessionId ?? undefined,
-          model: route.model ?? undefined,
-          effort: route.effort ?? undefined,
+          ...runFor(route),
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
           signal: abort.signal,
           onEvent: (e) => {
@@ -794,6 +814,7 @@ export function createCore(opts: CoreOptions): Core {
         setRoute(p.routeId, { status: "answering" });
         p.resolve("allow");
       }
+      // 提前启动好的 Claude 是按旧的批准方式启动的：下一站问的时候 claude 模块发现对不上，会换一个新的
       return project;
     },
 
@@ -905,29 +926,23 @@ export function createCore(opts: CoreOptions): Core {
       return route;
     },
 
-    models(projectId) {
+    claudeOptions(projectId) {
       const project = mustProject(projectId);
-      const key = `models:${projectId}`;
-      const saved = db.settings.get(key);
-      if (!modelAsks.has(projectId)) {
-        modelAsks.add(projectId);
-        void claude.models(project.localDir).then(
-          (models) => {
+      if (!optionAsks.has(projectId)) {
+        optionAsks.add(projectId);
+        void claude.options(project.localDir).then(
+          (options) => {
             if (!db.projects.get(projectId)) return;
-            db.settings.set(key, JSON.stringify(models));
-            emit({ type: "models.updated", projectId, models });
+            db.settings.set(optionsKey(projectId), JSON.stringify(options));
+            emit({ type: "claude-options.updated", projectId, options });
           },
           () => {
-            modelAsks.delete(projectId); // 下次再试
-            if (db.projects.get(projectId)) emit({ type: "models.updated", projectId, models: null });
+            optionAsks.delete(projectId); // 下次再试
+            if (db.projects.get(projectId)) emit({ type: "claude-options.updated", projectId, options: null });
           },
         );
       }
-      try {
-        return saved ? (JSON.parse(saved) as ModelChoice[]) : null;
-      } catch {
-        return null;
-      }
+      return savedOptions(projectId);
     },
 
     async changes(routeId) {

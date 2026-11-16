@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, ModelChoice, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -24,12 +24,21 @@ export function installMockBw(): void {
   let queue: QueueItem[] = [];
   const permissions = new Map<string, (d: string) => void>();
 
-  const MOCK_MODELS: ModelChoice[] = [
-    { value: "default", label: "Default (recommended)", description: "Opus 5.5 · 你的账号默认用的模型", efforts: ["low", "medium", "high", "xhigh", "max"] },
-    { value: "best", label: "Best", description: "Fable 5.1 · 最难、最长的任务", efforts: ["low", "medium", "high", "xhigh", "max"] },
-    { value: "sonnet", label: "Sonnet", description: "Sonnet 5.5 · 日常写代码", efforts: ["low", "medium", "high", "xhigh", "max"] },
-    { value: "haiku", label: "Haiku", description: "Haiku 5.5 · 最快，适合简单的事", efforts: ["low", "medium", "high", "xhigh", "max"] },
-  ];
+  // 和真的 Claude Code（2026-11）报的一样：常用的别名在前，后面是具体型号
+  const ALL: Effort[] = ["low", "medium", "high", "xhigh", "max"];
+  const MOCK_OPTIONS: ClaudeOptions = {
+    models: [
+      { value: "default", label: "Default (recommended)", description: "Opus 5.5 · Best for everyday, complex tasks", efforts: ALL, autoMode: true },
+      { value: "opus", label: "Opus 5.5", description: "Best for everyday, complex tasks", efforts: ALL, autoMode: true },
+      { value: "sonnet", label: "Sonnet 5.5", description: "Efficient for routine tasks", efforts: ALL, autoMode: true },
+      { value: "fable", label: "Fable 5.2", description: "Most capable for your hardest and longest-running tasks", efforts: ALL, autoMode: true },
+      { value: "haiku", label: "Haiku 5.5", description: "Fastest for quick answers", efforts: ALL, autoMode: true },
+      { value: "claude-fable-5-1", label: "Fable 5.1", description: "Most capable for your hardest and longest-running tasks", efforts: ALL, autoMode: true },
+      { value: "claude-sonnet-5", label: "Sonnet 5", description: "Efficient for routine tasks", efforts: ALL, autoMode: true },
+      { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", description: "Fastest for quick answers", efforts: [], autoMode: false },
+    ],
+    modes: ["ask", "edits", "auto", "plan", "dontAsk", "all"],
+  };
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
     const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, effort: null, color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
@@ -254,9 +263,9 @@ export function installMockBw(): void {
       const r = routes.get(routeId)!;
       return setRoute(routeId, { model: model === "default" ? null : model, effort: effort === undefined ? r.effort : effort });
     },
-    async models(projectId) {
+    async claudeOptions(projectId) {
       // 假装第一次要读一会儿
-      setTimeout(() => emit({ type: "models.updated", projectId, models: MOCK_MODELS }), 1200);
+      setTimeout(() => emit({ type: "claude-options.updated", projectId, options: MOCK_OPTIONS }), 1200);
       return null;
     },
     changes: async () => [

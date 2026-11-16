@@ -16,9 +16,11 @@ export type StopSyncState = "none" | "synced" | "unsynced" | "conflict";
 
 /**
  * Claude 要做需要批准的事时怎么办：
- * ask 每次都问；edits 改文件不问、运行命令等仍然问；all 全部不问（相当于 --dangerously-skip-permissions）
+ * ask 每次都问；edits 改文件不问、运行命令等仍然问；auto 另一个模型在后台把关，拿不准才问；
+ * plan 先只出计划，批准计划后才动手；dontAsk 不问，没事先允许过的一律拒绝；all 全部不问（相当于 --dangerously-skip-permissions）。
+ * 对应 Claude Code 的 default / acceptEdits / auto / plan / dontAsk / bypassPermissions
  */
-export type PermissionMode = "ask" | "edits" | "all";
+export type PermissionMode = "ask" | "edits" | "auto" | "plan" | "dontAsk" | "all";
 
 export interface Project {
   id: string;
@@ -115,6 +117,14 @@ export interface ModelChoice {
   description: string;
   /** 支持的思考强度；空数组表示不能调 */
   efforts: Effort[];
+  /** 能不能用“自动判断”（auto）批准方式 */
+  autoMode: boolean;
+}
+
+/** 从这台电脑上的 Claude Code 读到的：能选的模型、能用的批准方式（账号、管理员设置、项目设置都算进去了） */
+export interface ClaudeOptions {
+  models: ModelChoice[];
+  modes: PermissionMode[];
 }
 
 /** 移除项目的结果：还有没进 Local 的改动或留下的工作区时先不删，列出来让你再确认 */
