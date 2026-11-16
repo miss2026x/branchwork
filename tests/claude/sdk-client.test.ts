@@ -35,6 +35,7 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
       { sessionId: "s-new", summary: "摘要", lastModified: 2, firstPrompt: "看一下  过期问题" },
       { sessionId: "s-old", summary: "旧的", lastModified: 1, customTitle: "自己起的名" },
     ],
+    supportedModels: async () => [],
     ...extra,
   };
   return fns;
@@ -334,6 +335,45 @@ describe("模型、应用自己的工具、起名", () => {
   it("选了模型就交给 SDK；没选不传", async () => {
     expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x", model: "opus" }))).toMatchObject({ model: "opus" });
     expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).not.toHaveProperty("model");
+  });
+
+  it("思考强度也交给 SDK；提前启动的强度不一样也不能用", async () => {
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x", effort: "high" }))).toMatchObject({ effort: "high" });
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).not.toHaveProperty("effort");
+    let closed = false;
+    const log: string[] = [];
+    const client = createClaudeClient(
+      fakeSdk([], {
+        query: () => (log.push("cold"), (async function* () { yield init; yield success; })()),
+        startup: async () => ({ query: () => (log.push("warm"), (async function* () { yield init; yield success; })()), close: () => void (closed = true) }),
+      }),
+    );
+    client.warm("/wt", undefined, "opus", "low");
+    await client.ask({ cwd: "/wt", prompt: "x", model: "opus", effort: "max" });
+    expect(log).toEqual(["cold"]);
+    await new Promise((r) => setImmediate(r));
+    expect(closed).toBe(true);
+  });
+
+  it("能选的模型：问 Claude Code 要，只启动不提问；字段换成界面用的样子", async () => {
+    let seen: Record<string, unknown> | undefined;
+    const client = createClaudeClient(
+      fakeSdk([], {
+        supportedModels: async (o) => {
+          seen = o as Record<string, unknown>;
+          return [
+            { value: "default", displayName: "Default (recommended)", description: "Opus 5.5", supportsEffort: true, supportedEffortLevels: ["max", "low", "high"] },
+            { value: "haiku", displayName: "", description: "Haiku 5.5", supportsEffort: false, supportedEffortLevels: ["low"] },
+          ];
+        },
+      }),
+      { claudeExecutable: "/x/claude" },
+    );
+    expect(await client.models("/proj")).toEqual([
+      { value: "default", label: "Default (recommended)", description: "Opus 5.5", efforts: ["low", "high", "max"] },
+      { value: "haiku", label: "haiku", description: "Haiku 5.5", efforts: [] },
+    ]);
+    expect(seen).toMatchObject({ cwd: "/proj", persistSession: false, tools: [], pathToClaudeCodeExecutable: "/x/claude" });
   });
 
   it("提前启动的进程用的是另一个模型：不能用，关掉后现启动", async () => {

@@ -4,6 +4,7 @@ import { IconClose, IconFolder, IconSend, IconWait } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
 import { Select, type SelectOption } from "../ui/Select";
+import { modelItems, type ModelsState } from "../ui/models";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
 
@@ -15,18 +16,14 @@ interface Props {
   /** 这个项目候车区里还没派车的问题 */
   parked(projectId: string): QueueItem[];
   onAddProject(): void;
+  /** 这个项目能选的模型（从 Claude Code 读的）；没读过时 onLoadModels 去读 */
+  models(projectId: string): ModelsState;
+  onLoadModels(projectId: string): void;
   onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; question: string; itemId?: string }): void;
   /** “动手前”是整个项目的设置，这里改了就是改这个项目的 */
   onPermissionMode(projectId: string, mode: PermissionMode): void;
   onCancel(): void;
 }
-
-const MODELS: SelectOption<string>[] = [
-  { value: "", label: "默认", hint: "跟着 Claude Code 的设置" },
-  { value: "opus", label: "Opus", hint: "最强，适合难题" },
-  { value: "sonnet", label: "Sonnet", hint: "又快又好，日常用" },
-  { value: "haiku", label: "Haiku", hint: "最快，适合简单的事" },
-];
 
 const MODES: SelectOption<PermissionMode>[] = [
   { value: "ask", label: "每次都问我" },
@@ -35,7 +32,7 @@ const MODES: SelectOption<PermissionMode>[] = [
 ];
 
 /** “开一路新车”：选项目、起名、挑颜色和模型，写第一个问题（可以从候车区选） */
-export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, onCreate, onPermissionMode, onCancel }: Props) {
+export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, models, onLoadModels, onCreate, onPermissionMode, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
@@ -49,6 +46,9 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const route = { number, express: null, color };
   const colors = routeColors(route);
   const items = parked(projectId);
+  const modelState = models(projectId);
+  useEffect(() => onLoadModels(projectId), [projectId, onLoadModels]);
+  const modelOptions: SelectOption<string>[] = modelItems(modelState, null).map((m) => ({ value: m.value === "default" ? "" : m.value, label: m.label, hint: m.description }));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
     window.addEventListener("keydown", onKey);
@@ -104,7 +104,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
             <div className={own.pair}>
               <div className={css.field}>
                 <span>模型</span>
-                <Select label="模型" value={model} options={MODELS} onChange={setModel} />
+                <Select label="模型" value={modelOptions.some((o) => o.value === model) ? model : ""} options={modelOptions} onChange={setModel} />
+                {modelState === "loading" && <small className={own.from}>正在从 Claude Code 读取能用的模型…</small>}
               </div>
               <div className={css.field}>
                 <span>动手前</span>

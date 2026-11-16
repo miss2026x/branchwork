@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatItem, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
+import type { ChatItem, Effort, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
+import type { ModelsState } from "../ui/models";
 import { TerminalStrip } from "../terminal/TerminalStrip";
 import { ModelControl } from "./ModelControl";
 import { PermissionModeControl } from "./PermissionModeControl";
@@ -30,7 +31,9 @@ interface Props {
   viewing?: Stop;
   onBackToLatest(): void;
   /** 这一路换模型 */
-  onModel(model: string | null): void;
+  onModel(model: string | null, effort: Effort | null): void;
+  /** 这个项目能选的模型（从 Claude Code 读的） */
+  models: ModelsState;
   /** 这一路的后台终端 */
   terminals: Terminal[];
   onOpenTerminal(terminalId: string): void;
@@ -64,7 +67,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, models, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -437,7 +440,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         )}
         <div className={css.actions}>
           <PermissionModeControl mode={permissionMode} projectName={projectName} onChange={onPermissionMode} />
-          <ModelControl model={route.model} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
+          <ModelControl model={route.model} effort={route.effort} models={models} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
           <span>{route.status === "interrupted" ? "上一站没答完，可以接着问" : ""}</span>
           <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
             {busy ? "排队" : "发车"} <IconSend size={14} />

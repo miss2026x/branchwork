@@ -1,4 +1,4 @@
-import type { Project, QueueItem, Route, Stop, SyncLogEntry, Terminal } from "./model";
+import type { ModelChoice, Project, QueueItem, Route, Stop, SyncLogEntry, Terminal } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -7,6 +7,8 @@ export type BwEvent =
   | { type: "project.updated"; project: Project }
   /** 项目从 Branchwork 里移除了（Local 文件夹不动） */
   | { type: "project.removed"; projectId: string }
+  /** 从 Claude Code 读到了这个项目能选的模型；读不到时 models 为 null */
+  | { type: "models.updated"; projectId: string; models: ModelChoice[] | null }
   | { type: "route.updated"; route: Route }
   | { type: "route.deleted"; routeId: string; projectId: string }
   | { type: "stop.created"; stop: Stop }

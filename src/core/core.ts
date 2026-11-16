@@ -8,6 +8,7 @@ import type {
   BwListener,
   ChatItem,
   DirectoryInfo,
+  Effort,
   Environment,
   FileStat,
   KeptWorktree,
@@ -17,6 +18,7 @@ import type {
   Project,
   ProjectSnapshot,
   QueueItem,
+  ModelChoice,
   QueueMode,
   RemoveProjectResult,
   Route,
@@ -104,7 +106,13 @@ export interface Core {
   /** 改站名；改过的不再被自动起的名字覆盖 */
   renameStop(stopId: string, name: string): Stop;
   /** 这一路以后用哪个模型（别名或完整名字）；null 用默认的。下一站起生效 */
-  setRouteModel(routeId: string, model: string | null): Route;
+  /** 换模型和思考强度。model 为空或 "default" 表示用账号的默认；effort 不传就不变 */
+  setRouteModel(routeId: string, model: string | null, effort?: Effort | null): Route;
+  /**
+   * 这个项目里能选哪些模型。先给上次读到的（没有就是 null），同时在后台再问一次 Claude Code，
+   * 读到了发 models.updated（读不到也发，models 为 null）。每个项目每次启动只问一次
+   */
+  models(projectId: string): ModelChoice[] | null;
   /** 这一路的工作区里还没进 Local 的改动，带增删的行数 */
   changes(routeId: string): Promise<FileStat[]>;
   // ── 后台终端：Claude（通过应用提供的工具）开的长时间命令，跑在那一路的工作区里，不随一站结束而停 ──
@@ -362,8 +370,10 @@ export function createCore(opts: CoreOptions): Core {
   };
 
   const prewarm = opts.prewarm ?? true;
+  /** 这次启动以来已经去问过模型列表的项目 */
+  const modelAsks = new Set<string>();
   const warmRoute = (route: Route) => {
-    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined, route.model ?? undefined);
+    if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined, route.model ?? undefined, route.effort ?? undefined);
   };
 
   // ── 后台终端 ──
@@ -541,6 +551,7 @@ export function createCore(opts: CoreOptions): Core {
           prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : text,
           sessionId: route.sessionId ?? undefined,
           model: route.model ?? undefined,
+          effort: route.effort ?? undefined,
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
           signal: abort.signal,
           onEvent: (e) => {
@@ -674,6 +685,7 @@ export function createCore(opts: CoreOptions): Core {
           parentRouteId: null,
           forkStopId: null,
           model: null,
+          effort: null,
           color: null,
           contextTokens: null,
           pinned: false,
@@ -803,6 +815,7 @@ export function createCore(opts: CoreOptions): Core {
         parentRouteId: null,
         forkStopId: null,
         model: null,
+        effort: null,
         color: null,
         contextTokens: null,
         pinned: false,
@@ -880,14 +893,41 @@ export function createCore(opts: CoreOptions): Core {
       return setStop(stopId, { name: next, nameState: "manual" });
     },
 
-    setRouteModel(routeId, model) {
+    setRouteModel(routeId, model, effort) {
       const before = mustRoute(routeId);
-      const next = model?.trim() || null;
-      if (before.model === next) return before;
-      const route = setRoute(routeId, { model: next });
+      const trimmed = model?.trim() || null;
+      const next = trimmed === "default" ? null : trimmed;
+      const nextEffort = effort === undefined ? before.effort : effort;
+      if (before.model === next && before.effort === nextEffort) return before;
+      const route = setRoute(routeId, { model: next, effort: nextEffort });
       // 提前启动好的那个用的是旧模型：换一个（正在回答时不动，这一站结束后自然会按新的准备）
       if (route.status !== "answering" && route.status !== "awaiting_permission") warmRoute(route);
       return route;
+    },
+
+    models(projectId) {
+      const project = mustProject(projectId);
+      const key = `models:${projectId}`;
+      const saved = db.settings.get(key);
+      if (!modelAsks.has(projectId)) {
+        modelAsks.add(projectId);
+        void claude.models(project.localDir).then(
+          (models) => {
+            if (!db.projects.get(projectId)) return;
+            db.settings.set(key, JSON.stringify(models));
+            emit({ type: "models.updated", projectId, models });
+          },
+          () => {
+            modelAsks.delete(projectId); // 下次再试
+            if (db.projects.get(projectId)) emit({ type: "models.updated", projectId, models: null });
+          },
+        );
+      }
+      try {
+        return saved ? (JSON.parse(saved) as ModelChoice[]) : null;
+      } catch {
+        return null;
+      }
     },
 
     async changes(routeId) {
@@ -940,6 +980,7 @@ export function createCore(opts: CoreOptions): Core {
         parentRouteId: parent.id,
         forkStopId: stop.id,
         model: parent.model,
+        effort: parent.effort,
         color: null,
         contextTokens: null,
         pinned: false,
@@ -1093,6 +1134,7 @@ export function createCore(opts: CoreOptions): Core {
         parentRouteId: source.id,
         forkStopId: stop.id,
         model: source.model,
+        effort: source.effort,
         color: null,
         contextTokens: null,
         pinned: false,

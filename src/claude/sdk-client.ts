@@ -5,6 +5,7 @@ import * as sdk from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, Options } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
 import { z } from "zod";
+import type { Effort, ModelChoice } from "../shared";
 import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage } from "./types";
 
 /** 应用自己的工具挂在这个名字的服务下；Claude 看到的工具名是 mcp__branchwork__<name> */
@@ -34,6 +35,8 @@ export interface SdkFunctions {
   getSessionMessages(sessionId: string): Promise<{ type: string; uuid: string; message: unknown }[]>;
   deleteSession(sessionId: string): Promise<void>;
   listSessions(options: { dir: string; limit?: number; includeWorktrees?: boolean }): Promise<{ sessionId: string; summary: string; lastModified: number; customTitle?: string; firstPrompt?: string }[]>;
+  /** 这样启动的 Claude 能选哪些模型（只启动、不提问） */
+  supportedModels(options: Options): Promise<{ value: string; displayName: string; description: string; supportsEffort?: boolean; supportedEffortLevels?: string[] }[]>;
 }
 
 const realSdk: SdkFunctions = {
@@ -43,6 +46,21 @@ const realSdk: SdkFunctions = {
   getSessionMessages: (id) => sdk.getSessionMessages(id),
   deleteSession: (id) => sdk.deleteSession(id),
   listSessions: (o) => sdk.listSessions(o),
+  async supportedModels(options) {
+    // 输入一直不给：Claude 启动、握手完就停在那里等，模型列表是握手时就有的
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    async function* idle(): AsyncGenerator<never> {
+      await hold;
+    }
+    const q = sdk.query({ prompt: idle(), options });
+    try {
+      return await q.supportedModels();
+    } finally {
+      release();
+      q.close();
+    }
+  },
 };
 
 export interface ClaudeClientOptions {
@@ -69,7 +87,7 @@ interface Turn {
 }
 
 /** 一个 Claude 进程用的配置：目录、接着哪个会话、怎么停、怎么问批准 */
-function processOptions(cwd: string, sessionId: string | undefined, model: string | undefined, abort: AbortController, turn: Turn, client: ClaudeClientOptions, tools: ClaudeTool[]): Options {
+function processOptions(cwd: string, sessionId: string | undefined, model: string | undefined, effort: Effort | undefined, abort: AbortController, turn: Turn, client: ClaudeClientOptions, tools: ClaudeTool[]): Options {
   const append = client.appendSystemPrompt;
   const own = new Map(tools.map((t) => [TOOL_PREFIX + t.name, t]));
   const canUseTool: CanUseTool = async (toolName, input, extra) => {
@@ -91,6 +109,7 @@ function processOptions(cwd: string, sessionId: string | undefined, model: strin
     canUseTool,
     ...(client.claudeExecutable ? { pathToClaudeCodeExecutable: client.claudeExecutable } : {}),
     ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
     ...(tools.length > 0 ? { mcpServers: { [TOOL_SERVER]: toolServer(tools, cwd) } } : {}),
     ...(sessionId ? { resume: sessionId } : {}),
   };
@@ -121,6 +140,7 @@ interface Warm {
   cwd: string;
   sessionId: string | undefined;
   model: string | undefined;
+  effort: Effort | undefined;
   abort: AbortController;
   turn: Turn;
   /** 启动好了得到可以提问的对象；启动失败得到 null */
@@ -148,12 +168,12 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
 
     name: (prompt) => namer.name(prompt),
 
-    warm(cwd, sessionId, model) {
+    warm(cwd, sessionId, model, effort) {
       if (maxWarm <= 0) return;
       const existing = warmed.get(cwd);
       if (existing) {
-        if (existing.sessionId === sessionId && existing.model === model) return; // 已经在准备了
-        discard(existing); // 会话或模型变了，旧的没用了
+        if (existing.sessionId === sessionId && existing.model === model && existing.effort === effort) return; // 已经在准备了
+        discard(existing); // 会话、模型或思考强度变了，旧的没用了
       }
       const abort = new AbortController();
       const turn: Turn = {};
@@ -161,9 +181,10 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         cwd,
         sessionId,
         model,
+        effort,
         abort,
         turn,
-        ready: fns.startup({ options: processOptions(cwd, sessionId, model, abort, turn, clientOpts, tools), initializeTimeoutMs: clientOpts.warmTimeoutMs ?? 180_000 }).catch(() => {
+        ready: fns.startup({ options: processOptions(cwd, sessionId, model, effort, abort, turn, clientOpts, tools), initializeTimeoutMs: clientOpts.warmTimeoutMs ?? 180_000 }).catch(() => {
           if (warmed.get(cwd) === w) warmed.delete(cwd);
           return null;
         }),
@@ -190,8 +211,8 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       let prewarmed = false;
       // 会话对不上的不动它：那是给这一路自己的下一站准备的，现在问的是别的会话（比如提炼摘要用的临时会话）
       const w = warmed.get(opts.cwd);
-      if (w && w.sessionId === opts.sessionId && w.model !== opts.model) {
-        discard(w); // 换了模型：提前启动的那个用的是旧模型，不能用
+      if (w && w.sessionId === opts.sessionId && (w.model !== opts.model || w.effort !== opts.effort)) {
+        discard(w); // 换了模型或思考强度：提前启动的那个用的是旧的，不能用
       } else if (w && w.sessionId === opts.sessionId) {
         warmed.delete(opts.cwd);
         const q = await w.ready; // 还在启动的话等它：已经跑了一段，比现在重新启动快
@@ -219,7 +240,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       };
 
       try {
-        stream ??= fns.query({ prompt: opts.prompt, options: processOptions(opts.cwd, opts.sessionId, opts.model, abort, turn, clientOpts, tools) });
+        stream ??= fns.query({ prompt: opts.prompt, options: processOptions(opts.cwd, opts.sessionId, opts.model, opts.effort, abort, turn, clientOpts, tools) });
         const title = titles();
         if (prewarmed) markStarted(); // 进程早就启动好了
         for await (const raw of stream) {
@@ -290,6 +311,22 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       // 只要这个目录自己的：各路的工作区里开的会话是 Branchwork 自己的，不算
       const list = await fns.listSessions({ dir, limit: max, includeWorktrees: false });
       return list.map((s) => ({ id: s.sessionId, title: (s.customTitle || s.firstPrompt || s.summary || "").replace(/\s+/g, " ").trim(), lastModified: s.lastModified }));
+    },
+
+    async models(cwd) {
+      const list = await fns.supportedModels({
+        cwd,
+        persistSession: false,
+        tools: [],
+        ...(clientOpts.claudeExecutable ? { pathToClaudeCodeExecutable: clientOpts.claudeExecutable } : {}),
+      });
+      const LEVELS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
+      return list.map((m) => ({
+        value: m.value,
+        label: m.displayName || m.value,
+        description: m.description ?? "",
+        efforts: m.supportsEffort === false ? [] : LEVELS.filter((l) => (m.supportedEffortLevels ?? []).includes(l)),
+      }));
     },
 
     environment: () => readEnvironment(),

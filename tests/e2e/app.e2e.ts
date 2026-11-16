@@ -52,7 +52,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "models", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setPermissionMode", "setRouteColor", "setRouteFlags", "setRouteModel", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -373,9 +373,13 @@ describe("应用", () => {
     await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
   });
   it("模型、起名、后台终端：选模型；站名稍后换成小模型起的；Claude 开的终端在一站结束后还在，能看输出、能停", async () => {
-    await page.getByRole("button", { name: /^模型：默认/ }).click();
+    // 列表是从 Claude Code 读的（演示模式下是假的三个）
+    await page.getByRole("button", { name: /^模型：Default/ }).click();
     await page.getByRole("menuitemradio", { name: /Sonnet/ }).click();
     await expect.poll(() => page.getByRole("button", { name: /^模型：Sonnet/ }).isVisible()).toBe(true);
+    await page.getByRole("button", { name: /^模型：Sonnet/ }).click();
+    await page.getByRole("radio", { name: "高", exact: true }).click();
+    await expect.poll(() => page.getByRole("button", { name: "模型：Sonnet · 高" }).isVisible()).toBe(true);
 
     await page.locator("textarea").fill("起名试试，再开一个终端");
     await page.keyboard.press("Enter");

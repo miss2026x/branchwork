@@ -95,6 +95,11 @@ export function createDemoClaudeClient(): ClaudeClient {
       ];
     },
     environment: async () => ({ version: "演示模式", loggedIn: true }),
+    models: async () => [
+      { value: "default", label: "Default (recommended)", description: "Opus 5.5 · 账号的默认模型", efforts: ["low", "medium", "high", "xhigh", "max"] },
+      { value: "sonnet", label: "Sonnet", description: "Sonnet 5.5 · 日常写代码", efforts: ["low", "medium", "high", "xhigh", "max"] },
+      { value: "haiku", label: "Haiku", description: "Haiku 5.5 · 最快", efforts: ["low", "medium", "high", "xhigh", "max"] },
+    ],
     deleteSession: async (sessionId) => void sessions.delete(sessionId),
     useTools(list) {
       tools = list;

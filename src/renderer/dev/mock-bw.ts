@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, ModelChoice, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -24,9 +24,15 @@ export function installMockBw(): void {
   let queue: QueueItem[] = [];
   const permissions = new Map<string, (d: string) => void>();
 
+  const MOCK_MODELS: ModelChoice[] = [
+    { value: "default", label: "Default (recommended)", description: "Opus 5.5 · 你的账号默认用的模型", efforts: ["low", "medium", "high", "xhigh", "max"] },
+    { value: "best", label: "Best", description: "Fable 5.1 · 最难、最长的任务", efforts: ["low", "medium", "high", "xhigh", "max"] },
+    { value: "sonnet", label: "Sonnet", description: "Sonnet 5.5 · 日常写代码", efforts: ["low", "medium", "high", "xhigh", "max"] },
+    { value: "haiku", label: "Haiku", description: "Haiku 5.5 · 最快，适合简单的事", efforts: ["low", "medium", "high", "xhigh", "max"] },
+  ];
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
-    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
+    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, effort: null, color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
   };
@@ -244,8 +250,14 @@ export function installMockBw(): void {
     async renameStop(stopId, name) {
       setStop(stopId, { name, nameState: "manual" });
     },
-    async setRouteModel(routeId, model) {
-      return setRoute(routeId, { model });
+    async setRouteModel(routeId, model, effort) {
+      const r = routes.get(routeId)!;
+      return setRoute(routeId, { model: model === "default" ? null : model, effort: effort === undefined ? r.effort : effort });
+    },
+    async models(projectId) {
+      // 假装第一次要读一会儿
+      setTimeout(() => emit({ type: "models.updated", projectId, models: MOCK_MODELS }), 1200);
+      return null;
     },
     changes: async () => [
       { path: "src/auth/session.ts", kind: "modified", added: 42, removed: 17 },

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage } from "../../src/claude";
-import type { PermissionDecision } from "../../src/shared";
+import type { ModelChoice, PermissionDecision } from "../../src/shared";
 
 export interface FakeTurn {
   cwd: string;
@@ -72,10 +72,12 @@ export class FakeClaude implements ClaudeClient {
   readonly warmed: [string, string | undefined][] = [];
   /** 每次提前启动时要的模型 */
   readonly warmedModels: (string | undefined)[] = [];
+  readonly warmedEfforts: (string | undefined)[] = [];
   disposed = false;
-  warm(cwd: string, sessionId?: string, model?: string): void {
+  warm(cwd: string, sessionId?: string, model?: string, effort?: string): void {
     this.warmed.push([cwd, sessionId]);
     this.warmedModels.push(model);
+    this.warmedEfforts.push(effort);
   }
   /** 每一站结束时报的上下文占用 */
   contextTokens: number | null = null;
@@ -118,6 +120,17 @@ export class FakeClaude implements ClaudeClient {
   terminalSessions: { id: string; title: string; lastModified: number }[] = [];
   async listSessions(): Promise<{ id: string; title: string; lastModified: number }[]> {
     return this.terminalSessions;
+  }
+  /** Claude Code 报的模型列表；设成一个 Error 就是读不到。modelCalls 记下问了几次、在哪个目录 */
+  modelList: ModelChoice[] | Error = [
+    { value: "default", label: "Default", description: "Opus 5.5", efforts: ["low", "medium", "high"] },
+    { value: "haiku", label: "Haiku", description: "Haiku 5.5", efforts: [] },
+  ];
+  readonly modelCalls: string[] = [];
+  async models(cwd: string): Promise<ModelChoice[]> {
+    this.modelCalls.push(cwd);
+    if (this.modelList instanceof Error) throw this.modelList;
+    return this.modelList;
   }
   async environment(): Promise<{ version: string | null; loggedIn: boolean | null }> {
     return { version: "9.9.9", loggedIn: true };

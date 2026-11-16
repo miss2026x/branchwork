@@ -1,4 +1,4 @@
-import type { PermissionDecision } from "../shared";
+import type { Effort, ModelChoice, PermissionDecision } from "../shared";
 
 /** 回答过程中的事件 */
 export type ClaudeEvent =
@@ -26,6 +26,8 @@ export interface AskOptions {
   afterMessageId?: string;
   /** 用哪个模型：别名（opus、sonnet、haiku）或完整名字；不传用 Claude Code 的默认 */
   model?: string;
+  /** 思考强度；不传用模型自己的默认 */
+  effort?: Effort;
   /** 停车：abort 之后这一站算没答完 */
   signal?: AbortSignal;
   onEvent?: (e: ClaudeEvent) => void;
@@ -85,7 +87,7 @@ export interface ClaudeClient {
    * 提前在后台把 Claude 启动好，等下一站用。启动 Claude 在有些机器上要几十秒，
    * 提前做掉，问的时候就不用等。尽力而为：失败了不报错，问的时候照常现启动。
    */
-  warm(cwd: string, sessionId?: string, model?: string): void;
+  warm(cwd: string, sessionId?: string, model?: string, effort?: Effort): void;
   /** 设定应用自己提供给 Claude 的工具。对之后启动的 Claude 进程生效 */
   useTools(tools: ClaudeTool[]): void;
   /**
@@ -103,6 +105,11 @@ export interface ClaudeClient {
   deleteSession(sessionId: string): Promise<void>;
   /** 在这个目录下用 claude 命令开过的会话（新的在前，最多 max 个） */
   listSessions(dir: string, max?: number): Promise<{ id: string; title: string; lastModified: number }[]>;
+  /**
+   * 在这个目录下能选哪些模型：问 Claude Code 要（它按你的账号和这个目录的设置给出列表，还有每个模型能调哪几档思考强度）。
+   * 要启动一个 Claude 进程，不花 token；读不到就抛错
+   */
+  models(cwd: string): Promise<ModelChoice[]>;
   /** Claude 的版本、有没有登录。只看本机的文件，不启动 Claude */
   environment(): Promise<{ version: string | null; loggedIn: boolean | null }>;
 }

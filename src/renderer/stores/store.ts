@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ModelChoice } from "../../shared";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -53,6 +53,11 @@ export interface Distill {
 interface State {
   ready: boolean;
   projects: Project[];
+  /**
+   * 每个项目能选的模型（从 Claude Code 读的）。没有这一项：还没读过；
+   * loading：正在读、手里还没有；failed：没读到（界面上先给几个常见的）
+   */
+  models: Record<string, ModelChoice[] | "loading" | "failed">;
   routes: Record<string, Route>;
   stops: Record<string, Stop>;
   /** 各站的回答内容（到站后的，或从会话文件读回来的） */
@@ -150,7 +155,9 @@ interface State {
   /** 不要这份摘要了 */
   dropDistill(stopId: string): void;
   dismissNotice(id: string): void;
-  setRouteModel(routeId: string, model: string | null): Promise<void>;
+  setRouteModel(routeId: string, model: string | null, effort?: Effort | null): Promise<void>;
+  /** 读这个项目能选的模型（每个项目只读一次；先给上次的，新的到了再换） */
+  loadModels(projectId: string): void;
   renameRoute(routeId: string, name: string): Promise<void>;
   setRouteColor(routeId: string, color: number | null): Promise<void>;
   renameStop(stopId: string, name: string): Promise<void>;
@@ -260,6 +267,10 @@ export const useStore = create<State>((set, get) => {
       }
       case "project.updated":
         set((s) => ({ projects: s.projects.map((p) => (p.id === e.project.id ? e.project : p)) }));
+        break;
+      case "models.updated":
+        // 读不到时：手里有上次的就继续用上次的
+        set((s) => ({ models: { ...s.models, [e.projectId]: e.models ?? (Array.isArray(s.models[e.projectId]) ? s.models[e.projectId]! : "failed") } }));
         break;
       case "project.removed": {
         const routeIds = new Set(Object.values(get().routes).filter((r) => r.projectId === e.projectId).map((r) => r.id));
@@ -403,6 +414,7 @@ export const useStore = create<State>((set, get) => {
   return {
     ready: false,
     projects: [],
+    models: {},
     routes: {},
     stops: {},
     content: {},
@@ -459,6 +471,7 @@ export const useStore = create<State>((set, get) => {
         .filter((r) => r.projectId === projectId && r.status !== "archived")
         .sort((a, b) => a.number - b.number)[0];
       set({ selectedProjectId: projectId, selectedRouteId: route?.id ?? null });
+      get().loadModels(projectId);
       if (route) get().selectRoute(route.id);
     },
 
@@ -466,6 +479,7 @@ export const useStore = create<State>((set, get) => {
       const route = get().routes[routeId];
       if (!route) return;
       set((s) => ({ overview: false, viewing: s.viewing && s.stops[s.viewing]?.routeId === routeId ? s.viewing : null, selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
+      get().loadModels(route.projectId);
       void loadHistory(routeId);
       void window.bw.warm(routeId).catch(() => {});
       // 这一路最近一次同步的结果（冲突面板要用）
@@ -748,9 +762,18 @@ export const useStore = create<State>((set, get) => {
     async renameStop(stopId, name) {
       await window.bw.renameStop(stopId, name).catch((e) => set({ error: message(e) }));
     },
-    async setRouteModel(routeId, model) {
+    loadModels(projectId) {
+      if (get().models[projectId]) return;
+      set((s) => ({ models: { ...s.models, [projectId]: "loading" } }));
+      void window.bw
+        .models(projectId)
+        .then((list) => list && set((s) => ({ models: { ...s.models, [projectId]: s.models[projectId] === "loading" ? list : s.models[projectId]! } })))
+        .catch(() => set((s) => ({ models: { ...s.models, [projectId]: "failed" } })));
+    },
+
+    async setRouteModel(routeId, model, effort) {
       try {
-        const route = await window.bw.setRouteModel(routeId, model);
+        const route = await window.bw.setRouteModel(routeId, model, effort);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
       } catch (e) {
         set({ error: message(e) });

@@ -53,6 +53,11 @@ export interface Db {
     listByProject(projectId: string): KeptWorktree[];
     delete(id: string): void;
   };
+  /** 零碎的设置和缓存：键 → 一段文字（通常是 JSON） */
+  settings: {
+    get(key: string): string | null;
+    set(key: string, value: string): void;
+  };
   close(): void;
 }
 
@@ -113,6 +118,7 @@ export function openDb(file: string): Db {
       parentRouteId: "parent_route_id",
       forkStopId: "fork_stop_id",
       model: "model",
+      effort: "effort",
       color: "color",
       contextTokens: "context_tokens",
       pinned: "pinned",
@@ -133,6 +139,7 @@ export function openDb(file: string): Db {
       parentRouteId: r.parent_route_id as string | null,
       forkStopId: r.fork_stop_id as string | null,
       model: (r.model as string | null) ?? null,
+      effort: (r.effort as Route["effort"]) ?? null,
       color: (r.color as number | null) ?? null,
       contextTokens: (r.context_tokens as number | null) ?? null,
       pinned: !!r.pinned,
@@ -248,6 +255,10 @@ export function openDb(file: string): Db {
       get: (id) => kept.where("id = ?", id)[0],
       listByProject: (pid) => kept.where("project_id = ? ORDER BY at DESC", pid),
       delete: (id) => run("DELETE FROM kept_worktree WHERE id = ?", id),
+    },
+    settings: {
+      get: (key) => (one("SELECT value FROM setting WHERE key = ?", key)?.value as string | undefined) ?? null,
+      set: (key, value) => run("INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value),
     },
     close: () => sql.close(),
   };

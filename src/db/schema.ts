@@ -70,4 +70,6 @@ export const MIGRATIONS: string[] = [
   `CREATE TABLE kept_worktree (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE, path TEXT NOT NULL, label TEXT NOT NULL, at INTEGER NOT NULL);`,
   // 7：置顶、折叠、父路被删掉之后留下的叫法
   `ALTER TABLE route ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0; ALTER TABLE route ADD COLUMN folded INTEGER NOT NULL DEFAULT 0; ALTER TABLE route ADD COLUMN orphan_of TEXT;`,
+  // 8：每一路的思考强度；记下来的小东西（比如上次从 Claude Code 读到的模型列表）
+  `ALTER TABLE route ADD COLUMN effort TEXT; CREATE TABLE setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
 ];

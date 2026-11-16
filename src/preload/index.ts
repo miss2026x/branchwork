@@ -43,6 +43,7 @@ const api: BwApi = {
   setRouteFlags: call("setRouteFlags"),
   renameStop: call("renameStop"),
   setRouteModel: call("setRouteModel"),
+  models: call("models"),
   changes: call("changes"),
   terminals: call("terminals"),
   terminalOutput: call("terminalOutput"),

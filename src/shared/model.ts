@@ -47,6 +47,8 @@ export interface Route {
   forkStopId: string | null;
   /** 这一路用哪个模型：模型的别名（opus、sonnet、haiku）或完整名字；空表示用 Claude Code 的默认 */
   model: string | null;
+  /** 这一路的思考强度；空表示用模型自己的默认 */
+  effort: Effort | null;
   /** 线路颜色：1–8 中的一个；空表示按路号自动取 */
   color: number | null;
   /** 这一路的会话现在占了多少上下文（token 数）；还没问过或不知道时为空 */
@@ -101,6 +103,19 @@ export interface QueueItem {
 /** local：不是同步，是发现你直接在 Local 里改了文件 */
 export type SyncDirection = "pull" | "push" | "resolve" | "recover" | "local";
 export type SyncOutcomeStatus = "ok" | "noop" | "conflict" | "error";
+
+/** 思考强度。哪个模型支持哪几档由 Claude Code 告诉我们（ModelChoice.efforts） */
+export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/** 一个能选的模型：从 Claude Code 读出来的（你的账号、这个项目的设置决定有哪些） */
+export interface ModelChoice {
+  /** 交给 Claude Code 的值：别名（opus）、完整型号，或 default */
+  value: string;
+  label: string;
+  description: string;
+  /** 支持的思考强度；空数组表示不能调 */
+  efforts: Effort[];
+}
 
 /** 移除项目的结果：还有没进 Local 的改动或留下的工作区时先不删，列出来让你再确认 */
 export type RemoveProjectResult =

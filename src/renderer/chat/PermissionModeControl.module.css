@@ -2,6 +2,8 @@
   position: relative;
 }
 .trigger {
+  max-width: 200px;
+  min-width: 0;
   height: 32px;
   display: flex;
   align-items: center;
@@ -61,7 +63,8 @@
 }
 .menu i {
   flex: none;
-  width: 12px;
+  width: 14px;
+  padding-top: 3px;
   font-style: normal;
   font-size: 10px;
   color: var(--text-1);
@@ -101,4 +104,54 @@
 .confirmRow .danger {
   background: var(--amber-text);
   color: #fff;
+}
+
+/* 模型菜单：列表是 Claude Code 给的，可能比较长 */
+.wide {
+  width: 340px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+.menu .loading {
+  margin: 0 10px 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-3);
+}
+.effort {
+  margin: 4px 0 0;
+  padding: 10px 10px 6px;
+  border-top: 1px solid var(--divider);
+}
+.effort > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.effort > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.effort button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.effort button:hover {
+  border-color: var(--line-strong);
+}
+.effort button[aria-checked="true"] {
+  border-color: var(--text-1);
+  background: var(--text-1);
+  color: #fff;
+  font-weight: 600;
+}
+.effort small {
+  margin-top: 8px;
 }

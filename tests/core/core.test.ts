@@ -993,6 +993,42 @@ describe("每一路用哪个模型", () => {
     expect(forked.model).toBe("opus");
     expect(core.setRouteModel(route.id, null).model).toBeNull();
   });
+
+  it("思考强度：下一站起用，提前启动的也按它准备；换模型不传强度时强度不变；default 就是不指定", async () => {
+    const route = await core.createRoute(project.id);
+    expect(route.effort).toBeNull();
+    const r1 = core.setRouteModel(route.id, "opus", "high");
+    expect(r1).toMatchObject({ model: "opus", effort: "high" });
+    expect(claude.warmedEfforts.at(-1)).toBe("high");
+    await core.ask(route.id, "一");
+    expect(claude.asks[0]).toMatchObject({ model: "opus", effort: "high" });
+    expect(core.setRouteModel(route.id, "sonnet")).toMatchObject({ model: "sonnet", effort: "high" });
+    expect(core.setRouteModel(route.id, "default", null)).toMatchObject({ model: null, effort: null });
+    const forked = await core.fork(route.id, stopsOf(route.id)[0]!.id);
+    expect(forked.effort).toBeNull();
+  });
+
+  it("能选的模型：先给上次读到的，同时再问一次 Claude Code；每次启动每个项目只问一次；读不到下次再试", async () => {
+    const updated = () => events.filter((e) => e.type === "models.updated");
+    expect(core.models(project.id)).toBeNull();
+    await until("models.updated");
+    expect(updated()).toEqual([{ type: "models.updated", projectId: project.id, models: claude.modelList }]);
+    expect(claude.modelCalls).toEqual([project.localDir]);
+    expect(core.models(project.id)).toEqual(claude.modelList); // 记下来了
+    expect(claude.modelCalls).toHaveLength(1);
+
+    // 重新启动：先给记下的，再问一次；这次读不到
+    const saved = claude.modelList;
+    claude.modelList = new Error("连不上");
+    boot();
+    expect(core.models(project.id)).toEqual(saved);
+    await until("models.updated");
+    expect(updated()).toEqual([{ type: "models.updated", projectId: project.id, models: null }]);
+    events.length = 0;
+    core.models(project.id); // 上次没读到，再试
+    await until("models.updated");
+    expect(claude.modelCalls).toHaveLength(3);
+  });
 });
 
 describe("给站起名", () => {
