@@ -33,7 +33,7 @@ export function PermissionModeControl({ mode, routeLabel, options, model, onChan
 
   return (
     <div className={css.wrap}>
-      <button
+      <button type="button"
         className={css.trigger}
         data-mode={mode}
         aria-haspopup="menu"
@@ -63,8 +63,8 @@ export function PermissionModeControl({ mode, routeLabel, options, model, onChan
               </p>
               <p>只在你信得过这个项目里的代码和你要它做的事时开启。随时可以在这里改回去；之后新开的路也会默认用它。</p>
               <div className={css.confirmRow}>
-                <button onClick={close}>取消</button>
-                <button
+                <button type="button" onClick={close}>取消</button>
+                <button type="button"
                   className={css.danger}
                   onClick={() => {
                     onChange("all");
@@ -81,7 +81,7 @@ export function PermissionModeControl({ mode, routeLabel, options, model, onChan
               {options === "loading" && <p className={css.loading}>正在从 Claude Code 读取能用的批准方式…</p>}
               {fallback && <p className={css.note}>这一路的模型（{model?.label}）不支持自动判断，这一路先按“每次都问”。</p>}
               {items.map((m) => (
-                <button
+                <button type="button"
                   key={m.mode}
                   role="menuitemradio"
                   aria-checked={m.mode === mode}

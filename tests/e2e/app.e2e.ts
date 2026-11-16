@@ -470,7 +470,7 @@ describe("应用", () => {
     await fresh.getByPlaceholder("不填就用第一个问题起名").fill("带着问题出发");
     await fresh.getByRole("radio", { name: "颜色 6" }).click();
     await fresh.getByRole("button", { name: /^模型：/ }).click();
-    await fresh.getByRole("option", { name: /^Haiku 5\.5/ }).click();
+    await fresh.getByRole("menuitemradio", { name: /^Haiku 5\.5/ }).click();
     await fresh.getByLabel("第一个问题").fill("新车的第一个问题");
     await fresh.getByRole("button", { name: /发车/ }).click();
     await expect.poll(() => page.getByRole("heading", { name: "带着问题出发" }).isVisible(), { timeout: 30000 }).toBe(true);

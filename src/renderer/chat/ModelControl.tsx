@@ -33,7 +33,7 @@ export function ModelControl({ model, effort, options, routeLabel, onChange }: P
     close();
   };
   const row = (m: ModelChoice) => (
-    <button key={m.value} role="menuitemradio" aria-checked={m === current} onClick={() => pickModel(m)}>
+    <button type="button" key={m.value} role="menuitemradio" aria-checked={m === current} onClick={() => pickModel(m)}>
       <i>{m === current ? <IconCheck size={14} /> : ""}</i>
       <span>
         {m.label}
@@ -45,7 +45,7 @@ export function ModelControl({ model, effort, options, routeLabel, onChange }: P
 
   return (
     <div className={css.wrap}>
-      <button className={css.trigger} aria-haspopup="menu" aria-expanded={open} aria-label={`模型：${short(current.label)}`} onClick={() => (open ? close() : setOpen(true))} title={`这一路用的模型：${current.label}`}>
+      <button type="button" className={css.trigger} aria-haspopup="menu" aria-expanded={open} aria-label={`模型：${short(current.label)}`} onClick={() => (open ? close() : setOpen(true))} title={`这一路用的模型：${current.label}`}>
         <IconSpark size={14} />
         <span className="ell">{short(current.label)}</span>
         <IconDown size={12} />
@@ -60,7 +60,7 @@ export function ModelControl({ model, effort, options, routeLabel, onChange }: P
             {common.map(row)}
             {more.length > 0 && (
               <>
-                <button className={css.more} aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
+                <button type="button" className={css.more} aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
                   <IconChevron size={12} open={showMore} /> {showMore ? "收起" : `更多型号（${more.length}）`}
                 </button>
                 {showMore && more.map(row)}

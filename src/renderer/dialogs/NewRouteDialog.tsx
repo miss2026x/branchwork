@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Effort, PermissionMode, Project, QueueItem } from "../../shared";
-import { IconClose, IconFolder, IconSend, IconWait, IconWarn } from "../ui/icons";
-import { Plate } from "../ui/Plate";
+import { EffortControl } from "../chat/EffortControl";
+import { ModelControl } from "../chat/ModelControl";
+import { PermissionModeControl } from "../chat/PermissionModeControl";
+import { currentModel, modeItems, type OptionsState } from "../ui/claude-options";
+import { IconClose, IconFolder, IconWait, IconWarn } from "../ui/icons";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
-import { Select, type SelectOption } from "../ui/Select";
-import { EFFORT_HINT, EFFORT_LABEL, modeItems, modelHint, modelItems, type OptionsState } from "../ui/claude-options";
 import css from "./Dialog.module.css";
-import own from "./Extra.module.css";
+import own from "./NewRoute.module.css";
 
 interface Props {
   projects: Project[];
@@ -23,172 +24,166 @@ interface Props {
   onCancel(): void;
 }
 
-
-/** “开一路新车”：选项目、起名、挑颜色和模型，写第一个问题（可以从候车区选） */
+/** 底部那行用：同样的设置在终端里怎么写 */
 const CLI_MODE: Record<PermissionMode, string> = { ask: "default", edits: "acceptEdits", auto: "auto", plan: "plan", dontAsk: "dontAsk", all: "bypassPermissions" };
 
+/**
+ * “开一路新车”（设计稿 3-4）：一栏。项目、名称和颜色在上；下面就是这一路第一站的输入框，
+ * 和对话栏底下的输入框一个样子，左下角是这一路的批准方式、模型、思考强度，右下角从候车区选
+ */
 export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
-  const [model, setModel] = useState("");
-  const [effort, setEffort] = useState("");
+  const [model, setModel] = useState<string | null>(null);
+  const [effort, setEffort] = useState<Effort | null>(null);
   const [question, setQuestion] = useState("");
   const [from, setFrom] = useState<QueueItem | null>(null);
   const [picking, setPicking] = useState(false);
-  const projectMode = projects.find((p) => p.id === projectId)?.permissionMode ?? "ask";
   const [mode, setMode] = useState<PermissionMode | null>(null);
   const number = nextNumber(projectId);
-  const route = { number, express: null, color };
-  const colors = routeColors(route);
+  const colors = routeColors({ number, express: null, color });
   const items = parked(projectId);
-  const modelState = claudeOptions(projectId);
+  const options = claudeOptions(projectId);
   useEffect(() => onLoadClaudeOptions(projectId), [projectId, onLoadClaudeOptions]);
-  const { common, more } = modelItems(modelState, null);
-  const modelOptions: SelectOption<string>[] = [...common, ...more].map((m) => ({ value: m.value === "default" ? "" : m.value, label: m.label, hint: [modelHint(m), m.description].filter(Boolean).join(" · ") }));
-  const picked = [...common, ...more].find((m) => m.value === (model || "default"));
-  const effortOptions: SelectOption<string>[] = [{ value: "", label: "默认", hint: "跟着模型自己的设定" }, ...(picked?.efforts ?? []).map((e) => ({ value: e, label: EFFORT_LABEL[e], hint: EFFORT_HINT[e] }))];
-  const modeOptions: SelectOption<PermissionMode>[] = modeItems(modelState, picked)
-    .filter((m) => !m.disabled)
-    .map((m) => ({ value: m.mode, label: m.recommended ? `${m.label}（推荐）` : m.label, hint: m.hint }));
-  // 默认沿用项目上次选的；那个方式这一路的模型用不了（比如自动判断）就退回每次都问
-  const chosenMode: PermissionMode = modeOptions.some((o) => o.value === (mode ?? projectMode)) ? (mode ?? projectMode) : "ask";
+  const picked = currentModel(options, model);
+  // 动手前默认沿用项目上次选的；那个方式这一路的模型用不了（比如自动判断）就退回每次都问
+  const projectMode = projects.find((p) => p.id === projectId)?.permissionMode ?? "ask";
+  const usable = modeItems(options, picked).filter((m) => !m.disabled);
+  const chosenMode: PermissionMode = usable.some((m) => m.mode === (mode ?? projectMode)) ? (mode ?? projectMode) : "ask";
+  const label = `${number}路`;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
-  // 底部那行：同样的设置在终端里怎么写（思考强度没有对应的参数，不写）
+
   const command = ["claude", model ? `--model ${model}` : "", chosenMode === "all" ? "--dangerously-skip-permissions" : chosenMode !== "ask" ? `--permission-mode ${CLI_MODE[chosenMode]}` : ""].filter(Boolean).join(" ");
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const pickedEffort = picked?.efforts.find((e) => e === effort) ?? null;
-    onCreate({ projectId, name, color, model: model || null, effort: pickedEffort, permissionMode: chosenMode, question, itemId: from && question.trim() === from.text ? from.id : undefined });
+    onCreate({
+      projectId,
+      name,
+      color,
+      model,
+      effort: effort && picked.efforts.includes(effort) ? effort : null,
+      permissionMode: chosenMode,
+      question,
+      itemId: from && question.trim() === from.text ? from.id : undefined,
+    });
   };
 
   return (
     <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && !question && onCancel()}>
-      <form className={`${css.dialog} ${own.two}`} role="dialog" aria-modal aria-label="开一路新车" onSubmit={submit}>
-        <header>
-          <span className={own.ghostPlate} style={{ background: colors.tag }}>
-            {number}路
+      <form className={`${css.dialog} ${own.dialog}`} role="dialog" aria-modal aria-label="开一路新车" onSubmit={submit}>
+        <header className={own.head}>
+          <span className={own.plate} style={{ background: colors.tag }}>
+            {number}
+            <small>路</small>
           </span>
           <h2>开一路新车</h2>
           <button type="button" aria-label="关闭" onClick={onCancel}>
-            <IconClose />
+            <IconClose size={14} />
           </button>
         </header>
-        <div className={own.cols}>
-          <div className={own.col}>
-            <div className={css.field}>
-              <span>项目</span>
-              <div className={own.chips} role="radiogroup" aria-label="项目">
-                {projects.map((p) => (
-                  <button key={p.id} type="button" role="radio" aria-checked={p.id === projectId} onClick={() => (setProjectId(p.id), setFrom(null))}>
-                    {p.name}
-                  </button>
-                ))}
-                <button type="button" className={own.dashed} onClick={onAddProject}>
-                  添加项目
+
+        <div className={own.body}>
+          <div className={own.row}>
+            <span className={own.label}>项目</span>
+            <div className={own.chips} role="radiogroup" aria-label="项目">
+              {projects.map((p) => (
+                <button key={p.id} type="button" role="radio" aria-checked={p.id === projectId} onClick={() => (setProjectId(p.id), setFrom(null))}>
+                  {p.name}
                 </button>
-              </div>
+              ))}
+              <button type="button" className={own.dashed} onClick={onAddProject}>
+                + 添加项目
+              </button>
             </div>
-            <div className={own.nameColor}>
-              <label className={css.field}>
-                <span>线路名称</span>
-                <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="不填就用第一个问题起名" maxLength={40} />
-              </label>
-              <div className={css.field}>
-                <span>颜色</span>
-                <div className={own.swatches} role="radiogroup" aria-label="颜色">
-                  {ROUTE_COLORS.map(([n, c], i) => (
-                    <button key={n} type="button" role="radio" aria-checked={c === colors.line} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => setColor(n)} />
-                  ))}
-                </div>
-              </div>
-            </div>
-            {/* 这一路怎么跑：三个选择一行，和输入框左下角的是同一套，开出来以后也能在那里改 */}
-            <section className={own.run} aria-label="这一路怎么跑">
-              <header>
-                <span>这一路怎么跑</span>
-                <small>开出来以后，在输入框左下角也能改</small>
-              </header>
-              <div className={own.runGrid}>
-                <div className={css.field}>
-                  <span>模型</span>
-                  <Select label="模型" value={modelOptions.some((o) => o.value === model) ? model : ""} options={modelOptions} onChange={setModel} />
-                  <small className={own.hint}>{modelState === "loading" ? "正在从 Claude Code 读取…" : picked ? modelHint(picked) || picked.description : ""}</small>
-                </div>
-                <div className={css.field}>
-                  <span>思考强度</span>
-                  {effortOptions.length > 1 ? (
-                    <Select<string> label="思考强度" value={effortOptions.some((o) => o.value === effort) ? effort : ""} options={effortOptions} onChange={setEffort} />
-                  ) : (
-                    <p className={own.na}>{picked ? "这个模型不能调" : "等模型列表读好"}</p>
-                  )}
-                  <small className={own.hint}>{effortOptions.find((o) => o.value === effort)?.hint ?? "跟着模型自己的设定"}</small>
-                </div>
-                <div className={css.field}>
-                  <span>动手前</span>
-                  <Select<PermissionMode> label="动手前" value={chosenMode} options={modeOptions} onChange={(m) => setMode(m)} />
-                  <small className={own.hint}>{chosenMode === "all" ? "" : modeOptions.find((o) => o.value === chosenMode)?.hint}</small>
-                </div>
-              </div>
-              {chosenMode === "all" && (
-                <p className={own.runWarn}>
-                  <IconWarn size={14} /> 全部不问：这一路运行命令、改文件、联网都不再问你，能碰到这台电脑上你能碰到的任何东西。
-                </p>
-              )}
-            </section>
           </div>
-          <div className={`${own.col} ${own.right}`}>
-            <div className={css.field}>
-              <span className={own.between}>
-                第一个问题
-                {items.length > 0 && (
+
+          <div className={own.row}>
+            <label className={own.label} htmlFor="nr-name">
+              名称
+            </label>
+            <input id="nr-name" className={own.name} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="不填就用第一个问题起名" maxLength={40} />
+            <div className={own.swatches} role="radiogroup" aria-label="颜色">
+              {ROUTE_COLORS.map(([n, c], i) => (
+                <button key={n} type="button" role="radio" aria-checked={c === colors.line} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => setColor(n)} />
+              ))}
+            </div>
+          </div>
+
+          {/* 第一站：和对话栏的输入框同一个样子 */}
+          <div className={own.box}>
+            <label htmlFor="nr-q">第一站</label>
+            <textarea
+              id="nr-q"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={4}
+              placeholder="想让 Claude 做什么？可以先不填，开好再问"
+              aria-label="第一个问题"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(e);
+              }}
+            />
+            <div className={own.toolbar}>
+              <div className={own.controls}>
+                <PermissionModeControl mode={chosenMode} routeLabel={label} options={options} model={picked} onChange={setMode} />
+                <ModelControl model={model} effort={effort} options={options} routeLabel={label} onChange={(m, e) => (setModel(m), setEffort(e))} />
+                <EffortControl effort={effort} model={picked} routeLabel={label} onChange={setEffort} />
+              </div>
+              {items.length > 0 && (
+                <div className={own.pickWrap}>
                   <button type="button" className={own.pick} aria-expanded={picking} onClick={() => setPicking(!picking)}>
-                    <IconWait size={14} /> 从候车区选
+                    <IconWait size={13} /> 从候车区选 <span>{items.length}</span>
                   </button>
-                )}
-              </span>
-              {picking && (
-                <div className={own.pickList} role="listbox" aria-label="候车区里还没派车的问题">
-                  {items.map((it) => (
-                    <button key={it.id} type="button" role="option" aria-selected={from?.id === it.id} onClick={() => (setFrom(it), setQuestion(it.text), setPicking(false))}>
-                      {it.text}
-                    </button>
-                  ))}
+                  {picking && (
+                    <div className={own.pickList} role="listbox" aria-label="候车区里还没派车的问题">
+                      {items.map((it) => (
+                        <button key={it.id} type="button" role="option" aria-selected={from?.id === it.id} onClick={() => (setFrom(it), setQuestion(it.text), setPicking(false))}>
+                          {it.text}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-              <textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                rows={4}
-                placeholder="可以先不填，开好再问"
-                aria-label="第一个问题"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(e);
-                }}
-              />
-              {from && question.trim() === from.text && <small className={own.from}>来自候车区，发车后从候车区移走</small>}
             </div>
-            <div className={own.note}>
-              <IconFolder size={16} />
-              <span>
-                <b>新对话有自己的工作区</b>，代码从 Local 的现在开始。每站答完，改动自动同步进 Local；下一站开始前，先拿到 Local 的最新代码。
+          </div>
+
+          {chosenMode === "all" && (
+            <p className={own.warn}>
+              <IconWarn size={14} /> 全部不问：这一路运行命令、改文件、联网都不再问你，能碰到这台电脑上你能碰到的任何东西。
+            </p>
+          )}
+          <div className={own.under}>
+            {from && question.trim() === from.text ? (
+              <span className={own.from}>
+                <IconWait size={13} /> 来自候车区 · 发车后从候车区移走
+                <button type="button" aria-label="改回自己写" onClick={() => (setFrom(null), setQuestion(""))}>
+                  <IconClose size={11} />
+                </button>
               </span>
-            </div>
+            ) : (
+              <span />
+            )}
+            <span className={own.workspace} title="每站答完，改动自动同步进 Local；下一站开始前，先拿到 Local 的最新代码">
+              <IconFolder size={13} /> 有自己的工作区，代码从 Local 的现在开始
+            </span>
           </div>
         </div>
-        <footer>
-          <span className={own.footNote}>
-            等同于在新的工作区里运行 <code className="ell" title={command}>{command}</code>
-          </span>
-          <button type="button" className={css.ghost} onClick={onCancel}>
+
+        <footer className={own.foot}>
+          <code className="ell" title="同样的设置在终端里这样写（思考强度没有对应的参数）">$ {command}</code>
+          <button type="button" className={own.cancel} onClick={onCancel}>
             取消
           </button>
-          <button type="submit" className={css.confirm} style={{ background: colors.tag }}>
-            {question.trim() ? "发车" : `开出 ${number}路`} <IconSend size={14} />
+          <button type="submit" className={own.go} style={{ background: colors.tag }}>
+            {question.trim() ? "发车" : `开出 ${label}`}
+            <kbd>Ctrl ↵</kbd>
           </button>
         </footer>
       </form>

@@ -26,7 +26,7 @@ export function EffortControl({ effort, model, routeLabel, onChange }: Props) {
   };
   return (
     <div className={css.wrap}>
-      <button className={css.trigger} aria-haspopup="menu" aria-expanded={open} aria-label={`强度：${shown ? EFFORT_LABEL[shown] : "默认"}`} onClick={() => setOpen(!open)} title="这一路想得多深（思考强度）">
+      <button type="button" className={css.trigger} aria-haspopup="menu" aria-expanded={open} aria-label={`强度：${shown ? EFFORT_LABEL[shown] : "默认"}`} onClick={() => setOpen(!open)} title="这一路想得多深（思考强度）">
         <IconGauge size={14} />
         <span className="ell">{shown ? EFFORT_LABEL[shown] : "默认"}</span>
         <IconDown size={12} />
@@ -36,7 +36,7 @@ export function EffortControl({ effort, model, routeLabel, onChange }: Props) {
           <div className={css.backdrop} onClick={() => setOpen(false)} />
           <div ref={box} className={css.menu} role="menu">
             <header>只对 {routeLabel} 生效，下一站起用。越高想得越久、越贵</header>
-            <button role="menuitemradio" aria-checked={!shown} onClick={() => pick(null)}>
+            <button type="button" role="menuitemradio" aria-checked={!shown} onClick={() => pick(null)}>
               <i>{!shown ? <IconCheck size={14} /> : ""}</i>
               <span>
                 默认
@@ -44,7 +44,7 @@ export function EffortControl({ effort, model, routeLabel, onChange }: Props) {
               </span>
             </button>
             {model.efforts.map((e) => (
-              <button key={e} role="menuitemradio" aria-checked={shown === e} onClick={() => pick(e)}>
+              <button type="button" key={e} role="menuitemradio" aria-checked={shown === e} onClick={() => pick(e)}>
                 <i>{shown === e ? <IconCheck size={14} /> : ""}</i>
                 <span>
                   {EFFORT_LABEL[e]}
