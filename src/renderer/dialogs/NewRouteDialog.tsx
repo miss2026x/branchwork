@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Effort, PermissionMode, Project, QueueItem } from "../../shared";
-import { IconClose, IconFolder, IconSend, IconWait } from "../ui/icons";
+import { IconClose, IconFolder, IconSend, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { ROUTE_COLORS, routeColors } from "../ui/route-color";
 import { Select, type SelectOption } from "../ui/Select";
@@ -25,6 +25,8 @@ interface Props {
 
 
 /** “开一路新车”：选项目、起名、挑颜色和模型，写第一个问题（可以从候车区选） */
+const CLI_MODE: Record<PermissionMode, string> = { ask: "default", edits: "acceptEdits", auto: "auto", plan: "plan", dontAsk: "dontAsk", all: "bypassPermissions" };
+
 export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
@@ -56,6 +58,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
+  // 底部那行：同样的设置在终端里怎么写（思考强度没有对应的参数，不写）
+  const command = ["claude", model ? `--model ${model}` : "", chosenMode === "all" ? "--dangerously-skip-permissions" : chosenMode !== "ask" ? `--permission-mode ${CLI_MODE[chosenMode]}` : ""].filter(Boolean).join(" ");
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const pickedEffort = picked?.efforts.find((e) => e === effort) ?? null;
@@ -103,28 +107,39 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
                 </div>
               </div>
             </div>
-            <div className={own.pair}>
-              <div className={css.field}>
-                <span>模型</span>
-                <Select label="模型" value={modelOptions.some((o) => o.value === model) ? model : ""} options={modelOptions} onChange={setModel} />
-                {modelState === "loading" && <small className={own.from}>正在从 Claude Code 读取能用的模型…</small>}
+            {/* 这一路怎么跑：三个选择一行，和输入框左下角的是同一套，开出来以后也能在那里改 */}
+            <section className={own.run} aria-label="这一路怎么跑">
+              <header>
+                <span>这一路怎么跑</span>
+                <small>开出来以后，在输入框左下角也能改</small>
+              </header>
+              <div className={own.runGrid}>
+                <div className={css.field}>
+                  <span>模型</span>
+                  <Select label="模型" value={modelOptions.some((o) => o.value === model) ? model : ""} options={modelOptions} onChange={setModel} />
+                  <small className={own.hint}>{modelState === "loading" ? "正在从 Claude Code 读取…" : picked ? modelHint(picked) || picked.description : ""}</small>
+                </div>
+                <div className={css.field}>
+                  <span>思考强度</span>
+                  {effortOptions.length > 1 ? (
+                    <Select<string> label="思考强度" value={effortOptions.some((o) => o.value === effort) ? effort : ""} options={effortOptions} onChange={setEffort} />
+                  ) : (
+                    <p className={own.na}>{picked ? "这个模型不能调" : "等模型列表读好"}</p>
+                  )}
+                  <small className={own.hint}>{effortOptions.find((o) => o.value === effort)?.hint ?? "跟着模型自己的设定"}</small>
+                </div>
+                <div className={css.field}>
+                  <span>动手前</span>
+                  <Select<PermissionMode> label="动手前" value={chosenMode} options={modeOptions} onChange={(m) => setMode(m)} />
+                  <small className={own.hint}>{chosenMode === "all" ? "" : modeOptions.find((o) => o.value === chosenMode)?.hint}</small>
+                </div>
               </div>
-              <div className={css.field}>
-                <span>思考强度</span>
-                {effortOptions.length > 1 ? (
-                  <Select<string> label="思考强度" value={effortOptions.some((o) => o.value === effort) ? effort : ""} options={effortOptions} onChange={setEffort} />
-                ) : (
-                  <p className={own.na}>{picked ? "这个模型不能调" : "先等模型列表读好"}</p>
-                )}
-              </div>
-            </div>
-            <div className={own.pair}>
-              <div className={css.field}>
-                <span>动手前</span>
-                <Select<PermissionMode> label="动手前" value={chosenMode} options={modeOptions} onChange={(m) => setMode(m)} />
-              </div>
-              {chosenMode === "all" && <p className={own.pairWarn}>全部不问：这一路运行命令、改文件、联网都不再问你，能碰到这台电脑上你能碰到的任何东西。</p>}
-            </div>
+              {chosenMode === "all" && (
+                <p className={own.runWarn}>
+                  <IconWarn size={14} /> 全部不问：这一路运行命令、改文件、联网都不再问你，能碰到这台电脑上你能碰到的任何东西。
+                </p>
+              )}
+            </section>
           </div>
           <div className={`${own.col} ${own.right}`}>
             <div className={css.field}>
@@ -167,7 +182,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
         </div>
         <footer>
           <span className={own.footNote}>
-            等同于在新的工作区里运行 <code>claude</code>
+            等同于在新的工作区里运行 <code className="ell" title={command}>{command}</code>
           </span>
           <button type="button" className={css.ghost} onClick={onCancel}>
             取消
