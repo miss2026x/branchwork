@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useFit } from "../ui/useFit";
 import type { PermissionMode } from "../../shared";
 import { IconChevron, IconWarn } from "../ui/icons";
 import css from "./PermissionModeControl.module.css";
@@ -14,6 +15,8 @@ export function PermissionModeControl({ mode, projectName, onChange }: { mode: P
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const current = MODES.find((m) => m.mode === mode)!;
+  const box = useRef<HTMLDivElement>(null);
+  useFit(box, [open, confirming]);
   const close = () => {
     setOpen(false);
     setConfirming(false);
@@ -31,7 +34,7 @@ export function PermissionModeControl({ mode, projectName, onChange }: { mode: P
         <>
           <div className={css.backdrop} onClick={close} />
           {confirming ? (
-            <div className={css.menu} role="alertdialog" aria-label="开启全部不问">
+            <div ref={box} className={css.menu} role="alertdialog" aria-label="开启全部不问">
               <b>
                 <IconWarn size={16} /> 全部不问
               </b>
@@ -53,7 +56,7 @@ export function PermissionModeControl({ mode, projectName, onChange }: { mode: P
               </div>
             </div>
           ) : (
-            <div className={css.menu} role="menu">
+            <div ref={box} className={css.menu} role="menu">
               <header>对「{projectName}」里所有的路生效</header>
               {MODES.map((m) => (
                 <button

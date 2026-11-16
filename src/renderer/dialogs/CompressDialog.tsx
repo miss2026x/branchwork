@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
+import { useFit } from "../ui/useFit";
 import type { QueueItem, Route, Stop } from "../../shared";
 import { IconClose, IconCompress, IconFolder, IconWait } from "../ui/icons";
 import { Plate } from "../ui/Plate";
@@ -58,6 +59,8 @@ export function CompressDialog({ source, stop, stopNumber, choices, contextToken
   const [question, setQuestion] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const pickBox = useRef<HTMLUListElement>(null);
+  useFit(pickBox, [picking]);
   const express = { number: 0, express: nextExpress };
   const green = routeColors(express).tag;
   const shownName = name.trim() || `${source.name} · 续`;
@@ -255,7 +258,7 @@ export function CompressDialog({ source, stop, stopNumber, choices, contextToken
                     <IconWait size={14} /> 从候车区选
                   </button>
                   {picking && (
-                    <ul role="listbox" aria-label="候车区里没派车的问题">
+                    <ul ref={pickBox} role="listbox" aria-label="候车区里没派车的问题">
                       {waiting.map((q) => (
                         <li key={q.id}>
                           <button

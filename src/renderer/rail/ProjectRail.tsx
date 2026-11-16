@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useFit } from "../ui/useFit";
 import type { Route } from "../../shared";
 import { useStore } from "../stores/store";
 import { IconChevron, IconMore, IconPlus, IconWarn, IconTerminal, IconPin } from "../ui/icons";
@@ -24,6 +25,8 @@ export function ProjectRail({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [menuAt, setMenuAt] = useState({ top: 0, left: 0 });
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
+  const projectMenuBox = useRef<HTMLDivElement>(null);
+  useFit(projectMenuBox, [projectMenu]);
   const requestArchive = useStore((s) => s.requestArchive);
   const openCompress = useStore((s) => s.openCompress);
   const exportRoute = useStore((s) => s.exportRoute);
@@ -166,7 +169,7 @@ export function ProjectRail({
                 {projectMenu === p.id && (
                   <>
                     <div className={css.backdrop} onClick={() => setProjectMenu(null)} />
-                    <div className={`${css.menu} ${css.projectMenu}`} role="menu">
+                    <div ref={projectMenuBox} className={`${css.menu} ${css.projectMenu}`} role="menu">
                       <button role="menuitem" onClick={() => (setProjectMenu(null), selectProject(p.id), openNewRoute())}>
                         在此项目开新对话
                       </button>

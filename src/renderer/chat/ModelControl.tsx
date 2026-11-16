@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useFit } from "../ui/useFit";
 import { IconChevron } from "../ui/icons";
 import css from "./PermissionModeControl.module.css";
 
@@ -12,6 +13,8 @@ const MODELS: { model: string | null; label: string; hint: string }[] = [
 /** 这一路用哪个模型。只收当前值、回传用户选的值 */
 export function ModelControl({ model, routeLabel, onChange }: { model: string | null; routeLabel: string; onChange(model: string | null): void }) {
   const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useFit(box, [open]);
   const current = MODELS.find((m) => m.model === model);
   return (
     <div className={css.wrap}>
@@ -22,7 +25,7 @@ export function ModelControl({ model, routeLabel, onChange }: { model: string | 
       {open && (
         <>
           <div className={css.backdrop} onClick={() => setOpen(false)} />
-          <div className={css.menu} role="menu">
+          <div ref={box} className={css.menu} role="menu">
             <header>只对 {routeLabel} 生效，下一站起用。换模型后的第一站要重新启动 Claude，会慢一点</header>
             {MODELS.map((m) => (
               <button

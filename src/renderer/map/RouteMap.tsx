@@ -3,6 +3,7 @@ import type { QueueItem, QueueMode, Route, Stop, SyncFile } from "../../shared";
 import { BusMark, IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
+import { useFit } from "../ui/useFit";
 import { firstStops } from "../stores/numbering";
 import { estimateTokens, parseSummary } from "../ui/summary-items";
 import { nameRepeat, repeatMark } from "../stores/numbering";
@@ -87,6 +88,8 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
   };
   const allSpots = layout.lanes.flatMap((l) => l.stops.map((spot) => ({ spot, route: l.route })));
   const hoverStop = hover?.kind === "stop" && !menuStopId ? allSpots.find((m) => m.spot.stop.id === hover.id) : undefined;
+  const menuBox = useRef<HTMLDivElement>(null);
+  const cardBox = useRef<HTMLDivElement>(null);
   const hoverQueue = hover?.kind === "queue" ? layout.lanes.flatMap((l) => queue.filter((q) => q.routeId === l.route.id).map((q, i) => ({ item: q, lane: l, i }))).find((m) => m.item.id === hover.id) : undefined;
   useEffect(() => {
     if (hoverStop) onHoverStop(hoverStop.spot.stop);
@@ -94,6 +97,8 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
   }, [hoverStop?.spot.stop.id]);
   const viewing = viewingStopId ? allSpots.find((m) => m.spot.stop.id === viewingStopId) : undefined;
   const menu = menuStopId ? layout.lanes.flatMap((l) => l.stops.map((spot) => ({ spot, route: l.route }))).find((m) => m.spot.stop.id === menuStopId) : undefined;
+  useFit(menuBox, [menuStopId, renaming, view]);
+  useFit(cardBox, [hover, view]);
   useEffect(() => {
     if (!menuStopId) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -354,7 +359,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         </div>
 
         {menu && (
-          <div className={css.menu} role="menu" style={menuPlace(menu.spot.x * view.k + view.x, menu.spot.y * view.k + view.y, view.k, viewport.current)}>
+          <div ref={menuBox} className={css.menu} role="menu" style={menuPlace(menu.spot.x * view.k + view.x, menu.spot.y * view.k + view.y, view.k, viewport.current)}>
             <header>
               <Plate route={menu.route} />
               <b>第 {stopNumber(menu.spot.stop)} 站</b>
@@ -454,7 +459,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         )}
 
         {hoverStop && hoverStop.spot.stop.kind === "summary" && (
-          <div className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const stop = hoverStop.spot.stop;
               const source = allSpots.find((m) => m.spot.stop.id === hoverStop.route.forkStopId);
@@ -494,7 +499,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
         {hoverStop && hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id] && (
-          <div className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const files = conflicts[hoverStop.route.id]!;
               const label = hoverStop.route.express ? `快${hoverStop.route.express}` : `${hoverStop.route.number}路`;
@@ -529,7 +534,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
         {hoverStop && hoverStop.spot.stop.kind !== "summary" && !(hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id]) && (
-          <div className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             <header>
               <Plate route={hoverStop.route} />
               <b>第 {stopNumber(hoverStop.spot.stop)} 站</b>
@@ -566,6 +571,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
 
         {hoverQueue && (
           <div
+            ref={cardBox}
             className={`${css.card} ${css.cardDark}`}
             style={cardPlace((hoverQueue.lane.end.x + hoverQueue.i * 76) * view.k + view.x, hoverQueue.lane.end.y * view.k + view.y, view.k, viewport.current, true)}
             onPointerEnter={() => hoverOn(hover, 0)}
@@ -667,7 +673,7 @@ function cardPlace(x: number, y: number, k: number, box: HTMLElement | null, bel
 /** 站的菜单放哪：默认在站的下面；下面放不下就放上面，也不超出左右两边 */
 function menuPlace(x: number, y: number, k: number, box: HTMLElement | null): { left: number; top?: number; bottom?: number } {
   const W = 280;
-  const H = 230;
+  const H = 300;
   const gap = 44 * Math.max(0.6, k);
   const width = box?.clientWidth ?? Infinity;
   const height = box?.clientHeight ?? Infinity;

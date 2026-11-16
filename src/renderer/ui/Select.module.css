@@ -45,6 +45,10 @@
   background: var(--surface-0);
   box-shadow: var(--e3);
 }
+.list[data-up="true"] {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
 .list li {
   display: flex;
   align-items: center;

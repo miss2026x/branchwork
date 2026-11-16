@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useFit } from "../ui/useFit";
 import type { QueueItem, Route, Stop } from "../../shared";
 import { firstStops } from "../stores/numbering";
 import { IconClose, IconFold, IconWait } from "../ui/icons";
@@ -38,8 +39,12 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
   const [question, setQuestion] = useState("");
   const [color, setColor] = useState<number | null>(null);
   const [coloring, setColoring] = useState(false);
+  const colorBox = useRef<HTMLDivElement>(null);
+  useFit(colorBox, [coloring]);
   const [picked, setPicked] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const pickBox = useRef<HTMLUListElement>(null);
+  useFit(pickBox, [picking]);
   const [switchTo, setSwitchTo] = useState(remembered);
   const nameInput = useRef<HTMLInputElement>(null);
   const next = { number: nextNumber, express: null, color };
@@ -89,7 +94,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
                 换色
               </button>
               {coloring && (
-                <div className={own.swatches} role="radiogroup" aria-label="颜色" data-pop>
+                <div ref={colorBox} className={own.swatches} role="radiogroup" aria-label="颜色" data-pop>
                   {ROUTE_COLORS.map(([n, c], i) => (
                     <button key={n} type="button" role="radio" aria-checked={c === routeColors(next).line} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => (setColor(n), setColoring(false))} />
                   ))}
@@ -107,7 +112,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
                 <IconWait size={14} /> 从候车区选
               </button>
               {picking && (
-                <ul role="listbox" aria-label="候车区里没派车的问题">
+                <ul ref={pickBox} role="listbox" aria-label="候车区里没派车的问题">
                   {waiting.map((q) => (
                     <li key={q.id}>
                       <button type="button" role="option" aria-selected={picked === q.id} onClick={() => (setQuestion(q.text), setPicked(q.id), setPicking(false))}>

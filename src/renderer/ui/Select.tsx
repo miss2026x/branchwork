@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { IconCheck, IconChevron } from "./icons";
+import { useFit } from "./useFit";
 import css from "./Select.module.css";
 
 export interface SelectOption<T extends string> {
@@ -24,7 +25,11 @@ interface Props<T extends string> {
 export function Select<T extends string>({ value, options, onChange, label }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  // 下面放不下就往上开，别盖住按钮
+  const [up, setUp] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  useFit(list, [open]);
   const id = useId();
   const current = options.find((o) => o.value === value) ?? options[0]!;
 
@@ -36,6 +41,9 @@ export function Select<T extends string>({ value, options, onChange, label }: Pr
   }, [open]);
 
   const show = () => {
+    const r = root.current?.getBoundingClientRect();
+    const need = options.length * 44 + 16;
+    setUp(!!r && r.bottom + need > window.innerHeight - 8 && r.top - need > 8);
     setActive(Math.max(0, options.indexOf(current)));
     setOpen(true);
   };
@@ -67,7 +75,7 @@ export function Select<T extends string>({ value, options, onChange, label }: Pr
         <IconChevron size={14} open />
       </button>
       {open && (
-        <ul className={css.list} role="listbox" id={id} aria-label={label}>
+        <ul ref={list} className={css.list} data-up={up} role="listbox" id={id} aria-label={label}>
           {options.map((o, i) => (
             <li
               key={o.value}
