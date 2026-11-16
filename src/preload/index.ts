@@ -16,7 +16,7 @@ const api: BwApi = {
   pickDirectory: call("pickDirectory"),
   addProject: call("addProject"),
   snapshot: call("snapshot"),
-  setPermissionMode: call("setPermissionMode"),
+  setRoutePermissionMode: call("setRoutePermissionMode"),
   inspectDirectory: call("inspectDirectory"),
   droppedPath: (file) => {
     try {

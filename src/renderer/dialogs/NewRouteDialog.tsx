@@ -19,15 +19,13 @@ interface Props {
   /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的）；没读过时 onLoadClaudeOptions 去读 */
   claudeOptions(projectId: string): OptionsState;
   onLoadClaudeOptions(projectId: string): void;
-  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; question: string; itemId?: string }): void;
-  /** “动手前”是整个项目的设置，这里改了就是改这个项目的 */
-  onPermissionMode(projectId: string, mode: PermissionMode): void;
+  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; permissionMode: PermissionMode; question: string; itemId?: string }): void;
   onCancel(): void;
 }
 
 
 /** “开一路新车”：选项目、起名、挑颜色和模型，写第一个问题（可以从候车区选） */
-export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, onPermissionMode, onCancel }: Props) {
+export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
@@ -51,6 +49,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const modeOptions: SelectOption<PermissionMode>[] = modeItems(modelState, picked)
     .filter((m) => !m.disabled)
     .map((m) => ({ value: m.mode, label: m.recommended ? `${m.label}（推荐）` : m.label, hint: m.hint }));
+  // 默认沿用项目上次选的；那个方式这一路的模型用不了（比如自动判断）就退回每次都问
+  const chosenMode: PermissionMode = modeOptions.some((o) => o.value === (mode ?? projectMode)) ? (mode ?? projectMode) : "ask";
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
     window.addEventListener("keydown", onKey);
@@ -58,9 +58,8 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   }, [onCancel]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (mode && mode !== projectMode) onPermissionMode(projectId, mode);
     const pickedEffort = picked?.efforts.find((e) => e === effort) ?? null;
-    onCreate({ projectId, name, color, model: model || null, effort: pickedEffort, question, itemId: from && question.trim() === from.text ? from.id : undefined });
+    onCreate({ projectId, name, color, model: model || null, effort: pickedEffort, permissionMode: chosenMode, question, itemId: from && question.trim() === from.text ? from.id : undefined });
   };
 
   return (
@@ -122,9 +121,9 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
             <div className={own.pair}>
               <div className={css.field}>
                 <span>动手前</span>
-                <Select<PermissionMode> label="动手前" value={mode ?? projectMode} options={modeOptions} onChange={(m) => setMode(m)} />
+                <Select<PermissionMode> label="动手前" value={chosenMode} options={modeOptions} onChange={(m) => setMode(m)} />
               </div>
-              <p className={own.pairNote}>“动手前”是整个项目的设置，改了以后这个项目的每一路都一样。</p>
+              {chosenMode === "all" && <p className={own.pairWarn}>全部不问：这一路运行命令、改文件、联网都不再问你，能碰到这台电脑上你能碰到的任何东西。</p>}
             </div>
           </div>
           <div className={`${own.col} ${own.right}`}>

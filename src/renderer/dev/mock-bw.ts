@@ -41,7 +41,7 @@ export function installMockBw(): void {
   };
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
     const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
-    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, effort: null, color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
+    const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, effort: null, permissionMode: projects.find((p) => p.id === projectId)?.permissionMode ?? "ask", color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
   };
@@ -146,7 +146,7 @@ export function installMockBw(): void {
 
     await say("在回调里加 state 比对。失败时清掉临时 cookie，跳回登录页并带上错误码。我先改路由，再跑一遍测试。\n\n");
     await tool("Edit", "src/auth/routes.ts");
-    if (!stopped && text.includes("批准") && projects.find((p) => p.id === routes.get(routeId)!.projectId)?.permissionMode !== "all") {
+    if (!stopped && text.includes("批准") && routes.get(routeId)!.permissionMode !== "all") {
       const requestId = id("q");
       setRoute(routeId, { status: "awaiting_permission" });
       emit({ type: "permission.request", requestId, routeId, stopId: stop.id, tool: "Bash", input: { command: "npm test -- auth" }, canRemember: true });
@@ -211,12 +211,13 @@ export function installMockBw(): void {
       stops: [...stops.values()].filter((s) => routes.get(s.routeId)?.projectId === projectId),
       queue: queue.filter((x) => x.projectId === projectId),
     }),
-    async setPermissionMode(projectId, mode) {
-      const i = projects.findIndex((p) => p.id === projectId);
+    async setRoutePermissionMode(routeId, mode) {
+      const route = setRoute(routeId, { permissionMode: mode });
+      const i = projects.findIndex((p) => p.id === route.projectId);
       projects[i] = { ...projects[i]!, permissionMode: mode };
       emit({ type: "project.updated", project: projects[i]! });
       if (mode === "all") for (const [k, resolve] of permissions) (permissions.delete(k), resolve("allow"));
-      return projects[i]!;
+      return route;
     },
     environment: async () => ({ claudeVersion: "2.4.1", loggedIn: true, gitVersion: "2.43.0" }),
     terminalSessions: async (dir) =>

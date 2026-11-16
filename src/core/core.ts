@@ -93,7 +93,8 @@ export interface Core {
    * ask 每次都问；edits 改文件不问；all 全部不问（相当于 --dangerously-skip-permissions）。
    * 正在等批准的请求，按新的方式能自动批准的会立刻批准。
    */
-  setPermissionMode(projectId: string, mode: PermissionMode): Project;
+  /** 这一路的批准方式。同时记成项目的默认：之后新开的路沿用它 */
+  setRoutePermissionMode(routeId: string, mode: PermissionMode): Route;
   /** 新开一路（从 Local 当前状态建工作区） */
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 截线：删掉这一路从这一站起的所有站，会话退回到这一站之前；代码不动。返回这一站的提问 */
@@ -386,7 +387,7 @@ export function createCore(opts: CoreOptions): Core {
    * 不支持（Claude Code 说的）就按“每次都问”，免得它启动不了
    */
   const runFor = (route: Route): RunSettings => {
-    let permissionMode = mustProject(route.projectId).permissionMode;
+    let permissionMode = route.permissionMode;
     if (permissionMode === "auto") {
       const model = savedOptions(route.projectId)?.models.find((m) => m.value === (route.model ?? "default"));
       if (model && !model.autoMode) permissionMode = "ask";
@@ -586,7 +587,7 @@ export function createCore(opts: CoreOptions): Core {
             new Promise<PermissionDecision | { deny: string }>((resolve) => {
               const requestId = id("q");
               // 这个项目设了自动批准：不问，直接放行
-              if (autoApproves(mustProject(route.projectId).permissionMode, req.tool)) return resolve("allow");
+              if (autoApproves(mustRoute(routeId).permissionMode, req.tool)) return resolve("allow");
               pendingPermissions.set(requestId, { routeId, tool: req.tool, resolve });
               setRoute(routeId, { status: "awaiting_permission" });
               emit({ type: "permission.request", requestId, routeId, stopId, tool: req.tool, input: req.input, canRemember: req.canRemember });
@@ -706,6 +707,7 @@ export function createCore(opts: CoreOptions): Core {
           forkStopId: null,
           model: null,
           effort: null,
+          permissionMode: project.permissionMode,
           color: null,
           contextTokens: null,
           pinned: false,
@@ -803,19 +805,19 @@ export function createCore(opts: CoreOptions): Core {
       return route;
     },
 
-    setPermissionMode(projectId, mode) {
-      mustProject(projectId);
-      const project = db.projects.update(projectId, { permissionMode: mode });
-      emit({ type: "project.updated", project });
-      // 正在等批准的：按新的方式能放行的现在就放行
+    setRoutePermissionMode(routeId, mode) {
+      const before = mustRoute(routeId);
+      const route = before.permissionMode === mode ? before : setRoute(routeId, { permissionMode: mode });
+      if (mustProject(route.projectId).permissionMode !== mode) emit({ type: "project.updated", project: db.projects.update(route.projectId, { permissionMode: mode }) });
+      // 这一路正在等批准的：按新的方式能放行的现在就放行
       for (const [requestId, p] of pendingPermissions) {
-        if (db.routes.get(p.routeId)?.projectId !== projectId || !autoApproves(mode, p.tool)) continue;
+        if (p.routeId !== routeId || !autoApproves(mode, p.tool)) continue;
         pendingPermissions.delete(requestId);
         setRoute(p.routeId, { status: "answering" });
         p.resolve("allow");
       }
       // 提前启动好的 Claude 是按旧的批准方式启动的：下一站问的时候 claude 模块发现对不上，会换一个新的
-      return project;
+      return mustRoute(routeId);
     },
 
     async createRoute(projectId, name) {
@@ -837,6 +839,7 @@ export function createCore(opts: CoreOptions): Core {
         forkStopId: null,
         model: null,
         effort: null,
+        permissionMode: project.permissionMode,
         color: null,
         contextTokens: null,
         pinned: false,
@@ -996,6 +999,7 @@ export function createCore(opts: CoreOptions): Core {
         forkStopId: stop.id,
         model: parent.model,
         effort: parent.effort,
+        permissionMode: parent.permissionMode,
         color: null,
         contextTokens: null,
         pinned: false,
@@ -1150,6 +1154,7 @@ export function createCore(opts: CoreOptions): Core {
         forkStopId: stop.id,
         model: source.model,
         effort: source.effort,
+        permissionMode: source.permissionMode,
         color: null,
         contextTokens: null,
         pinned: false,

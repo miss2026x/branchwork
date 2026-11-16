@@ -129,7 +129,7 @@ interface State {
   importSessions(projectId: string, sessionIds: string[]): Promise<void>;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
-  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; question?: string; itemId?: string }): Promise<void>;
+  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; permissionMode?: PermissionMode; question?: string; itemId?: string }): Promise<void>;
   /** 看这个项目的同步记录；null 关掉 */
   viewLog(projectId: string | null): void;
   closeDialog(): void;
@@ -202,7 +202,8 @@ interface State {
   requestArchive(routeId: string): void;
   /** mode：later 答完再归档；now 现在停下，停稳后归档 */
   archiveBusy(routeId: string, mode: "later" | "now"): void;
-  setPermissionMode(projectId: string, mode: PermissionMode): Promise<void>;
+  /** 这一路的批准方式（也记成项目的默认，之后新开的路沿用） */
+  setRouteMode(routeId: string, mode: PermissionMode): Promise<void>;
   queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): Promise<void>;
   queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): Promise<void>;
   queueRemove(itemId: string): Promise<void>;
@@ -555,11 +556,12 @@ export const useStore = create<State>((set, get) => {
       if (get().projects.length > 0) set({ dialog: { kind: "new-route" } });
     },
 
-    async startRoute({ projectId, name, color, model, effort, question, itemId }) {
+    async startRoute({ projectId, name, color, model, effort, permissionMode, question, itemId }) {
       try {
         let route = await window.bw.createRoute(projectId, name?.trim() || undefined);
         if (color) route = await window.bw.setRouteColor(route.id, color);
         if (model || effort) route = await window.bw.setRouteModel(route.id, model ?? null, effort ?? null);
+        if (permissionMode && permissionMode !== route.permissionMode) route = await window.bw.setRoutePermissionMode(route.id, permissionMode);
         set((s) => ({ dialog: null, routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
@@ -994,10 +996,10 @@ export const useStore = create<State>((set, get) => {
       void window.bw.answerPermission(p.requestId, decision, note);
     },
 
-    async setPermissionMode(projectId, mode) {
+    async setRouteMode(routeId, mode) {
       try {
-        const project = await window.bw.setPermissionMode(projectId, mode);
-        set((s) => ({ projects: s.projects.map((p) => (p.id === project.id ? project : p)) }));
+        const route = await window.bw.setRoutePermissionMode(routeId, mode);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
       } catch (e) {
         set({ error: message(e) });
       }

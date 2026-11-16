@@ -29,7 +29,8 @@ export interface BwApi {
   openSystemTerminal(terminalId: string): Promise<void>;
   snapshot(projectId: string): Promise<ProjectSnapshot>;
   /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
-  setPermissionMode(projectId: string, mode: PermissionMode): Promise<Project>;
+  /** 这一路的批准方式；同时记成项目的默认，之后新开的路沿用 */
+  setRoutePermissionMode(routeId: string, mode: PermissionMode): Promise<Route>;
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 改线路名称 */
   renameRoute(routeId: string, name: string): Promise<Route>;

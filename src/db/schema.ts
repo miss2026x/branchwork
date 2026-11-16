@@ -72,4 +72,6 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE route ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0; ALTER TABLE route ADD COLUMN folded INTEGER NOT NULL DEFAULT 0; ALTER TABLE route ADD COLUMN orphan_of TEXT;`,
   // 8：每一路的思考强度；记下来的小东西（比如上次从 Claude Code 读到的模型列表）
   `ALTER TABLE route ADD COLUMN effort TEXT; CREATE TABLE setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+  // 9：批准方式改成每一路各自的；已有的路沿用项目原来的
+  `ALTER TABLE route ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'ask'; UPDATE route SET permission_mode = (SELECT permission_mode FROM project WHERE project.id = route.project_id);`,
 ];

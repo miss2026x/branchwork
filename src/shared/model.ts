@@ -28,6 +28,7 @@ export interface Project {
   /** 这个项目的 Local：唯一真实运行的目录 */
   localDir: string;
   /** 对这个项目里所有的路生效 */
+  /** 新开的路默认用的批准方式：这个项目里上一次选的 */
   permissionMode: PermissionMode;
   createdAt: number;
 }
@@ -51,6 +52,8 @@ export interface Route {
   model: string | null;
   /** 这一路的思考强度；空表示用模型自己的默认 */
   effort: Effort | null;
+  /** 这一路动手前问不问你（批准方式）。新开的路沿用项目上次选的，分叉、快线沿用来源那一路 */
+  permissionMode: PermissionMode;
   /** 线路颜色：1–8 中的一个；空表示按路号自动取 */
   color: number | null;
   /** 这一路的会话现在占了多少上下文（token 数）；还没问过或不知道时为空 */

@@ -25,6 +25,7 @@ import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
 import { BusMark, IconChat, IconFolder, IconSearch, IconSliders } from "../ui/icons";
 import { Plate } from "../ui/Plate";
+import { modeInfo } from "../ui/claude-options";
 import css from "./App.module.css";
 import { useTier } from "./use-tier";
 
@@ -70,7 +71,7 @@ export function App() {
   const project = projects.find((p) => p.id === projectId);
   const allRoutes = useStore((s) => s.routes);
   const fork = useStore((s) => s.fork);
-  const setPermissionMode = useStore((s) => s.setPermissionMode);
+  const setRouteMode = useStore((s) => s.setRouteMode);
   const [forkFrom, setForkFrom] = useState<Stop | null>(null);
   const deleteRoute = useStore((s) => s.deleteRoute);
   const createExpress = useStore((s) => s.createExpress);
@@ -341,7 +342,7 @@ export function App() {
                   }}
                 />
                 <div>
-                  <span>{project?.permissionMode === "all" ? "动手前不问" : project?.permissionMode === "edits" ? "改文件不问，运行命令前问我" : "动手前每次问我"}</span>
+                  <span>动手前：{modeInfo(project?.permissionMode ?? "ask").label}</span>
                   <button type="button" className={css.firstMore} onClick={() => openNewRoute()}>
                     更多选项…
                   </button>
@@ -453,7 +454,7 @@ export function App() {
         </main>
 
         {route && tier !== "narrow" && !overview && <Divider label="拖动调整对话栏宽度" onDrag={(dx, start) => setWidth("panel", Math.min(680, Math.max(340, (start ?? (tier === "wide" ? 420 : 380)) - dx)))} current={widths.panel} onReset={() => setWidth("panel", null)} />}
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={project?.permissionMode ?? "ask"} projectName={project?.name ?? ""} onPermissionMode={(mode) => project && void setPermissionMode(project.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
+        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
       </div>
 
       {deleting && allRoutes[deleting.routeId] && (
@@ -546,7 +547,6 @@ export function App() {
           claudeOptions={(id) => allOptions[id]}
           onLoadClaudeOptions={loadClaudeOptions}
           onCreate={(o) => void startRoute(o)}
-          onPermissionMode={(id, mode) => void setPermissionMode(id, mode)}
           onCancel={closeDialog}
         />
       )}

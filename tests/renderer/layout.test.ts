@@ -14,7 +14,7 @@ const route = (id: string, number: number, extra: Partial<Route> = {}): Route =>
   worktreePath: "",
   parentRouteId: null,
   forkStopId: null,
-  model: null, effort: null,
+  model: null, effort: null, permissionMode: "ask",
   color: null,
   contextTokens: null, pinned: false, folded: false, orphanOf: null,
   createdAt: number,

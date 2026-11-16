@@ -557,7 +557,7 @@ describe("压缩成快线", () => {
   };
 
   it("提炼：在临时会话里请 Claude 写摘要，它只看得到选中的站，什么都不能改；写完临时会话就删了，原来那一路不变", async () => {
-    core.setPermissionMode(project.id, "all"); // 即使项目设了全部不问，提炼时也不放行
+    db.projects.update(project.id, { permissionMode: "all" }); // 即使这一路是全部不问，提炼时也不放行
     const route = await threeStops();
     const sessions = claude.sessions.size;
     const before = await core.history(route.id);
@@ -653,11 +653,14 @@ describe("等你批准", () => {
     expect(routeOf(route.id).status).toBe("idle");
   });
 
-  it("全部自动批准：不再发出请求，Claude 直接得到允许", async () => {
+  it("全部自动批准：只对这一路；不再发出请求，Claude 直接得到允许；之后新开的路沿用", async () => {
     expect(project.permissionMode).toBe("ask");
-    expect(core.setPermissionMode(project.id, "all").permissionMode).toBe("all");
-    expect(events.at(-1)).toMatchObject({ type: "project.updated", project: { permissionMode: "all" } });
+    const other = await core.createRoute(project.id);
     const route = await core.createRoute(project.id);
+    expect(route.permissionMode).toBe("ask");
+    expect(core.setRoutePermissionMode(route.id, "all").permissionMode).toBe("all");
+    expect(events.some((e) => e.type === "project.updated" && e.project.permissionMode === "all")).toBe(true);
+    expect(routeOf(other.id).permissionMode).toBe("ask"); // 别的路不变
     const decisions: string[] = [];
     claude.script = async (t) => {
       decisions.push((await t.askPermission("Bash", { command: "rm -rf dist" })) as string, (await t.askPermission("Write", { file_path: "x" })) as string);
@@ -666,13 +669,18 @@ describe("等你批准", () => {
     expect(decisions).toEqual(["allow", "allow"]);
     expect(events.filter((e) => e.type === "permission.request")).toEqual([]);
     expect(events.some((e) => e.type === "route.updated" && e.route.status === "awaiting_permission")).toBe(false);
+    expect((await core.createRoute(project.id)).permissionMode).toBe("all"); // 新开的路沿用上次选的
+    claude.script = () => {};
+    await core.ask(other.id, "一");
+    expect((await core.fork(other.id, stopsOf(other.id)[0]!.id)).permissionMode).toBe("ask"); // 分叉沿用来源那一路
     boot(); // 设置存在数据库里，重启后还在
+    expect(routeOf(route.id).permissionMode).toBe("all");
     expect(core.listProjects()[0]!.permissionMode).toBe("all");
   });
 
   it("改文件不问：Edit、Write 直接放行，运行命令仍然问", async () => {
-    core.setPermissionMode(project.id, "edits");
     const route = await core.createRoute(project.id);
+    core.setRoutePermissionMode(route.id, "edits");
     const decisions: string[] = [];
     claude.script = async (t) => {
       decisions.push((await t.askPermission("Edit", { file_path: "a.ts" })) as string, (await t.askPermission("Bash", { command: "npm test" })) as string);
@@ -695,13 +703,13 @@ describe("等你批准", () => {
     const asking = core.ask(route.id, "跑测试");
     await until("permission.request");
     expect(routeOf(route.id).status).toBe("awaiting_permission");
-    core.setPermissionMode(project.id, "edits"); // 运行命令在这个方式下仍然要问
+    core.setRoutePermissionMode(route.id, "edits"); // 运行命令在这个方式下仍然要问
     expect(routeOf(route.id).status).toBe("awaiting_permission");
-    core.setPermissionMode(project.id, "all");
+    core.setRoutePermissionMode(route.id, "all");
     await asking;
     expect(decision).toBe("allow");
     expect(routeOf(route.id).status).toBe("idle");
-    expect(() => core.setPermissionMode("nope", "all")).toThrow();
+    expect(() => core.setRoutePermissionMode("nope", "all")).toThrow();
   });
 
   it("等批准时停车：按拒绝处理，这一站算没答完", async () => {
@@ -1033,15 +1041,15 @@ describe("每一路用哪个模型", () => {
   it("批准方式交给 Claude：项目选“自动判断”，这一路的模型不支持（Claude Code 说的）就按每次都问", async () => {
     core.claudeOptions(project.id);
     await until("claude-options.updated");
-    core.setPermissionMode(project.id, "auto");
     const route = await core.createRoute(project.id);
+    core.setRoutePermissionMode(route.id, "auto");
     await core.ask(route.id, "一");
     expect(claude.asks.at(-1)).toMatchObject({ permissionMode: "auto" });
     core.setRouteModel(route.id, "claude-haiku-4-5");
     expect(claude.warmedRuns.at(-1)).toMatchObject({ model: "claude-haiku-4-5", permissionMode: "ask" });
     await core.ask(route.id, "二");
     expect(claude.asks.at(-1)).toMatchObject({ permissionMode: "ask" });
-    core.setPermissionMode(project.id, "plan");
+    core.setRoutePermissionMode(route.id, "plan");
     await core.ask(route.id, "三");
     expect(claude.asks.at(-1)).toMatchObject({ permissionMode: "plan" });
   });

@@ -26,7 +26,6 @@ interface Props {
   onGoToRoute(routeId: string): void;
   /** 这个项目的批准方式 */
   permissionMode: PermissionMode;
-  projectName: string;
   onPermissionMode(mode: PermissionMode): void;
   /** 正在看的以前的某一站；没有就是跟着最新 */
   viewing?: Stop;
@@ -68,7 +67,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, projectName, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, claudeOptions, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, claudeOptions, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -442,7 +441,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         {route.status === "interrupted" && <p className={css.afterStop}>上一站没答完，可以接着问</p>}
         <div className={css.actions}>
           <div className={css.controls}>
-            <PermissionModeControl mode={permissionMode} projectName={projectName} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
+            <PermissionModeControl mode={permissionMode} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
             <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
             <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={(effort) => onModel(route.model, effort)} />
           </div>
