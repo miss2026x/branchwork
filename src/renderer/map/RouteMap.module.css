@@ -213,30 +213,30 @@
 .next .name {
   color: var(--text-4);
 }
-.bus {
+.live {
   position: absolute;
   left: 0;
   bottom: 22px;
   transform: translateX(-50%);
   display: flex;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
   pointer-events: none;
 }
-.bus em {
-  position: absolute;
-  right: calc(100% + 6px);
-  bottom: 3px;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--text-1);
-  color: #fff;
+.live > em:first-child {
   font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+.live > em[data-waiting="true"] {
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--amber-bg);
+  color: var(--amber-text);
   font-size: 11px;
-  font-weight: 600;
-  line-height: 20px;
 }
 .flagAmber {
   position: absolute;
@@ -282,7 +282,7 @@
 /* 缩小后的简化显示 */
 .viewport[data-detail="dots"] .name,
 .viewport[data-detail="lines"] .name,
-.viewport[data-detail="lines"] .bus em,
+.viewport[data-detail="lines"] .live,
 .viewport[data-detail="lines"] .flagAmber {
   display: none;
 }
@@ -734,11 +734,11 @@
   white-space: nowrap;
   pointer-events: none;
 }
-.stop[data-status="answering"] .naming {
-  /* 回答中站上方是公交车，起名标记挪到车的右边 */
-  left: 24px;
-  top: -48px;
-  transform: none;
+/* 回答中时放在“回答中”右边，“回答中”自己仍然对准站点 */
+.live .naming {
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
 }
 .naming i {
   width: 9px;

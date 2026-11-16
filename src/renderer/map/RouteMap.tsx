@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import type { QueueItem, QueueMode, Route, Stop, SyncFile } from "../../shared";
-import { BusMark, IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
+import { IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { useFit } from "../ui/useFit";
@@ -727,13 +727,20 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
         return (
           <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id}>
             {answering && (
-              <span className={css.bus}>
-                <em>{lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}</em>
-                <BusMark size={34} color={line} />
+              // 设计稿：站上方一行字，用线路的颜色；等批准时换成琥珀色。还在起名就并排放一个“起名中”
+              <span className={css.live}>
+                <em style={lane.route.status === "awaiting_permission" ? undefined : { color: line }} data-waiting={lane.route.status === "awaiting_permission"}>
+                  {lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}
+                </em>
+                {stop.nameState === "temp" && latest && detail === "full" && (
+                  <em className={css.naming}>
+                    <i /> 起名中
+                  </em>
+                )}
               </span>
             )}
             {stop.status === "interrupted" && <em className={css.flagAmber}>没答完</em>}
-            <button className={css.node} style={{ borderColor: answering || junction ? "var(--text-1)" : line, ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, var(--text-1) 50%, var(--surface-0) 50%)` } : {}) }} onClick={() => onStop(stop)}
+            <button className={css.node} style={{ borderColor: junction && !answering ? "var(--text-1)" : line, ...(answering ? { boxShadow: `0 0 0 5px color-mix(in srgb, ${line} 22%, transparent)` } : {}), ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, var(--text-1) 50%, var(--surface-0) 50%)` } : {}) }} onClick={() => onStop(stop)}
               onContextMenu={(e) => (e.preventDefault(), onStopMenu(stop))}
               onPointerEnter={() => onHover({ kind: "stop", id: stop.id })}
               onPointerLeave={() => onHover(null)}
@@ -744,7 +751,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
             {stop.syncState === "conflict" && <b className={css.badgeRed}>!</b>}
             {stop.syncState === "unsynced" && <b className={css.badgeAmber} title="改动还没进 Local" />}
             {viewingStopId === stop.id && <em className={css.viewingFlag}>正在看这一站</em>}
-            {stop.nameState === "temp" && latest && detail === "full" && (
+            {!answering && stop.nameState === "temp" && latest && detail === "full" && (
               <em className={css.naming}>
                 <i /> 起名中
               </em>
