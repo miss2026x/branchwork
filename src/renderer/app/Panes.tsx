@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconEye, IconEyeOff } from "../ui/icons";
 import { isMac } from "../ui/keys";
-import {
-  DEFAULT_LAYOUT,
-  PANES,
-  PRESETS,
-  applyPreset,
-  canHide,
-  isPreset,
-  moveTo,
-  type Layout,
-  type PaneId,
-} from "./layout";
+import { DEFAULT_LAYOUT, PANES, PRESETS, applyPreset, canHide, isPreset, moveTo, type Layout, type PaneId } from "./layout";
 import css from "./Panes.module.css";
 
 /** 面板的全名（按钮、提示里用） */
@@ -23,31 +13,12 @@ export const PANE_NAME: Record<PaneId, string> = {
 export const LAYOUT_SHORTCUT = isMac ? "⌘⌥L" : "Ctrl+Alt+L";
 
 const Chevron = ({ dir }: { dir: "l" | "r" }) => (
-  <svg
-    width="12"
-    height="12"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden
-  >
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d={dir === "l" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
   </svg>
 );
 const IconLayout = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinejoin="round"
-    aria-hidden
-  >
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M9 4v16M15 4v16" />
   </svg>
@@ -60,14 +31,8 @@ function useHover(delay: number) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return {
     on,
-    enter: () => (
-      window.clearTimeout(timer.current),
-      (timer.current = window.setTimeout(() => setOn(true), delay))
-    ),
-    leave: () => (
-      window.clearTimeout(timer.current),
-      (timer.current = window.setTimeout(() => setOn(false), 120))
-    ),
+    enter: () => (window.clearTimeout(timer.current), (timer.current = window.setTimeout(() => setOn(true), delay))),
+    leave: () => (window.clearTimeout(timer.current), (timer.current = window.setTimeout(() => setOn(false), 120))),
     off: () => (window.clearTimeout(timer.current), setOn(false)),
   };
 }
@@ -101,74 +66,33 @@ export function LayoutButton({
   const wrap = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const down = (e: PointerEvent) =>
-      wrap.current?.contains(e.target as Node) || onOpen(false);
-    const key = (e: KeyboardEvent) =>
-      e.key === "Escape" && (e.stopImmediatePropagation(), onOpen(false));
+    const down = (e: PointerEvent) => wrap.current?.contains(e.target as Node) || onOpen(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onOpen(false));
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key, true);
-    return () => (
-      window.removeEventListener("pointerdown", down),
-      window.removeEventListener("keydown", key, true)
-    );
+    return () => (window.removeEventListener("pointerdown", down), window.removeEventListener("keydown", key, true));
   }, [open, onOpen]);
   return (
     <div ref={wrap} className={css.layoutWrap}>
-      <button
-        className={css.layoutButton}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        title={`布局（${LAYOUT_SHORTCUT}）`}
-        onClick={() => onOpen(!open)}
-      >
+      <button className={css.layoutButton} aria-expanded={open} aria-haspopup="dialog" title={`布局（${LAYOUT_SHORTCUT}）`} onClick={() => onOpen(!open)}>
         <IconLayout />
         布局
       </button>
-      {open && (
-        <LayoutPopover
-          layout={layout}
-          widths={widths}
-          onChange={onChange}
-          onToggle={onToggle}
-        />
-      )}
+      {open && <LayoutPopover layout={layout} widths={widths} onChange={onChange} onToggle={onToggle} />}
     </div>
   );
 }
 
-function LayoutPopover({
-  layout,
-  widths,
-  onChange,
-  onToggle,
-}: {
-  layout: Layout;
-  widths: Partial<Record<PaneId, number>>;
-  onChange(next: Layout, animate: boolean): void;
-  onToggle(id: PaneId): void;
-}) {
+function LayoutPopover({ layout, widths, onChange, onToggle }: { layout: Layout; widths: Partial<Record<PaneId, number>>; onChange(next: Layout, animate: boolean): void; onToggle(id: PaneId): void }) {
   // 方块宽度：看得见的按真实宽度的比例分，收起的是一个窄虚线框
   const shown = layout.order.filter((p) => !layout.hidden.includes(p));
-  const free =
-    MINI_W - GAP * (layout.order.length - 1) - HIDDEN_W * layout.hidden.length;
-  const total =
-    shown.reduce((n, p) => n + (widths[p] ?? PANES[p].base), 0) || 1;
+  const free = MINI_W - GAP * (layout.order.length - 1) - HIDDEN_W * layout.hidden.length;
+  const total = shown.reduce((n, p) => n + (widths[p] ?? PANES[p].base), 0) || 1;
   // 窄的方块至少放得下名字和眼睛；多出来的从最宽的那块里扣
-  const raw = Object.fromEntries(
-    shown.map((p) => [
-      p,
-      Math.max(BLOCK_MIN, ((widths[p] ?? PANES[p].base) / total) * free),
-    ]),
-  ) as Partial<Record<PaneId, number>>;
-  const widest = shown.reduce<PaneId | undefined>(
-    (a, p) => (a && raw[a]! >= raw[p]! ? a : p),
-    undefined,
-  );
-  if (widest)
-    raw[widest] =
-      raw[widest]! - (shown.reduce((n, p) => n + raw[p]!, 0) - free);
-  const blockW = (p: PaneId) =>
-    layout.hidden.includes(p) ? HIDDEN_W : raw[p]!;
+  const raw = Object.fromEntries(shown.map((p) => [p, Math.max(BLOCK_MIN, ((widths[p] ?? PANES[p].base) / total) * free)])) as Partial<Record<PaneId, number>>;
+  const widest = shown.reduce<PaneId | undefined>((a, p) => (a && raw[a]! >= raw[p]! ? a : p), undefined);
+  if (widest) raw[widest] = raw[widest]! - (shown.reduce((n, p) => n + raw[p]!, 0) - free);
+  const blockW = (p: PaneId) => (layout.hidden.includes(p) ? HIDDEN_W : raw[p]!);
 
   const blocks = useRef<Partial<Record<PaneId, HTMLDivElement | null>>>({});
   const [drag, setDrag] = useState<{
@@ -195,12 +119,7 @@ function LayoutPopover({
         <h2>布局</h2>
         <span>拖方块换位置，点眼睛收起</span>
       </header>
-      <div
-        className={css.mini}
-        role="listbox"
-        aria-label="面板的顺序"
-        data-settling={settling || undefined}
-      >
+      <div className={css.mini} role="listbox" aria-label="面板的顺序" data-settling={settling || undefined}>
         {layout.order.map((p) => {
           const hidden = layout.hidden.includes(p);
           const dragging = drag?.id === p;
@@ -217,9 +136,7 @@ function LayoutPopover({
               data-dragging={dragging || undefined}
               style={{
                 width: blockW(p),
-                transform: dragging
-                  ? `translateX(${drag.dx}px) rotate(-2deg)`
-                  : `translateX(${shift(p)}px)`,
+                transform: dragging ? `translateX(${drag.dx}px) rotate(-2deg)` : `translateX(${shift(p)}px)`,
               }}
               onPointerDown={(e) => {
                 if (e.button !== 0) return;
@@ -251,9 +168,7 @@ function LayoutPopover({
                   // 松手：先不带过渡地换到新顺序，免得方块从让开的位置再滑一次
                   setSettling(true);
                   onChange(moveTo(layout, p, drag.over), false);
-                  requestAnimationFrame(() =>
-                    requestAnimationFrame(() => setSettling(false)),
-                  );
+                  requestAnimationFrame(() => requestAnimationFrame(() => setSettling(false)));
                 }
                 setDrag(null);
               }}
@@ -264,13 +179,7 @@ function LayoutPopover({
                 <b>{PANES[p].label}</b>
                 <button
                   aria-label={`${hidden ? "打开" : "收起"}${PANE_NAME[p]}`}
-                  title={
-                    !hidden && !canHide(layout, p)
-                      ? "至少留一个面板"
-                      : hidden
-                        ? "打开"
-                        : "收起"
-                  }
+                  title={!hidden && !canHide(layout, p) ? "至少留一个面板" : hidden ? "打开" : "收起"}
                   disabled={!hidden && !canHide(layout, p)}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => onToggle(p)}
@@ -286,20 +195,14 @@ function LayoutPopover({
         <span>常用</span>
         <div>
           {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              aria-pressed={isPreset(layout, p)}
-              onClick={() => onChange(applyPreset(layout, p), true)}
-            >
+            <button key={p.label} aria-pressed={isPreset(layout, p)} onClick={() => onChange(applyPreset(layout, p), true)}>
               {p.label}
             </button>
           ))}
         </div>
       </div>
       <footer>
-        <span>
-          也可以在两个面板中间悬停，点箭头收起一边；收起的移到边上才出现
-        </span>
+        <span>也可以在两个面板中间悬停，点箭头收起一边；收起的移到边上才出现</span>
         <button onClick={() => onChange(DEFAULT_LAYOUT, true)}>恢复默认</button>
       </footer>
     </section>
@@ -354,60 +257,27 @@ export function PaneDivider({
         e.currentTarget.setPointerCapture(e.pointerId);
         hover.off();
       }}
-      onPointerMove={(e) =>
-        from.current && onDrag(e.clientX - from.current.x, from.current.start)
-      }
+      onPointerMove={(e) => from.current && onDrag(e.clientX - from.current.x, from.current.start)}
       onPointerUp={() => (from.current = null)}
       onPointerCancel={() => (from.current = null)}
       onDoubleClick={resizable ? onReset : undefined}
     >
       {hover.on && (
-        <div
-          className={css.capsuleWrap}
-          onPointerDown={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
+        <div className={css.capsuleWrap} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
           {between.length > 0 ? (
             between.map((p) => (
-              <button
-                key={p}
-                className={css.openPill}
-                aria-label={`打开${PANE_NAME[p]}`}
-                onClick={() => (hover.off(), onShow(p))}
-              >
+              <button key={p} className={css.openPill} aria-label={`打开${PANE_NAME[p]}`} onClick={() => (hover.off(), onShow(p))}>
                 <Chevron dir="l" />
                 <span>{PANES[p].label}</span>
                 <Chevron dir="r" />
               </button>
             ))
           ) : (
-            <div
-              className={css.capsule}
-              role="group"
-              aria-label="收起两边的面板"
-            >
-              <button
-                aria-label={`收起${PANE_NAME[left]}`}
-                title={
-                  canHide(layout, left)
-                    ? `收起${PANE_NAME[left]}`
-                    : "至少留一个面板"
-                }
-                disabled={!canHide(layout, left)}
-                onClick={() => (hover.off(), onHide(left))}
-              >
+            <div className={css.capsule} role="group" aria-label="收起两边的面板">
+              <button aria-label={`收起${PANE_NAME[left]}`} title={canHide(layout, left) ? `收起${PANE_NAME[left]}` : "至少留一个面板"} disabled={!canHide(layout, left)} onClick={() => (hover.off(), onHide(left))}>
                 <Chevron dir="l" />
               </button>
-              <button
-                aria-label={`收起${PANE_NAME[right]}`}
-                title={
-                  canHide(layout, right)
-                    ? `收起${PANE_NAME[right]}`
-                    : "至少留一个面板"
-                }
-                disabled={!canHide(layout, right)}
-                onClick={() => (hover.off(), onHide(right))}
-              >
+              <button aria-label={`收起${PANE_NAME[right]}`} title={canHide(layout, right) ? `收起${PANE_NAME[right]}` : "至少留一个面板"} disabled={!canHide(layout, right)} onClick={() => (hover.off(), onHide(right))}>
                 <Chevron dir="r" />
               </button>
             </div>
@@ -421,33 +291,15 @@ export function PaneDivider({
 /* ------------------------------------------------------------------ 窗口边上 */
 
 /** 收起后贴在窗口最左 / 最右的面板：平时什么都没有，鼠标贴到边上才探出“› 项目”“对话 ‹” */
-export function EdgeOpener({
-  side,
-  panes,
-  onShow,
-}: {
-  side: "left" | "right";
-  panes: PaneId[];
-  onShow(id: PaneId): void;
-}) {
+export function EdgeOpener({ side, panes, onShow }: { side: "left" | "right"; panes: PaneId[]; onShow(id: PaneId): void }) {
   const hover = useHover(150);
   if (panes.length === 0) return null;
   return (
-    <div
-      className={css.edge}
-      data-side={side}
-      data-hover={hover.on || undefined}
-      onPointerEnter={hover.enter}
-      onPointerLeave={hover.leave}
-    >
+    <div className={css.edge} data-side={side} data-hover={hover.on || undefined} onPointerEnter={hover.enter} onPointerLeave={hover.leave}>
       {hover.on && (
         <div className={css.edgeButtons}>
           {panes.map((p) => (
-            <button
-              key={p}
-              aria-label={`打开${PANE_NAME[p]}`}
-              onClick={() => (hover.off(), onShow(p))}
-            >
+            <button key={p} aria-label={`打开${PANE_NAME[p]}`} onClick={() => (hover.off(), onShow(p))}>
               {side === "left" && <Chevron dir="r" />}
               <span>{PANES[p].label}</span>
               {side === "right" && <Chevron dir="l" />}
