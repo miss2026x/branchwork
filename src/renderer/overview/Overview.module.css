@@ -39,7 +39,7 @@
 }
 .add {
   height: 40px;
-  padding: 0 14px;
+  padding: 0 12px;
   border-radius: var(--r-10);
   background: var(--text-1);
   color: #fff;
@@ -70,7 +70,7 @@
 }
 .mini {
   height: 150px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   border-radius: var(--r-10);
   background: var(--canvas);
   background-image: radial-gradient(#d5dbe2 1px, transparent 1px);

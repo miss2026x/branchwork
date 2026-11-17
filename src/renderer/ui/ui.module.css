@@ -1,39 +1,69 @@
+/* 路牌（设计稿“颜色”“字体”画板）：白字压在线路的角标色上，号码和“路”字永远完整 */
 .plate,
-.plateL {
+.plateM,
+.plateL,
+.plateI {
   flex: none;
   display: inline-flex;
-  align-items: baseline;
   justify-content: center;
   color: #fff;
-  font-weight: 700;
-  border-radius: var(--r-4);
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  white-space: nowrap;
 }
+
+/* 小号：列表、菜单、通知里的“1路”，11 / 800 / 18px */
 .plate {
-  min-width: 30px;
-  height: 20px;
-  padding: 0 5px;
-  font-size: 12px;
-  line-height: 20px;
+  align-items: center;
+  min-width: 32px;
+  padding: 0 4px;
+  border-radius: var(--r-4);
+  font-size: 11px;
+  line-height: 18px;
 }
-.plate small {
-  font-size: 10px;
-  font-weight: 600;
-  margin-left: 1px;
+
+/* 中号：地图上线路起点的路牌，数字 16px、“路”字 11px，撑满外框的高 */
+.plateM {
+  align-items: center;
+  align-self: stretch;
+  padding: 0 8px;
+  font-size: 16px;
 }
+.plateM small {
+  padding-left: 1px;
+  font-size: 11px;
+}
+
+/* 大号：对话栏头部，数字 36 / 42px、“路”字 14px */
 .plateL {
+  align-items: baseline;
   min-width: 64px;
-  height: 64px;
-  padding: 0 10px;
-  font-size: 34px;
-  line-height: 64px;
-  border-radius: 0;
+  padding: 10px 12px 0;
+}
+.plateL .num {
+  font-size: 36px;
+  line-height: 42px;
 }
 .plateL small {
-  font-size: 13px;
-  margin-left: 2px;
+  padding-left: 2px;
+  font-size: 14px;
 }
-.plate .kuai,
+
+/* 图标位：深色通知左边 32×32 的方块 */
+.plateI {
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-8);
+  font-size: 12px;
+}
+
+.plate small,
+.plateI small {
+  font-size: inherit;
+}
+.kuai {
+  margin-right: 1px;
+}
 .plateL .kuai {
-  margin: 0 1px 0 0;
+  font-size: 18px;
 }

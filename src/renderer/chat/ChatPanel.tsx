@@ -169,9 +169,13 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 </button>
               </>
             )}
-            {!viewing && busy && <i className={css.statusDot} style={{ background: colors.line }} />}
-            {!viewing && <StatusLine route={route} n={total} phase={pending !== undefined ? "syncing" : currentLive?.phase} />}
-            {!viewing && busy && waiting[0] && <span className={css.next}>下一站 {total + 1} {waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
+            {!viewing && (
+              <span className={busy ? css.status : undefined} style={busy ? { color: route.status === "awaiting_permission" ? "var(--amber-text)" : colors.text } : undefined}>
+                {busy && <i className={css.statusDot} style={{ background: route.status === "awaiting_permission" ? "var(--amber)" : colors.line }} />}
+                <StatusLine route={route} n={total} phase={pending !== undefined ? "syncing" : currentLive?.phase} />
+              </span>
+            )}
+            {!viewing && busy && waiting[0] && <span>下一站 {total + 1} {waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
           </p>
         </div>
         {onCollapse && (
@@ -472,8 +476,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
 
 function StatusLine({ route, n, phase }: { route: Route; n: number; phase?: LiveStop["phase"] | "syncing" }) {
   if (phase === "syncing") return <>第 {n + 1} 站 · 正在同步 Local</>;
-  if (route.status === "awaiting_permission") return <b>第 {n} 站暂停，等你批准</b>;
-  if (route.status === "answering") return <b>第 {n} 站{phase === "starting" ? "正在启动 Claude" : phase === "finishing" ? "正在收尾" : "回答中"}</b>;
+  if (route.status === "awaiting_permission") return <>第 {n} 站暂停，等你批准</>;
+  if (route.status === "answering") return <>第 {n} 站{phase === "starting" ? "正在启动 Claude" : phase === "finishing" ? "正在收尾" : "回答中"}</>;
   if (route.status === "interrupted") return <>第 {n} 站没答完</>;
   if (route.status === "conflict") return <>有同步冲突</>;
   return <>{n === 0 ? "还没发车" : `已到第 ${n} 站`}</>;

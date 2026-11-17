@@ -6,7 +6,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(22, 27, 34, 0.42);
+  background: var(--scrim);
 }
 .dialog {
   animation: dialogIn var(--t-slow) var(--ease);
@@ -14,7 +14,7 @@
   padding: 20px;
   border-radius: var(--r-16);
   background: var(--surface-0);
-  box-shadow: 0 24px 60px rgba(22, 27, 34, 0.28), 0 0 0 1px rgba(22, 27, 34, 0.06);
+  box-shadow: var(--e4);
 }
 .dialog header {
   display: flex;
@@ -45,7 +45,7 @@
 }
 .field {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .field > span {
   display: block;
@@ -58,7 +58,7 @@
 .field textarea {
   display: block;
   width: 100%;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-8);
   background: var(--surface-0);
@@ -109,7 +109,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 .ghost,
 .confirm {
@@ -150,7 +150,7 @@
 .files li {
   display: flex;
   gap: 12px;
-  padding: 7px 12px;
+  padding: 6px 12px;
   font-size: 13px;
 }
 .files li + li {
@@ -188,8 +188,8 @@
 }
 .working {
   display: flex;
-  gap: 14px;
-  padding: 18px 14px;
+  gap: 12px;
+  padding: 16px 12px;
   border: 1px solid var(--divider);
   border-radius: var(--r-8);
   background: var(--surface-1);
@@ -218,7 +218,7 @@
 .regen {
   display: flex;
   gap: 8px;
-  margin: -4px 0 14px;
+  margin: -4px 0 12px;
 }
 .regen input {
   flex: 1;

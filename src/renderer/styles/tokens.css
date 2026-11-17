@@ -15,28 +15,71 @@
   --surface-2: #f5f7f9;
   --surface-1: #fafbfc;
   --surface-0: #ffffff;
-  /* 线路色：按路号循环 */
+  /* 线路色（设计稿“颜色”画板）：每一路四个值——线、角标（压白字）、浅底、深字 */
   --route-1: #2563c9;
+  --route-1-tag: #2563c9;
+  --route-1-bg: #e6eefb;
+  --route-1-text: #1a4a9a;
   --route-2: #e0661c;
   --route-2-tag: #b5500f;
+  --route-2-bg: #fce9dc;
+  --route-2-text: #8a3b0a;
   --route-3: #7b4ccb;
+  --route-3-tag: #7b4ccb;
+  --route-3-bg: #efe8fa;
+  --route-3-text: #5a3699;
   --route-4: #0e7c86;
+  --route-4-tag: #0e7c86;
+  --route-4-bg: #e2f2f3;
+  --route-4-text: #09585f;
   --route-5: #c23d7a;
+  --route-5-tag: #c23d7a;
+  --route-5-bg: #fbe6ef;
+  --route-5-text: #8e2a58;
   --route-6: #6b7a1f;
+  --route-6-tag: #6b7a1f;
+  --route-6-bg: #eef1df;
+  --route-6-text: #4c5716;
   --route-7: #475569;
-  --route-8: #15803d;
+  --route-7-tag: #475569;
+  --route-7-bg: #e9edf2;
+  --route-7-text: #334155;
+  /* 快线；自己挑颜色时的“绿”也用这一组 */
   --express: #16804f;
-  /* 状态 */
+  --express-bg: #e3f3ea;
+  --express-text: #0f5e3a;
+  --route-8: var(--express);
+  --route-8-tag: var(--express);
+  --route-8-bg: var(--express-bg);
+  --route-8-text: var(--express-text);
+  /* 状态：同一处只出现一种 */
+  --orange: #e0661c;
+  --orange-bg: #fce9dc;
+  --orange-text: #8a3b0a;
   --amber: #e39a1f;
-  --amber-text: #8a5200;
   --amber-bg: #fff1d6;
+  --amber-text: #8a5200;
+  --amber-line: rgba(180, 110, 0, 0.3);
   --red: #a3260f;
   --red-bg: #fbe6e2;
+  --red-text: #8a1f0a;
+  --red-line: rgba(163, 38, 15, 0.25);
   --green: #16804f;
-  /* 阴影 */
+  --green-bg: #e3f3ea;
+  --green-text: #0f5e3a;
+  --info: #2563c9;
+  --info-bg: #e6eefb;
+  --info-text: #1a4a9a;
+  /* 搜索命中的高亮底 */
+  --highlight: #ffe58a;
+  /* 阴影：从低到高；白底浮层带一圈发丝线，深色浮层不带 */
   --e1: 0 1px 2px rgba(22, 27, 34, 0.08);
   --e2: 0 4px 12px rgba(22, 27, 34, 0.08);
   --e3: 0 12px 32px rgba(22, 27, 34, 0.16), 0 0 0 1px rgba(22, 27, 34, 0.06);
+  --e4: 0 24px 60px rgba(22, 27, 34, 0.28), 0 0 0 1px rgba(22, 27, 34, 0.06);
+  --e-dark: 0 12px 32px rgba(22, 27, 34, 0.28);
+  /* 弹窗的遮罩：40% */
+  --scrim: rgba(22, 27, 34, 0.4);
   /* 圆角 */
   --r-4: 4px;
   --r-6: 6px;
@@ -44,14 +87,16 @@
   --r-10: 10px;
   --r-12: 12px;
   --r-16: 16px;
+  --r-pill: 999px;
   /* 动效 */
   --t-fast: 120ms;
   --t-base: 200ms;
   --t-slow: 320ms;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* 字体 */
-  --font: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
-  --mono: "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas, "Microsoft YaHei", monospace;
+  /* 字体（设计稿“字体”画板）：西文和数字 Schibsted Grotesk，中文 Noto Sans SC，代码 JetBrains Mono；都打包在应用里 */
+  --font: "Schibsted Grotesk Variable", "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: "JetBrains Mono Variable", "Cascadia Code", "SF Mono", Consolas, "Noto Sans SC Variable", monospace;
 }
 
 * {

@@ -10,7 +10,7 @@
   width: 340px;
   max-height: calc(100vh - 16px);
   overflow-y: auto;
-  padding: 14px 8px 8px 8px;
+  padding: 12px 8px 8px 8px;
   border-radius: var(--r-16);
   background: var(--surface-0);
   box-shadow: var(--e3);
@@ -32,7 +32,7 @@
   padding: 0 12px;
   border: 1.5px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 .menu input:focus {
@@ -86,7 +86,7 @@
   align-items: center;
   gap: 12px;
   min-height: 34px;
-  padding: 5px 8px;
+  padding: 4px 8px;
   border-radius: var(--r-8);
   text-align: left;
   font-size: 13px;
@@ -106,8 +106,8 @@
 .resume small {
   display: block;
   font-weight: 400;
-  font-size: 11.5px;
-  line-height: 15px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--text-3);
 }
 .danger {
@@ -142,7 +142,7 @@
 .resume div button {
   flex: none;
   width: 30px;
-  height: 30px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);

@@ -173,7 +173,7 @@ function Card({ n, ...p }: Props & { n: Notice }) {
     case "board":
       return frame(
         "dark",
-        <Plate route={route} size="l" />,
+        <Plate route={route} size="i" />,
         <>
           {project && `${project} `}
           {route.express ? `快${route.express}` : `${route.number}路`} 到站了，有一条等你登车

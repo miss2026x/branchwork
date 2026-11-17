@@ -709,8 +709,8 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
   return (
     <div className={css.lane} data-on={on}>
       <button className={css.plate} style={{ left: lane.plate.x, top: lane.plate.y, borderColor: on ? tag : "var(--line)" }} onClick={onSelect}>
-        <Plate route={lane.route} />
-        <span className="ell">{lane.route.name}</span>
+        <Plate route={lane.route} size="m" />
+        <span className={`${css.plateName} ell`}>{lane.route.name}</span>
       </button>
 
       {lane.route.folded && lane.stops.length > 0 && (

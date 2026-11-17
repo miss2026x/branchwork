@@ -14,7 +14,7 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
   main: { modules: ["shared", "core", "db", "claude"], packages: ["electron"] },
   preload: { modules: ["shared"], packages: ["electron"] },
   // 界面只认识 shared 里的类型；数据只能经 window.bw 来
-  renderer: { modules: ["shared"], packages: ["react", "react-dom/client", "zustand", "react-markdown", "remark-gfm"] },
+  renderer: { modules: ["shared"], packages: ["react", "react-dom/client", "zustand", "react-markdown", "remark-gfm", "@fontsource-variable/schibsted-grotesk", "@fontsource-variable/noto-sans-sc", "@fontsource-variable/jetbrains-mono"] },
 };
 
 const SRC = path.resolve(__dirname, "..", "src");
@@ -75,6 +75,36 @@ describe("界面的动效", () => {
       }
     }
     expect(problems).toEqual([]);
+  });
+});
+
+describe("设计稿的样式规范（第 0 站：颜色、字体）", () => {
+  const css = () => files(path.join(SRC, "renderer")).filter((x) => x.endsWith(".module.css"));
+
+  it("字号只用设计稿“字体”画板的 10 级", () => {
+    const scale = new Set([36, 30, 24, 20, 18, 16, 14, 13, 12, 11]);
+    const problems: string[] = [];
+    for (const f of css())
+      for (const m of fs.readFileSync(f, "utf8").matchAll(/font-size:\s*([\d.]+)px/g))
+        if (!scale.has(Number(m[1]))) problems.push(`${path.relative(SRC, f)}：${m[1]}px`);
+    expect(problems).toEqual([]);
+  });
+
+  it("颜色都从 tokens.css 的变量来；只有白字和深色浮层上的几种浅色可以直接写", () => {
+    const allowed = new Set(["#fff", "#ffffff", "#d5dbe2", "#4a5463", "#fff6e5", "#fff8d6", "#bfe0cd", "#5a4310", "#ffe2a3", "#ffb4a8"]);
+    const problems: string[] = [];
+    for (const f of css())
+      for (const m of fs.readFileSync(f, "utf8").matchAll(/#[0-9a-fA-F]{3,8}\b/g))
+        if (!allowed.has(m[0].toLowerCase())) problems.push(`${path.relative(SRC, f)}：${m[0]}`);
+    expect(problems).toEqual([]);
+  });
+
+  it("字体打包在应用里：西文 Schibsted Grotesk、中文 Noto Sans SC、代码 JetBrains Mono", () => {
+    const main = fs.readFileSync(path.join(SRC, "renderer/main.tsx"), "utf8");
+    for (const pkg of ["schibsted-grotesk", "noto-sans-sc", "jetbrains-mono"]) expect(main).toContain(`@fontsource-variable/${pkg}`);
+    const tokens = fs.readFileSync(path.join(SRC, "renderer/styles/tokens.css"), "utf8");
+    expect(tokens).toMatch(/--font:\s*"Schibsted Grotesk Variable", "Noto Sans SC Variable"/);
+    expect(tokens).toMatch(/--mono:\s*"JetBrains Mono Variable"/);
   });
 });
 

@@ -2,7 +2,7 @@
 .keep {
   display: grid;
   gap: 4px;
-  margin: 12px 0 14px;
+  margin: 12px 0 12px;
   padding: 10px 12px;
   border-radius: var(--r-8);
   background: var(--surface-2);
@@ -29,8 +29,8 @@
 }
 .note {
   margin: 0 0 12px;
-  font-size: 12.5px;
-  line-height: 19px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--text-3);
 }
 .groups {

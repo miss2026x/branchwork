@@ -5,10 +5,10 @@
 .trigger {
   max-width: 100%;
   min-width: 0;
-  height: 30px;
+  height: 28px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: var(--r-8);
@@ -24,11 +24,11 @@
   background: var(--surface-2);
 }
 .trigger[aria-expanded="true"] {
-  background: var(--surface-3, #e9edf1);
+  background: var(--surface-2);
   color: var(--text-1);
 }
 .trigger[data-mode="all"] {
-  border-color: #f0c877;
+  border-color: var(--amber-line);
   background: var(--amber-bg);
   color: var(--amber-text);
   font-weight: 700;
@@ -62,7 +62,7 @@
   width: 100%;
   display: flex;
   gap: 8px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: var(--r-8);
   text-align: left;
   line-height: 20px;
@@ -76,7 +76,7 @@
   width: 14px;
   padding-top: 3px;
   font-style: normal;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-1);
 }
 .menu small {

@@ -42,7 +42,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #e3f3ea;
+  background: var(--green-bg);
   color: var(--green);
   font-style: normal;
   font-size: 11px;
@@ -74,7 +74,7 @@
 }
 .two > footer {
   margin: 0;
-  padding: 14px 20px;
+  padding: 12px 20px;
   border-top: 1px solid var(--divider);
   align-items: center;
 }
@@ -106,8 +106,8 @@
 }
 /* 这一路怎么跑：三个选择一行 */
 .run {
-  margin: 4px 0 14px;
-  padding-top: 14px;
+  margin: 4px 0 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--divider);
 }
 .run > header {
@@ -190,7 +190,7 @@
   margin: 0;
   display: flex;
   align-items: center;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-4);
 }
 .pairWarn {
@@ -205,7 +205,7 @@
 }
 .pairNote {
   align-self: end;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   font-size: 12px;
   line-height: 17px;
   color: var(--text-3);
@@ -213,7 +213,7 @@
 .note {
   display: flex;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 12px 12px;
   border: 1px solid var(--divider);
   border-radius: var(--r-10);
   background: var(--surface-0);
@@ -238,7 +238,7 @@
 .chips button {
   height: 38px;
   max-width: 220px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 13px;
@@ -259,7 +259,7 @@
 .nameColor {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 14px;
+  gap: 0 12px;
 }
 .nameColor > :first-child {
   flex: 1 1 180px;
@@ -296,7 +296,7 @@
   justify-content: space-between;
 }
 .pick {
-  height: 30px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -362,7 +362,7 @@
   margin: 0 24px 12px;
 }
 .filters button {
-  height: 30px;
+  height: 28px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -437,9 +437,9 @@
 }
 .see {
   margin-top: 8px;
-  height: 30px;
+  height: 32px;
   padding: 0 10px;
-  border: 1px solid #e9c98a;
+  border: 1px solid var(--amber-line);
   border-radius: var(--r-6);
   background: var(--amber-bg);
   color: var(--amber-text);
@@ -606,8 +606,8 @@
 .codeNote {
   display: flex;
   gap: 12px;
-  margin-top: 14px;
-  padding: 12px 14px;
+  margin-top: 12px;
+  padding: 12px 12px;
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   font-size: 13px;

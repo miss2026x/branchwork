@@ -94,28 +94,33 @@
   overflow: visible;
 }
 .lane[data-on="false"] .name,
-.lane[data-on="false"] .plate span {
+.lane[data-on="false"] .plateName {
   color: var(--text-4);
 }
 .lane[data-on="false"] .plate > :first-child {
   opacity: 0.55;
 }
 
-/* 路牌：贴在线的起点左边 */
+/* 路牌（设计稿：高 28、2px 线路色描边、左边一块角标色写号码，线路名最宽 168px） */
 .plate {
   position: absolute;
   transform: translate(-100%, -50%);
-  max-width: 148px;
-  height: 32px;
+  height: 28px;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px 0 5px;
+  align-items: stretch;
+  overflow: hidden;
   border: 2px solid;
   border-radius: var(--r-6);
   background: var(--surface-0);
-  font-weight: 600;
+  box-shadow: var(--e1);
+  font-size: 13px;
   white-space: nowrap;
+}
+.plateName {
+  max-width: 168px;
+  padding: 0 8px;
+  font-weight: 600;
+  line-height: 24px;
 }
 
 /* 站 */
@@ -236,7 +241,7 @@
 }
 .live > em[data-waiting="true"] {
   height: 18px;
-  padding: 0 7px;
+  padding: 0 6px;
   border-radius: 999px;
   background: var(--amber-bg);
   color: var(--amber-text);
@@ -248,7 +253,7 @@
   bottom: 18px;
   transform: translateX(-50%);
   height: 18px;
-  padding: 0 7px;
+  padding: 0 6px;
   border-radius: 999px;
   background: var(--amber-bg);
   color: var(--amber-text);
@@ -267,8 +272,9 @@
   height: 16px;
   border-radius: 50%;
   border: 2px solid var(--canvas);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 12px;
+  font-weight: 800;
   text-align: center;
   color: #fff;
 }
@@ -290,7 +296,7 @@
 .viewport[data-detail="lines"] .flagAmber {
   display: none;
 }
-.viewport[data-detail="lines"] .plate span {
+.viewport[data-detail="lines"] .plateName {
   display: none;
 }
 
@@ -324,7 +330,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: var(--r-8);
   text-align: left;
   line-height: 20px;
@@ -354,7 +360,7 @@
   height: 44px;
   margin: -22px 0 0 -22px;
   border-radius: 50%;
-  background: #ffe58a;
+  background: var(--highlight);
   animation: ring 1.8s var(--ease) forwards;
   pointer-events: none;
 }
@@ -416,7 +422,7 @@
   position: absolute;
   z-index: 8;
   width: 420px;
-  padding: 14px 16px 12px;
+  padding: 12px 16px 12px;
   border-radius: var(--r-12);
   background: var(--surface-0);
   box-shadow: var(--e3);
@@ -435,8 +441,8 @@
 }
 .cardAsk {
   margin: 10px 0 0;
-  font-size: 15px;
-  line-height: 23px;
+  font-size: 16px;
+  line-height: 24px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -494,8 +500,8 @@
 .cardDark header em {
   padding: 0 8px;
   border-radius: 999px;
-  background: #1c5a3c;
-  color: #b9f0d4;
+  background: var(--green-text);
+  color: #bfe0cd;
   font-style: normal;
   font-size: 11px;
   font-weight: 700;
@@ -516,7 +522,7 @@
   color: #fff;
 }
 .cardDark footer .cardDanger {
-  color: #ffb4a6;
+  color: #ffb4a8;
 }
 
 /* 正在看以前的某一站 */
@@ -629,7 +635,7 @@
   color: var(--text-4);
 }
 .selectBar .solve {
-  border-color: #e9c98a;
+  border-color: var(--amber-line);
   background: var(--amber-bg);
   color: var(--amber-text);
   font-weight: 700;
@@ -702,7 +708,7 @@
 }
 .cardList {
   margin: 8px 0 4px;
-  padding-left: 18px;
+  padding-left: 16px;
   font-size: 13px;
   line-height: 22px;
 }
@@ -781,7 +787,7 @@
 .cardResolve {
   width: 100%;
   margin: 8px 0;
-  padding: 12px 14px;
+  padding: 12px 12px;
   border-radius: var(--r-10);
   background: var(--text-1);
   color: #fff;
@@ -809,7 +815,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 12px 12px;
   border: 1px solid var(--border);
   border-radius: var(--r-12, 12px);
   background: var(--surface-0);

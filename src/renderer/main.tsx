@@ -1,6 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
+// 设计稿“字体”画板的三种字体，打包在应用里，不依赖电脑上装没装
+import "@fontsource-variable/schibsted-grotesk";
+import "@fontsource-variable/noto-sans-sc";
+import "@fontsource-variable/jetbrains-mono";
 import "./styles/tokens.css";
 
 async function start() {

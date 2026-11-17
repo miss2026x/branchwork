@@ -98,7 +98,7 @@
   flex: none;
   width: 28px;
   height: 28px;
-  margin-right: 5px;
+  margin-right: 4px;
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
@@ -132,7 +132,7 @@
 }
 .menu button {
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: var(--r-8);
   text-align: left;
 }
@@ -155,7 +155,7 @@
   border-top: 1px solid var(--divider);
 }
 .archivedToggle {
-  height: 30px;
+  height: 28px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -217,7 +217,7 @@
   margin: 0 4px;
 }
 .archived > div button {
-  height: 30px;
+  height: 28px;
   padding: 0 12px;
   border-radius: var(--r-8);
   font-size: 12px;
@@ -241,7 +241,7 @@
   align-items: center;
   gap: 3px;
   height: 20px;
-  padding: 0 7px;
+  padding: 0 6px;
   border-radius: 999px;
   font-style: normal;
   font-size: 11px;
@@ -374,7 +374,7 @@
 }
 .projectMore {
   flex: none;
-  margin-right: 5px;
+  margin-right: 4px;
   width: 28px;
   height: 28px;
   display: grid;
@@ -413,7 +413,7 @@
   flex: none;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--text-1);
   color: #fff;

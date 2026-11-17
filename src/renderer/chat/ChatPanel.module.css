@@ -6,32 +6,52 @@
   background: var(--surface-0);
   border-left: 1px solid var(--border);
 }
+/* 头部（设计稿 V3 主界面）：2px 角标色外框、圆角 12；左边大号路牌，右边线路名 18 / 700 和一行状态 */
 .head {
   flex: none;
   margin: 16px 16px 0;
   display: flex;
+  align-items: stretch;
   border: 2px solid;
-  border-radius: var(--r-8);
+  border-radius: var(--r-12);
   overflow: hidden;
+  background: var(--surface-0);
 }
 .headText {
   flex: 1;
   min-width: 0;
-  padding: 9px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 12px;
 }
 .headText h2 {
   margin: 0;
   font-size: 18px;
-  line-height: 26px;
+  line-height: 22px;
+  font-weight: 700;
 }
 .headText p {
+  display: flex;
+  align-items: center;
+  gap: 4px 12px;
   margin: 0;
   font-size: 12px;
   line-height: 18px;
   color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
 }
 .headText b {
   color: var(--text-1);
+}
+/* “第 N 站回答中”：圆点用线路色，字用这一路的深字 */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
 }
 .log {
   flex: 1;
@@ -49,11 +69,11 @@
   margin-bottom: 24px;
 }
 .ask {
-  /* 设计稿：提问靠右，宽度跟着字走，最多占八成五 */
+  /* 设计稿：提问靠右，宽度跟着字走，最多占 88% */
   width: fit-content;
-  max-width: 85%;
+  max-width: 88%;
   margin-left: auto;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border-radius: var(--r-12) var(--r-12) var(--r-4) var(--r-12);
   white-space: pre-wrap;
   line-height: 22px;
@@ -61,11 +81,12 @@
 .askNo {
   margin: 0 2px 4px;
   text-align: right;
-  font-size: 11.5px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--text-4);
 }
 .who {
-  margin: 14px 0 6px;
+  margin: 12px 0 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-3);
@@ -103,13 +124,13 @@
 .md h1,
 .md h2,
 .md h3 {
-  margin: 14px 0 6px;
-  font-size: 15px;
-  line-height: 22px;
+  margin: 12px 0 6px;
+  font-size: 16px;
+  line-height: 24px;
 }
 .md code {
   font: 12.5px/18px var(--mono);
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: var(--r-4);
   background: var(--surface-2);
   font-variant-ligatures: none;
@@ -232,7 +253,7 @@
 .conflict {
   flex: none;
   margin: 0 16px 12px;
-  padding: 12px 14px;
+  padding: 12px 12px;
   border-radius: var(--r-10);
 }
 .permission {
@@ -315,7 +336,7 @@
 .resolve {
   display: block;
   width: 100%;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border-radius: var(--r-8);
   background: var(--text-1);
   color: #fff;
@@ -415,7 +436,7 @@
   width: 100%;
   min-height: 76px;
   max-height: 240px;
-  padding: 12px 14px 4px;
+  padding: 12px 12px 4px;
   border: none;
   border-radius: var(--r-12) var(--r-12) 0 0;
   background: transparent;
@@ -501,7 +522,7 @@
 }
 .summary {
   margin-bottom: 24px;
-  padding: 12px 14px;
+  padding: 12px 12px;
   border: 1px solid;
   border-left-width: 4px;
   border-radius: var(--r-8);
@@ -539,7 +560,7 @@
 @keyframes flash {
   0%,
   40% {
-    box-shadow: 0 0 0 6px #ffe58a;
+    box-shadow: 0 0 0 6px var(--highlight);
     background: #fff8d6;
   }
   100% {
@@ -573,18 +594,11 @@
 }
 
 .statusDot {
-  display: inline-block;
+  flex: none;
   width: 7px;
   height: 7px;
-  margin-right: 6px;
   border-radius: 50%;
-  vertical-align: 1px;
   animation: pulse 1400ms ease-in-out infinite;
-}
-.next {
-  margin-left: 12px;
-  font-weight: 400;
-  color: var(--text-3);
 }
 .meta {
   flex: none;
@@ -701,7 +715,7 @@
   font-size: 11px;
   font-weight: 700;
   line-height: 20px;
-  background: #dff3ea;
+  background: var(--green-bg);
   color: var(--green);
 }
 .waitBar em[data-mode="manual"] {
@@ -722,7 +736,7 @@
   height: 24px;
   padding: 0 8px;
   border-radius: var(--r-6);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -734,7 +748,6 @@
 }
 
 .back {
-  margin-left: 10px;
   height: 24px;
   padding: 0 8px;
   border: 1px solid var(--border);
@@ -772,8 +785,8 @@
   gap: 6px;
 }
 .permission code {
-  background: #161b22;
-  color: #e6edf3;
+  background: var(--text-1);
+  color: var(--border);
 }
 .permission .choices {
   flex-direction: column;
@@ -790,7 +803,7 @@
 .denyRow kbd {
   flex: none;
   min-width: 20px;
-  padding: 0 5px;
+  padding: 0 4px;
   border: 1px solid var(--line);
   border-radius: var(--r-4);
   background: var(--surface-0);
@@ -824,7 +837,7 @@
   font-size: 12px;
 }
 .afterBreak button {
-  height: 30px;
+  height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--r-6);
