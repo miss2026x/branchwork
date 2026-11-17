@@ -108,7 +108,7 @@ describe("设计稿的样式规范（第 0 站）：组件样式只用 tokens.cs
     const problems: string[] = [];
     for (const f of [...css(), ...files(path.join(SRC, "renderer")).filter((x) => /\.tsx?$/.test(x))])
       for (const m of fs.readFileSync(f, "utf8").matchAll(/var\((--[\w-]+)/g))
-        if (!m[1]!.endsWith("-") && !defined.has(m[1]!) && !["--fx", "--fy", "--c", "--p", "--panel-w", "--lane", "--lane-text", "--rail-w"].includes(m[1]!)) problems.push(`${path.relative(SRC, f)}：${m[1]}`);
+        if (!m[1]!.endsWith("-") && !defined.has(m[1]!) && !["--fx", "--fy", "--c", "--p", "--panel-w", "--lane", "--lane-tag", "--lane-text", "--rail-w"].includes(m[1]!)) problems.push(`${path.relative(SRC, f)}：${m[1]}`);
     expect([...new Set(problems)]).toEqual([]);
   });
 

@@ -532,6 +532,12 @@ describe("应用", () => {
     await expect.poll(() => bar.isVisible()).toBe(true);
     expect(await page.getByText(/^正在看第 \d+ 站$/).isVisible()).toBe(true);
     expect(await page.locator("textarea").isVisible()).toBe(false);
+    // 对话栏只显示到这一站；后面的站在地图上淡下去，但还在
+    const chatLog = page.getByRole("log");
+    await expect.poll(() => chatLog.getByText("截线前的一站").count()).toBeGreaterThan(0);
+    expect(await chatLog.getByText("要被截掉的一站").count()).toBe(0);
+    expect(await page.locator('[data-after="true"]:has(button[data-prompt="要被截掉的一站"])').count()).toBe(1);
+    expect(await page.locator('button[data-prompt="截线前的一站"]').getAttribute("aria-current")).toBe("step");
     await shot("28-viewing");
     await page.getByRole("button", { name: "回到最新" }).first().click();
     await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);

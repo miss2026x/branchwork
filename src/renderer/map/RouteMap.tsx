@@ -9,6 +9,7 @@ import { estimateTokens, parseSummary } from "../ui/summary-items";
 import { nameRepeat, repeatMark } from "../stores/numbering";
 import { layoutMap, type Lane } from "./layout";
 import css from "./RouteMap.module.css";
+import { plainText } from "../ui/plain-text";
 
 interface Props {
   routes: Route[];
@@ -259,11 +260,18 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                     )}
                     {/* 选中的路：从父路带来的那几站，用它自己的颜色在父路的线下面再描一遍 */}
                     {on && !lane.route.express && inherited(lane, layout.lanes).map((d, i) => <path key={i} d={d} fill="none" stroke={colors.line} strokeWidth={5} strokeLinecap="round" />)}
+                    {/* 正在看以前的某一站：它后面的那段线淡下去（站还能点，只是“还没到”） */}
+                    {(() => {
+                      const at = lane.stops.findIndex((x) => x.stop.id === viewingStopId);
+                      if (at < 0 || at === lane.stops.length - 1) return null;
+                      return <path d={`M ${lane.stops[at]!.x} ${lane.y} H ${last!.x}`} stroke={colors.faded} strokeWidth={on ? 10 : 8} strokeLinecap="round" fill="none" />;
+                    })()}
                     {(() => {
                       const waiting = queue.filter((q) => q.routeId === lane.route.id).length;
                       const idle = lane.route.status !== "answering" && lane.route.status !== "awaiting_permission";
                       if (waiting === 0 && !(on && idle)) return null;
-                      return <path d={`M ${tailFrom + 20} ${lane.y} H ${lane.end.x + Math.max(0, waiting - 1) * 76 - 12}`} stroke={c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" fill="none" />;
+                      const viewingHere = lane.stops.some((x) => x.stop.id === viewingStopId);
+                      return <path d={`M ${tailFrom + 20} ${lane.y} H ${lane.end.x + Math.max(0, waiting - 1) * 76 - 12}`} stroke={viewingHere ? colors.faded : c} strokeWidth={3} strokeDasharray="5 7" strokeLinecap="round" fill="none" />;
                     })()}
                   </g>
                 );
@@ -459,7 +467,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         )}
 
         {hoverStop && hoverStop.spot.stop.kind === "summary" && (
-          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot, viewingStopId))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const stop = hoverStop.spot.stop;
               const source = allSpots.find((m) => m.spot.stop.id === hoverStop.route.forkStopId);
@@ -499,7 +507,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
         {hoverStop && hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id] && (
-          <div ref={cardBox} className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot, viewingStopId))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const files = conflicts[hoverStop.route.id]!;
               const label = hoverStop.route.express ? `快${hoverStop.route.express}` : `${hoverStop.route.number}路`;
@@ -534,7 +542,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
         {hoverStop && hoverStop.spot.stop.kind !== "summary" && !(hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id]) && (
-          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot, viewingStopId))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             <header>
               <Plate route={hoverStop.route} />
               <b>第 {stopNumber(hoverStop.spot.stop)} 站</b>
@@ -546,7 +554,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
               const pv = preview(stop);
               return (
                 <>
-                  {<p className={css.cardAnswer}>{stop.status === "answering" ? "还在回答…" : pv ? clip(pv.answer, 110) || "这一站没有文字回答。" : "正在读取回答…"}</p>}
+                  {<p className={css.cardAnswer}>{stop.status === "answering" ? "还在回答…" : pv ? clip(plainText(pv.answer), 110) || "这一站没有文字回答。" : "正在读取回答…"}</p>}
                   <p className={css.cardMeta}>
                     {pv && pv.tools > 0 && <span>{pv.tools} 次工具调用</span>}
                     {stop.syncState === "synced" && <span className={css.ok}>✓ 改动已进 Local</span>}
@@ -659,9 +667,9 @@ function inherited(lane: Lane, lanes: Lane[]): string[] {
 }
 
 /** 悬停卡片放哪：默认在站的上面，上面放不下就放下面；below 为真时反过来 */
-/** 站点上方有字（“正在看这一站”“没答完”、起名中、分叉站的站名）：悬停卡片要让开它 */
-function labelAbove(spot: { stop: Stop; junction: boolean }, viewingStopId: string | null) {
-  return spot.junction || spot.stop.id === viewingStopId || spot.stop.status === "interrupted" || spot.stop.nameState === "temp";
+/** 站点上方有字（“没答完”、起名中、分叉站的站名）：悬停卡片要让开它 */
+function labelAbove(spot: { stop: Stop; junction: boolean }) {
+  return spot.junction || spot.stop.status === "interrupted" || spot.stop.nameState === "temp";
 }
 
 /** 悬停卡片放哪：默认在站的上面，上面放不下就放下面；站点上方有字时再高一点，不压住它 */
@@ -712,8 +720,10 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
   const line = on ? colors.line : colors.faded;
   const tag = colors.tag;
   const busy = lane.route.status === "answering" || lane.route.status === "awaiting_permission";
+  /** 正在看这一路的第几站；它后面的站淡下去 */
+  const viewAt = lane.stops.findIndex((x) => x.stop.id === viewingStopId);
   return (
-    <div className={css.lane} data-on={on} style={{ "--lane": line, "--lane-text": colors.text } as CSSProperties}>
+    <div className={css.lane} data-on={on} style={{ "--lane": line, "--lane-tag": colors.tag, "--lane-text": colors.text } as CSSProperties}>
       <button className={css.plate} style={{ left: lane.plate.x, top: lane.plate.y, borderColor: on ? tag : "var(--line-2)" }} onClick={onSelect}>
         <Plate route={lane.route} size="m" />
         <span className={`${css.plateName} ell`}>{lane.route.name}</span>
@@ -730,8 +740,10 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
         const latest = i === lane.stops.length - 1;
         // 折叠的路只留分叉站和正在回答的那一站
         if (lane.route.folded && !junction && !answering) return null;
+        const after = viewAt >= 0 && i > viewAt;
+        const ring = after ? colors.faded : junction && !answering ? "var(--fg-1)" : line;
         return (
-          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id} data-new={Date.now() - stop.startedAt < 1500}>
+          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-after={after} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id} data-new={Date.now() - stop.startedAt < 1500}>
             {answering && (
               // 设计稿：站上方一行字，用线路的颜色；等批准时换成琥珀色。还在起名就并排放一个“起名中”
               <span className={css.live}>
@@ -746,7 +758,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
               </span>
             )}
             {stop.status === "interrupted" && <em className={css.flagAmber}>没答完</em>}
-            <button className={css.node} style={{ borderColor: junction && !answering ? "var(--fg-1)" : line, ...(answering ? { boxShadow: `0 0 0 5px color-mix(in srgb, ${line} 22%, transparent)` } : {}), ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, var(--fg-1) 50%, var(--surface) 50%)` } : {}) }} onClick={() => onStop(stop)}
+            <button className={css.node} aria-current={viewingStopId === stop.id ? "step" : undefined} style={{ borderColor: ring, ...(answering ? { boxShadow: `0 0 0 5px color-mix(in srgb, ${line} 22%, transparent)` } : {}), ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, ${after ? colors.faded : "var(--fg-1)"} 50%, var(--surface) 50%)` } : {}) }} onClick={() => onStop(stop)}
               onContextMenu={(e) => (e.preventDefault(), onStopMenu(stop))}
               onPointerEnter={() => onHover({ kind: "stop", id: stop.id })}
               onPointerLeave={() => onHover(null)}
@@ -756,7 +768,6 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
             </button>
             {stop.syncState === "conflict" && <b className={css.badgeRed}>!</b>}
             {stop.syncState === "unsynced" && <b className={css.badgeAmber} title="改动还没进 Local" />}
-            {viewingStopId === stop.id && <em className={css.viewingFlag}>正在看这一站</em>}
             {!answering && stop.nameState === "temp" && latest && detail === "full" && (
               <em className={css.naming}>
                 <i /> 起名中
@@ -771,8 +782,8 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
 
       {/* 候车区里派给这一路的问题：排在末尾的虚线站 */}
       {waiting.map((q, i) => (
-        <span key={q.id} className={css.next} style={{ left: lane.end.x + i * 76, top: lane.end.y }} onPointerEnter={() => onHover({ kind: "queue", id: q.id })} onPointerLeave={() => onHover(null)}>
-          <span className={css.ghost} style={{ borderColor: line, borderStyle: q.mode === "auto" ? "solid" : "dashed" }} />
+        <span key={q.id} className={css.next} data-after={viewAt >= 0} style={{ left: lane.end.x + i * 76, top: lane.end.y }} onPointerEnter={() => onHover({ kind: "queue", id: q.id })} onPointerLeave={() => onHover(null)}>
+          <span className={css.ghost} style={{ borderColor: viewAt >= 0 ? colors.faded : line, borderStyle: q.mode === "auto" ? "solid" : "dashed" }} />
           <span className={css.name}>{q.mode === "auto" ? "自动" : "手动"}</span>
         </span>
       ))}

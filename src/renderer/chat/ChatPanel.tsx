@@ -97,6 +97,14 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   useEffect(() => {
     stick.current = true;
   }, [route.id]);
+  // 看以前的某一站：只显示到这一站，滚到它的末尾；回到最新时滚到底，接着跟随
+  useLayoutEffect(() => {
+    const el = log.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    stick.current = true;
+  }, [viewing?.id]);
+
   // 有命令等批准：卡片在对话末尾，滚过去让它露出来
   useLayoutEffect(() => {
     const el = log.current;
@@ -115,6 +123,9 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
     const t = setTimeout(() => setFlash(null), 1600);
     return () => clearTimeout(t);
   }, [focus?.n, focus?.stopId]);
+
+  /** 对话里显示哪些站：在看以前的某一站时只到那一站为止 */
+  const shown = viewing ? stops.filter((s) => s.seq <= viewing.seq) : stops;
 
   /** 回答中写的问题怎么排：到站自动发、到站等你点、只放着 */
   const [queueMode, setQueueMode] = useState<QueueMode>("auto");
@@ -197,10 +208,10 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <i key={`p${i}`} data-kind="inherited" />
           ))}
           {stops.slice(-12).map((s) => (
-            <i key={s.id} data-kind={s.status === "answering" ? "current" : s.kind === "minor" ? "minor" : "own"} />
+            <i key={s.id} data-kind={s.status === "answering" ? "current" : s.kind === "minor" ? "minor" : "own"} data-viewing={viewing?.id === s.id} data-after={!!viewing && s.seq > viewing.seq} />
           ))}
           {waiting.slice(0, 4).map((q) => (
-            <i key={q.id} data-kind="waiting" />
+            <i key={q.id} data-kind="waiting" data-after={!!viewing} />
           ))}
         </div>
         <div className={css.stripLabels}>
@@ -267,7 +278,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         )}
         {stops.length === 0 && pending === undefined && <p className={css.hint}>{offset > 0 ? "这一路还没有自己的站。在下面写第一个问题，发车。" : "这一路还没有站。在下面写第一个问题，发车。"}</p>}
 
-        {stops.map((s) => {
+        {shown.map((s) => {
           const l = live[s.id];
           const items = l ? l.items : (content[s.id] ?? []);
           if (s.kind === "summary") {
@@ -282,7 +293,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             );
           }
           return (
-            <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id} data-viewing={viewing?.id === s.id}>
+            <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id}>
               {/* 设计稿：站号小字在提问上方靠右；短确认（小点）不占站号 */}
               <div className={`${css.askNo} ell`}>
                 {s.kind === "minor" ? `接着第 ${num(s)} 站` : `第 ${num(s)} 站`} · {s.name}
@@ -335,7 +346,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         })}
 
         {/* 等你批准（设计稿“权限请求”）：卡片排在对话里，紧跟着这一站，不挤占对话的高度 */}
-        {permission && (
+        {permission && !viewing && (
           <section className={css.permission} role="alertdialog" aria-label="等你批准" aria-describedby={permission.reason ? "perm-reason" : undefined}>
             <header>
               <span>{/bash|终端|command/i.test(permission.tool) ? <IconTerminal size={16} /> : /write|edit/i.test(permission.tool) ? <IconEdit size={16} /> : <IconWarn size={16} />}</span>
@@ -368,7 +379,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           </section>
         )}
 
-        {pending !== undefined && (
+        {pending !== undefined && !viewing && (
           <section className={css.stop}>
             <div className={css.ask} style={{ background: colors.tint }}>
               {pending}

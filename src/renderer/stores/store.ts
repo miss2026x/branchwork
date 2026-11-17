@@ -768,8 +768,9 @@ export const useStore = create<State>((set, get) => {
       if (!stopId) return set({ viewing: null });
       const stop = get().stops[stopId];
       if (!stop) return;
+      // 在地图上点的，站就在眼前：不挪地图、不闪；对话栏自己滚到这一站的末尾
       get().selectRoute(stop.routeId);
-      set((s) => ({ viewing: stopId, focus: { stopId, n: (s.focus?.n ?? 0) + 1 } }));
+      set({ viewing: stopId });
     },
 
     async truncate(routeId, stopId, requeue) {

@@ -594,6 +594,19 @@
   border-radius: var(--r-round);
   background: var(--surface);
 }
+/* 在看以前的某一站：它后面的点和线淡下去，它自己实心 */
+.strip i[data-after="true"] {
+  background: var(--line-2);
+}
+.strip i[data-after="true"]::before {
+  border-color: var(--line-2);
+}
+.strip i[data-viewing="true"] {
+  background: var(--line-2);
+}
+.strip i[data-viewing="true"]::before {
+  background: var(--c);
+}
 .strip i[data-kind="inherited"] {
   background: var(--p);
 }
@@ -736,10 +749,6 @@
 }
 .viewingNote .inlineLink {
   margin-left: var(--sp-6);
-}
-.stop[data-viewing="true"] > :first-child {
-  outline: 2px solid var(--route-1);
-  outline-offset: 1px;
 }
 
 .afterBreak {

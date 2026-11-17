@@ -529,21 +529,25 @@
   color: var(--on-dark-red);
 }
 
-/* 正在看以前的某一站：光圈用这一路的线色，字用这一路的深字（设计稿 V3 主界面） */
+/* 正在看以前的某一站：站名变成这一路颜色的实心标签，站点外一圈光；它后面的站和线淡下去，还能点 */
 .stop[data-viewing="true"] .node {
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--lane) 22%, transparent);
   transform: scale(1.15);
 }
-.viewingFlag {
-  position: absolute;
-  bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-style: normal;
-  font-size: var(--fs-12);
+.stop[data-viewing="true"] .name {
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-4);
+  background: var(--lane-tag);
+  color: var(--fg-on-color);
   font-weight: 700;
-  white-space: nowrap;
-  color: var(--lane-text);
+}
+.stop[data-after="true"] .name,
+.next[data-after="true"] .name {
+  color: var(--fg-4);
+}
+.stop[data-after="true"] .flagAmber,
+.stop[data-after="true"] b {
+  opacity: 0.5;
 }
 .selectBar {
   position: absolute;
