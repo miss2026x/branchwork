@@ -11,6 +11,8 @@ import { registerIpc } from "./ipc";
 // 打包后的正式版用系统给应用分配的数据目录
 const home = process.env.BRANCHWORK_HOME ?? (app.isPackaged ? app.getPath("userData") : path.join(os.homedir(), ".branchwork-dev"));
 fs.mkdirSync(home, { recursive: true });
+// 指定了数据目录（测试、并排开两份）时，界面记住的东西（栏宽、提示看过没有）也放进去，不和别的实例混在一起
+if (process.env.BRANCHWORK_HOME) app.setPath("userData", path.join(home, "chromium"));
 
 const db = openDb(path.join(home, "bw.sqlite"));
 // BRANCHWORK_DEMO=1：用假的 Claude（不联网、不用登录），其余全是真的——真的建工作区、真的同步

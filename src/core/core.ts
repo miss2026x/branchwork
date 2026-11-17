@@ -190,16 +190,37 @@ export interface Core {
   dispose(): void;
 }
 
-/** 一条用户消息里他自己打的字；只是工具结果的话返回 null */
+/** 一条用户消息里他自己打的字；只是工具结果、或 Claude Code 自己记的（中断、命令输出）返回 null */
 function promptText(content: unknown): string | null {
-  if (typeof content === "string") return content.trim() || null;
+  if (typeof content === "string") return typedPrompt(content);
   if (!Array.isArray(content)) return null;
   const text = (content as { type?: string; text?: unknown }[])
     .filter((b) => b.type === "text" && typeof b.text === "string")
     .map((b) => b.text as string)
-    .join("\n")
+    .join("\n");
+  return typedPrompt(text);
+}
+
+/**
+ * Claude Code 的会话文件里，用户消息不全是用户打的字：
+ * 斜杠命令记成 <command-name>/review</command-name><command-args>…</command-args>，
+ * ! 开头的终端命令记成 <bash-input>，命令的输出、“[Request interrupted by user]”也记成用户消息。
+ * 这里还原成用户当时打的样子；不是用户打的返回 null
+ */
+export function typedPrompt(raw: string): string | null {
+  const text = raw
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, "")
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
     .trim();
-  return text || null;
+  const command = /<command-name>\s*([^<]*?)\s*<\/command-name>/.exec(text)?.[1];
+  if (command) {
+    const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(text)?.[1]?.trim();
+    return `${command.startsWith("/") ? command : `/${command}`}${args ? ` ${args}` : ""}`;
+  }
+  const bash = /<bash-input>([\s\S]*?)<\/bash-input>/.exec(text)?.[1]?.trim();
+  if (bash) return `!${bash}`;
+  if (!text || /^\[Request interrupted by user/.test(text) || /^<(local-command-stdout|local-command-stderr|bash-stdout|bash-stderr)>/.test(text)) return null;
+  return text;
 }
 
 export function createCore(opts: CoreOptions): Core {
@@ -213,6 +234,20 @@ export function createCore(opts: CoreOptions): Core {
   const running = new Map<string, AbortController>();
   /** 各路正在回答的是哪一站 */
   const runningStop = new Map<string, string>();
+
+  // 早先导入的终端会话里，有些站直接用了 Claude Code 记的原始消息（<command-name>…、[Request interrupted by user]）当提问和站名，这里改回用户打的样子
+  for (const project of db.projects.list()) {
+    for (const stop of db.stops.listByProject(project.id)) {
+      if (!/<command-|<bash-input>|<local-command-|^\[Request interrupted/.test(stop.prompt)) continue;
+      const text = typedPrompt(stop.prompt);
+      db.stops.update(stop.id, text === null ? { kind: "minor", name: "中断" } : { prompt: text, name: slashCommand(text) ?? stopName(text) });
+    }
+    for (const route of db.routes.listByProject(project.id)) {
+      if (!/^(<command-|<local-command-|\[Request interrupted)/.test(route.name)) continue;
+      const first = db.stops.listByRoute(route.id).find((st) => st.kind === "normal");
+      db.routes.update(route.id, { name: first ? stopName(first.prompt) : "导入的会话" });
+    }
+  }
   const distilling = new Map<string, AbortController>();
   const pendingPermissions = new Map<string, { routeId: string; tool: string; resolve: (d: PermissionDecision | { deny: string }) => void }>();
 
@@ -693,13 +728,24 @@ export function createCore(opts: CoreOptions): Core {
           await claude.deleteSession(sessionId).catch(() => {});
           throw e;
         }
-        const first = history.find((m) => m.role === "user" && promptText(m.content) !== null);
+        // 每个提问是一站：从这条提问到下一条提问之前的最后一条消息
+        const asks: { at: number; end: number; text: string }[] = [];
+        for (let i = 0; i < history.length; i++) {
+          const text = history[i]!.role === "user" ? promptText(history[i]!.content) : null;
+          if (text === null) continue;
+          let end = i;
+          while (end + 1 < history.length && !(history[end + 1]!.role === "user" && promptText(history[end + 1]!.content) !== null)) end++;
+          // /model、/clear 这类只在本机执行、没让 Claude 回答的命令，不算一站
+          const local = slashCommand(text) !== null || text.startsWith("!");
+          if (local && !history.slice(i + 1, end + 1).some((m) => m.role === "assistant")) continue;
+          asks.push({ at: i, end, text });
+        }
         const route: Route = {
           id: routeId,
           projectId,
           number: db.routes.nextNumber(projectId),
           express: null,
-          name: (titles.get(source) || (first ? stopName(promptText(first.content)!) : "") || "导入的会话").slice(0, 40),
+          name: (titles.get(source) || (asks[0] ? stopName(asks[0].text) : "") || "导入的会话").slice(0, 40),
           status: "idle",
           sessionId,
           worktreePath,
@@ -718,24 +764,21 @@ export function createCore(opts: CoreOptions): Core {
         };
         db.routes.insert(route);
         emit({ type: "route.updated", route });
-        // 每个提问是一站：从这条提问到下一条提问之前的最后一条消息
         let seq = 0;
-        for (let i = 0; i < history.length; i++) {
-          const text = history[i]!.role === "user" ? promptText(history[i]!.content) : null;
-          if (text === null) continue;
-          let end = i;
-          while (end + 1 < history.length && !(history[end + 1]!.role === "user" && promptText(history[end + 1]!.content) !== null)) end++;
+        for (const { at, end, text } of asks) {
+          // 和直接在 Branchwork 里问一样：“继续”“好的”画成小点，斜杠命令用命令名当站名
+          const minor = seq > 0 && isShortConfirm(text);
           const stop: Stop = {
             id: id("s"),
             routeId,
             seq: ++seq,
-            kind: "normal",
-            name: stopName(text),
+            kind: minor ? "minor" : "normal",
+            name: minor ? text.trim() : (slashCommand(text) ?? stopName(text)),
             nameState: "final",
             prompt: text,
             status: "done",
             syncState: "none",
-            messageId: history[i]!.id,
+            messageId: history[at]!.id,
             lastMessageId: history[end]!.id,
             error: null,
             startedAt: route.createdAt + seq,

@@ -508,6 +508,20 @@ describe("应用", () => {
     const nodes = page.locator('[class*="node"]');
     const count = await nodes.count();
 
+    // 拖动地图：从空白处按下，斜着拖过站名，不会把站名、路牌当文字选中；再拖回原处
+    const box = (await page.locator('button[data-prompt="截线前的一站"]').boundingBox())!;
+    const from = { x: box.x - 60, y: box.y - 30 };
+    const to = { x: box.x + 200, y: box.y + 60 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    await page.mouse.up();
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+    await page.mouse.down();
+    await page.mouse.move(from.x, from.y, { steps: 8 });
+    await page.mouse.up();
+    expect((await page.locator('button[data-prompt="截线前的一站"]').boundingBox())!.x).toBeCloseTo(box.x, 0);
+
     // 悬停：出卡片
     await page.locator('button[data-prompt="截线前的一站"]').hover();
     await expect.poll(() => page.getByRole("button", { name: "打开这站" }).isVisible(), { timeout: 10000 }).toBe(true);

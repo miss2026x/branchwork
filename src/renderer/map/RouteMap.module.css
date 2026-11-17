@@ -76,6 +76,8 @@
   inset: 0;
   cursor: grab;
   touch-action: none;
+  /* 拖动地图时不要把站名、路牌当成文字选中（会整片变蓝） */
+  user-select: none;
 }
 .viewport:active {
   cursor: grabbing;
@@ -418,6 +420,8 @@
 
 /* 悬停卡片 */
 .card {
+  /* 卡片里的提问和回答可以选中复制 */
+  user-select: text;
   animation: pop var(--t-base) var(--ease);
   position: absolute;
   z-index: 8;
