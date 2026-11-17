@@ -32,9 +32,9 @@ export function TerminalStrip({ route, terminals, stopLabel, onOpen, onStop }: P
   return (
     <section className={css.strip} aria-label="后台终端">
       <button className={css.stripHead} aria-expanded={open} onClick={() => setOpen(!open)}>
-        <IconChevron size={12} open={open} />
         <b>{terminals.length} 个后台终端</b>
-        <span data-running={running > 0}>{running > 0 ? "运行中" : "都已退出"}</span>
+        <span>{running > 0 ? (running < terminals.length ? `${running} 个运行中` : "运行中") : "都已退出"}</span>
+        <IconChevron size={12} open={open} />
       </button>
       {open && (
         <ul>
@@ -52,7 +52,7 @@ export function TerminalStrip({ route, terminals, stopLabel, onOpen, onStop }: P
                     </small>
                   </span>
                   {t.port !== null && t.status === "running" && <em>{`:${t.port}`}</em>}
-                  <span className={css.state}>{t.status === "running" ? since(t.startedAt) : t.exitCode === 0 ? "已结束" : `已退出${t.exitCode !== null ? `（${t.exitCode}）` : ""}`}</span>
+                  {t.status !== "running" && <span className={css.state}>{t.exitCode === 0 ? "已结束" : `已退出${t.exitCode !== null ? `（${t.exitCode}）` : ""}`}</span>}
                 </button>
                 <button className={css.rowStop} onClick={() => onStop(t.id)} aria-label={t.status === "running" ? `停止 ${t.name}` : `清掉 ${t.name}`} title={t.status === "running" ? "停止" : "从列表里清掉"}>
                   {t.status === "running" ? "停止" : <IconClose size={14} />}

@@ -1,64 +1,61 @@
+/* 输入框上面的后台终端（设计稿“后台终端”）：一张左右各缩进 16px 的线框卡片，头一行浅灰底，每个终端一行 */
 .strip {
   flex: none;
-  border-top: 1px solid var(--divider);
-  background: var(--surface-1);
+  margin: 0 var(--sp-16) var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  background: var(--surface);
+  overflow: hidden;
 }
 .stripHead {
   width: 100%;
-  height: var(--h-menu);
+  min-height: var(--h-menu);
   display: flex;
   align-items: center;
   gap: var(--sp-8);
-  padding: 0 var(--sp-16);
+  padding: 0 var(--sp-10);
+  background: var(--surface-2);
   font-size: var(--fs-12);
   color: var(--fg-3);
 }
 .stripHead b {
-  color: var(--fg-2);
-}
-.stripHead span {
   flex: 1;
-  text-align: right;
-}
-.stripHead span[data-running="true"]::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: var(--sp-6);
-  border-radius: var(--r-round);
-  background: var(--green);
-  vertical-align: middle;
-}
-.stripHead b {
-  font-weight: 500;
-}
-li[data-status="exited"] .row {
-  opacity: 0.6;
+  min-width: 0;
+  font-weight: 400;
+  text-align: left;
 }
 .strip ul {
   margin: 0;
-  padding: 0 var(--sp-8) var(--sp-8);
+  padding: 0;
   list-style: none;
-  max-height: 150px;
+  max-height: 148px;
   overflow-y: auto;
 }
 .strip li {
   display: flex;
   align-items: center;
-  border-radius: var(--r-8);
+  min-height: var(--h-36);
+  padding-right: var(--sp-4);
+  border-top: 1px solid var(--divider);
 }
 .strip li:hover {
-  background: var(--surface-2);
+  background: var(--info-bg);
+}
+li[data-status="exited"] .row {
+  opacity: 0.6;
 }
 .row {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--sp-10);
-  padding: var(--sp-6) var(--sp-4) var(--sp-6) var(--sp-8);
+  gap: var(--sp-8);
+  padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-10);
   text-align: left;
+}
+.row > svg {
+  flex: none;
+  color: var(--fg-3);
 }
 .dot {
   flex: none;
@@ -80,12 +77,11 @@ li[data-status="exited"] .dot {
 }
 .rowText b {
   font-size: var(--fs-13);
-  line-height: var(--lh-20);
-  font-weight: 600;
+  line-height: var(--lh-16);
+  font-weight: 400;
 }
 li[data-status="exited"] .rowText b {
   color: var(--fg-3);
-  font-weight: 500;
 }
 .rowText small {
   font-size: var(--fs-11);
@@ -97,14 +93,12 @@ li[data-status="exited"] .rowText b {
   font: inherit;
   font-family: var(--mono);
 }
+/* 端口：等宽蓝字，不加框 */
 .row em {
   flex: none;
-  padding: 0 var(--sp-6);
-  border-radius: var(--r-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font: var(--fs-11) / var(--lh-18) var(--mono);
-  color: var(--fg-2);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
+  font-style: normal;
+  color: var(--info);
 }
 .state {
   flex: none;
@@ -115,12 +109,13 @@ li[data-status="exited"] .rowText b {
   flex: none;
   min-width: 30px;
   height: var(--h-28);
-  padding: 0 var(--sp-8);
+  padding: 0 var(--sp-6);
   display: grid;
   place-items: center;
-  font-size: var(--fs-12);
   border-radius: var(--r-6);
+  font-size: var(--fs-12);
   color: var(--fg-3);
+  white-space: nowrap;
 }
 .rowStop:hover {
   background: var(--surface);

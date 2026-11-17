@@ -53,12 +53,15 @@
   gap: var(--sp-6);
   font-weight: 600;
 }
+/* 对话：顶上 28px 渐隐到“本路候车”下面，不画分隔线（设计稿 V3 主界面） */
 .log {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: var(--sp-16) var(--sp-16) var(--sp-8);
   overflow-wrap: anywhere;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, var(--fg-1) 28px);
+  mask-image: linear-gradient(to bottom, transparent 0, var(--fg-1) 28px);
 }
 .hint {
   margin: var(--sp-24) 0;
@@ -564,7 +567,6 @@
 .meta {
   flex: none;
   padding: var(--sp-12) var(--sp-16) var(--sp-10);
-  border-bottom: 1px solid var(--divider);
 }
 .strip {
   display: flex;
@@ -645,7 +647,7 @@
 }
 .waitBar {
   width: 100%;
-  height: var(--h-40);
+  height: var(--h-44);
   margin-top: var(--sp-10);
   display: flex;
   align-items: center;
@@ -653,7 +655,7 @@
   padding: 0 var(--sp-10) 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
-  background: var(--surface-1);
+  background: var(--surface-2);
   font-size: var(--fs-13);
   text-align: left;
 }
@@ -671,17 +673,17 @@
 .waitBar em {
   flex: none;
   padding: 0 var(--sp-6);
-  border-radius: var(--r-4);
+  border-radius: var(--r-8);
   font-style: normal;
   font-size: var(--fs-11);
   font-weight: 700;
-  line-height: var(--lh-20);
+  line-height: var(--lh-18);
   background: var(--green-bg);
   color: var(--green);
 }
 .waitBar em[data-mode="manual"] {
-  background: var(--amber-bg);
-  color: var(--amber-text);
+  background: var(--orange-bg);
+  color: var(--orange-text);
 }
 .waitBar svg:last-child {
   color: var(--fg-3);
