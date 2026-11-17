@@ -821,7 +821,7 @@
   gap: var(--sp-12);
   padding: var(--sp-12) var(--sp-12);
   border: 1px solid var(--border);
-  border-radius: var(--r-12, var(--r-12));
+  border-radius: var(--r-12);
   background: var(--surface);
   font-size: var(--fs-13);
   line-height: var(--lh-20);

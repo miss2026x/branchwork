@@ -565,6 +565,12 @@ describe("应用", () => {
     await page.getByRole("button", { name: /^候车 \d/ }).click();
     await expect.poll(() => area.getByText("拖过去的问题").isVisible()).toBe(true);
     expect(await area.getByText("未派车").count()).toBe(0);
+    // 三档范围：所有项目 ⊃ 当前项目 ⊃ 当前路线，每档带条数；派过去以后，“当前路线”里也有它
+    const scopes = area.getByRole("radiogroup", { name: "看哪些" });
+    expect(await scopes.getByRole("radio").allInnerTexts()).toEqual([expect.stringMatching(/^所有项目\s*\d+$/), expect.stringMatching(/^当前项目\s*\d+$/), expect.stringMatching(/^当前路线\s*\d+$/)]);
+    await scopes.getByRole("radio", { name: /^当前路线/ }).click();
+    await expect.poll(() => area.getByText("拖过去的问题").isVisible()).toBe(true);
+    await scopes.getByRole("radio", { name: /^当前项目/ }).click();
     // 收拾：把它撤掉
     await area.getByRole("button", { name: /「拖过去的问题」的更多操作/ }).click();
     await area.getByRole("button", { name: "删除这个问题" }).click();

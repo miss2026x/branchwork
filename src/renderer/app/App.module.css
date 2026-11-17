@@ -391,7 +391,7 @@
   align-items: center;
   gap: var(--sp-12);
   padding: var(--sp-12) var(--sp-16);
-  border-radius: var(--r-12, var(--r-12));
+  border-radius: var(--r-12);
   background: var(--fg-1);
   color: var(--fg-on-color);
   box-shadow: var(--e-dark);

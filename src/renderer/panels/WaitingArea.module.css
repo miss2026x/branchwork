@@ -271,29 +271,30 @@
   gap: var(--sp-6);
   padding: 0 var(--sp-16) var(--sp-10);
 }
+/* 三档范围，一档比一档窄（设计稿“候车区”）：所有项目 ⊃ 当前项目 ⊃ 当前路线，每档带条数 */
 .filters button {
-  height: var(--h-28);
-  max-width: 180px;
-  padding: 0 var(--sp-12);
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
   font-size: var(--fs-12);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.filters b {
+  padding-left: var(--sp-4);
+  font-weight: 700;
 }
 .filters button[aria-checked="true"] {
   border-color: var(--fg-1);
   background: var(--fg-1);
   color: var(--fg-on-color);
-  font-weight: 600;
 }
 /* 在建快线 */
 .building {
   margin-bottom: var(--sp-8);
   padding: var(--sp-12);
   border: 2px dashed var(--express);
-  border-radius: var(--r-12, var(--r-12));
+  border-radius: var(--r-12);
   background: var(--express-bg);
 }
 .building > div {

@@ -62,7 +62,7 @@
 .env {
   padding: var(--sp-12) var(--sp-16) var(--sp-16);
   border: 1px solid var(--border);
-  border-radius: var(--r-12, var(--r-12));
+  border-radius: var(--r-12);
   background: var(--surface);
 }
 .env h2 {
@@ -122,7 +122,7 @@
   z-index: 30;
   width: 360px;
   padding: var(--sp-16);
-  border-radius: var(--r-12, var(--r-12));
+  border-radius: var(--r-12);
   background: var(--surface);
   box-shadow: var(--e3);
 }

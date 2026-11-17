@@ -205,15 +205,15 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
           </header>
 
           <div className={css.filters} role="radiogroup" aria-label="看哪些">
-            <button role="radio" aria-checked={effective === "all"} onClick={() => setScope("all")}>
-              全部 {everything.length}
+            <button role="radio" aria-checked={effective === "all"} title="所有项目里的候车问题" onClick={() => setScope("all")}>
+              所有项目<b>{everything.length}</b>
             </button>
-            <button role="radio" aria-checked={effective === "project"} onClick={() => setScope("project")}>
-              {project.name}
+            <button role="radio" aria-checked={effective === "project"} title={`${project.name} 的候车问题`} onClick={() => setScope("project")}>
+              当前项目<b>{mine.length}</b>
             </button>
             {selectedRoute && (
-              <button role="radio" aria-checked={effective === "route"} onClick={() => setScope("route")}>
-                只看 {selectedRoute.express ? `快${selectedRoute.express}` : `${selectedRoute.number}路`}
+              <button role="radio" aria-checked={effective === "route"} title={`只看要上 ${selectedRoute.express ? `快${selectedRoute.express}` : `${selectedRoute.number}路`} 的`} onClick={() => setScope("route")}>
+                当前路线<b>{mine.filter((q) => q.routeId === selectedRoute.id).length}</b>
               </button>
             )}
           </div>
