@@ -67,8 +67,33 @@
 .pane[data-pane="map"] {
   background: var(--canvas);
 }
-.pane[data-dragging] > :not(:first-child) {
-  opacity: 0.4;
+/* 收起 / 打开时：每个面板用固定宽度，320ms 滑到新宽度 */
+.pane[data-anim] {
+  flex: none;
+  overflow: hidden;
+}
+.pane[data-anim="run"] {
+  transition: width var(--t-slow) var(--ease);
+}
+/* 内容保持打开时的宽度：靠左的往左滑出去，靠右的往右，中间的两边一起收 */
+.pane[data-anim] > * {
+  flex: 1 0 auto;
+  width: var(--anim-w);
+  min-width: var(--anim-w);
+}
+.pane[data-slide="left"] {
+  align-items: flex-end;
+}
+.pane[data-slide="right"] {
+  align-items: flex-start;
+}
+.pane[data-slide="middle"] {
+  align-items: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pane[data-anim="run"] {
+    transition: none;
+  }
 }
 /* 项目列表在最右边时，窄窗口里展开的浮层往左展开 */
 .pane[data-edge="right"] > aside:last-child {
@@ -78,19 +103,6 @@
 /* 对话占满剩下的宽度时（没有地图），内容收在中间约 900px，行不会太长 */
 .pane[data-pane="chat"][data-flex] > aside {
   padding-inline: max(0px, calc((100% - 900px) / 2)); /* 例外：按面板宽度算出来的左右留白 */
-}
-.paneAction {
-  flex: none;
-  width: 28px;
-  height: var(--h-28);
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-6);
-  color: var(--fg-3);
-}
-.paneAction:hover {
-  background: var(--surface-2);
-  color: var(--fg-1);
 }
 .noChat {
   flex: 1;

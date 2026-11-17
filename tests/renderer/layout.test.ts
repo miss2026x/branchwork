@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_LAYOUT, canHide, dividerTarget, flexPane, loadLayout, move, normalize, sameSlot, saveLayout, setWidth, slotAt, toggle, visible, type Layout } from "../../src/renderer/app/layout";
+import { DEFAULT_LAYOUT, PRESETS, applyPreset, canHide, dividerTarget, edgeHidden, flexPane, hiddenBetween, isPreset, loadLayout, move, moveTo, normalize, sameSlot, saveLayout, setWidth, slotAt, targetWidths, toggle, visible, type Layout } from "../../src/renderer/app/layout";
 
 const L = (order: Layout["order"], hidden: Layout["hidden"] = []): Layout => ({ ...DEFAULT_LAYOUT, order, hidden });
 
@@ -74,5 +74,29 @@ describe("面板布局", () => {
       localStorage.setItem("bw.widths", JSON.stringify({ rail: 300, panel: 500 }));
       expect(loadLayout().width).toEqual({ rail: 300, map: null, chat: 500 });
     });
+  });
+});
+
+describe("面板布局：布局小窗和收起", () => {
+  it("在整条顺序里挪（收起的也算位置）", () => {
+    expect(moveTo(DEFAULT_LAYOUT, "chat", 0).order).toEqual(["chat", "rail", "map"]);
+    expect(moveTo(DEFAULT_LAYOUT, "rail", 2).order).toEqual(["map", "chat", "rail"]);
+  });
+  it("两个面板中间夹着的收起的面板；贴在窗口两边的收起的面板", () => {
+    const l = toggle(DEFAULT_LAYOUT, "map");
+    expect(hiddenBetween(l, "rail", "chat")).toEqual(["map"]);
+    expect(edgeHidden(l)).toEqual({ left: [], right: [] });
+    const r = toggle(toggle(DEFAULT_LAYOUT, "rail"), "chat");
+    expect(edgeHidden(r)).toEqual({ left: ["rail"], right: ["chat"] });
+  });
+  it("常用排列", () => {
+    expect(PRESETS.filter((p) => isPreset(DEFAULT_LAYOUT, p)).map((p) => p.label)).toEqual(["项目｜地图｜对话"]);
+    const chatOnly = applyPreset(DEFAULT_LAYOUT, PRESETS[3]!);
+    expect(visible(chatOnly)).toEqual(["chat"]);
+    expect(isPreset(chatOnly, PRESETS[3]!)).toBe(true);
+  });
+  it("动画的目标宽度：占剩下宽度的拿走其余的", () => {
+    expect(targetWidths(["rail", "map", "chat"], "map", (id) => (id === "rail" ? 264 : 420), 1440)).toEqual({ rail: 264, chat: 420, map: 1440 - 264 - 420 - 2 });
+    expect(targetWidths(["rail", "chat"], "chat", () => 264, 1000)).toEqual({ rail: 264, chat: 1000 - 264 - 1 });
   });
 });

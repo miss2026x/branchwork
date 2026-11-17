@@ -60,6 +60,8 @@ interface Props {
   /** 刚开始用：地图下面放一条说明 */
   hint?: boolean;
   onDismissHint?(): void;
+  /** 面板正在收起 / 打开（宽度在动画） */
+  resizing?: boolean;
 }
 
 const MIN = 0.3;
@@ -70,12 +72,13 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
+  const [focusTick, setFocusTick] = useState(0);
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   /** 点开了哪一站的菜单 */
   const [menuStopId, setMenuStopId] = useState<string | null>(null);
@@ -140,9 +143,38 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
   const selected = layout.lanes.find((l) => l.route.id === selectedRouteId);
   const focus = selected ? (selected.stops.at(-1) ?? { x: selected.from.x, y: selected.y }) : null;
   const focusKey = selected ? `${selected.route.id}:${selected.stops.length}` : "";
+  // 地图左边的面板收起 / 打开时，地图的左边缘在动：让里面的线路在屏幕上不动，只是露出或盖住边上那一块。
+  // 地图自己是在这次动画里刚打开的，就不管（它跟着面板一起展开），等动画完了再开始跟
+  const armed = useRef(!resizing);
+  useEffect(() => {
+    if (!resizing) armed.current = true;
+  }, [resizing]);
+  useEffect(() => {
+    const el = viewport.current;
+    if (!el) return;
+    let left = el.getBoundingClientRect().left;
+    const ro = new ResizeObserver(() => {
+      const now = el.getBoundingClientRect().left;
+      if (armed.current && now !== left && el.clientWidth > 0) setView((v) => ({ ...v, x: v.x + (left - now) }));
+      left = now;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     const el = viewport.current;
     if (!el || !focus) return;
+    // 地图刚从收起里打开、还没撑开时先不挪，等宽度够了再看最新一站在不在视野里
+    if (el.clientWidth < 240) {
+      const ro = new ResizeObserver(() => {
+        if (el.clientWidth < 240) return;
+        ro.disconnect();
+        setFocusTick((n) => n + 1);
+      });
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
     const r = el.getBoundingClientRect();
     setView((v) => {
       const sx = focus.x * v.k + v.x;
@@ -154,9 +186,9 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
       if (sy < 110) y += 150 - sy;
       return x === v.x && y === v.y ? v : { ...v, x, y };
     });
-    // 只在“选中的路或它的站数变了”时触发
+    // 只在“选中的路或它的站数变了”（或地图刚撑开）时触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusKey]);
+  }, [focusKey, focusTick]);
 
   // 跳到某一站：把它放到视野中间，圈一下
   const [ringed, setRinged] = useState<string | null>(null);

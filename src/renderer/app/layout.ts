@@ -116,3 +116,57 @@ export function setWidth(l: Layout, id: PaneId, value: number | null): Layout {
   const p = PANES[id];
   return { ...l, width: { ...l.width, [id]: value === null ? null : Math.round(Math.min(p.max, Math.max(p.min, value))) } };
 }
+
+/** 在整条顺序里挪（“布局”小窗里拖方块用，收起的方块也算位置） */
+export function moveTo(l: Layout, id: PaneId, index: number): Layout {
+  const rest = l.order.filter((p) => p !== id);
+  const at = Math.max(0, Math.min(index, rest.length));
+  return { ...l, order: [...rest.slice(0, at), id, ...rest.slice(at)] };
+}
+
+/** 两个看得见的面板中间夹着的、收起的面板（分隔处的胶囊里给它们一个“打开”按钮） */
+export function hiddenBetween(l: Layout, left: PaneId, right: PaneId): PaneId[] {
+  const a = l.order.indexOf(left);
+  const b = l.order.indexOf(right);
+  return l.order.slice(Math.min(a, b) + 1, Math.max(a, b)).filter((p) => l.hidden.includes(p));
+}
+
+/** 收起后贴在窗口最左、最右的面板（移到窗口边上才出现打开按钮） */
+export function edgeHidden(l: Layout): { left: PaneId[]; right: PaneId[] } {
+  const shown = visible(l);
+  if (shown.length === 0) return { left: [], right: [] };
+  const first = l.order.indexOf(shown[0]!);
+  const last = l.order.indexOf(shown[shown.length - 1]!);
+  return { left: l.order.slice(0, first), right: l.order.slice(last + 1) };
+}
+
+/** “布局”小窗里的常用排列 */
+export const PRESETS: { label: string; order: PaneId[]; hidden: PaneId[] }[] = [
+  { label: "项目｜地图｜对话", order: ["rail", "map", "chat"], hidden: [] },
+  { label: "地图｜对话", order: ["rail", "map", "chat"], hidden: ["rail"] },
+  { label: "对话｜地图", order: ["rail", "chat", "map"], hidden: ["rail"] },
+  { label: "只看对话", order: ["rail", "map", "chat"], hidden: ["rail", "map"] },
+];
+
+/** 现在是不是某个常用排列（看得见的面板和顺序一样就算） */
+export function isPreset(l: Layout, p: (typeof PRESETS)[number]): boolean {
+  const shown = visible(l);
+  const want = p.order.filter((x) => !p.hidden.includes(x));
+  return shown.length === want.length && shown.every((x, i) => x === want[i]);
+}
+
+export function applyPreset(l: Layout, p: (typeof PRESETS)[number]): Layout {
+  return { ...l, order: [...p.order], hidden: [...p.hidden] };
+}
+
+/**
+ * 收起 / 打开时各面板要动画到的宽度：不占剩下宽度的用自己的宽度，占剩下宽度的拿走其余的。
+ * total 是整个窗口内容区的宽度，每两个面板之间有 1px 的线
+ */
+export function targetWidths(shown: PaneId[], flex: PaneId | null, own: (id: PaneId) => number, total: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  let used = Math.max(0, shown.length - 1);
+  for (const id of shown) if (id !== flex) used += out[id] = own(id);
+  if (flex) out[flex] = Math.max(0, total - used);
+  return out;
+}

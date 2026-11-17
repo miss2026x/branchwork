@@ -2,7 +2,14 @@ import { useRef, useState } from "react";
 import { useFit } from "../ui/useFit";
 import type { Route } from "../../shared";
 import { useStore } from "../stores/store";
-import { IconChevron, IconMore, IconPlus, IconWarn, IconTerminal, IconPin } from "../ui/icons";
+import {
+  IconChevron,
+  IconMore,
+  IconPlus,
+  IconWarn,
+  IconTerminal,
+  IconPin,
+} from "../ui/icons";
 import { RouteMenu } from "./RouteMenu";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
@@ -13,12 +20,9 @@ import { ago } from "../ui/ago";
 export function ProjectRail({
   onDelete,
   compact = false,
-  hideHead = false,
 }: {
   onDelete(routeId: string): void;
   /** 窗口窄：收成一列图标，点项目图标展开成浮层 */ compact?: boolean;
-  /** 放在面板里时，“项目 +”那一行由面板顶上那一条代替 */
-  hideHead?: boolean;
 }) {
   const [floating, setFloating] = useState(false);
   const archiveRoute = useStore((s) => s.archiveRoute);
@@ -131,7 +135,6 @@ export function ProjectRail({
         <div className={css.floatBackdrop} onClick={() => setFloating(false)} />
       )}
       <aside className={compact ? `${css.rail} ${css.floating}` : css.rail}>
-        {!hideHead && (
         <div className={css.head}>
           <span>项目</span>
           <button
@@ -142,7 +145,6 @@ export function ProjectRail({
             <IconPlus />
           </button>
         </div>
-        )}
 
         <div className={css.list}>
           {projects.map((p) => {
@@ -155,46 +157,93 @@ export function ProjectRail({
             return (
               <section key={p.id} className={css.projectSection}>
                 <div className={css.projectHead}>
-                <button
-                  className={css.project}
-                  aria-expanded={open}
-                  onClick={() => {
-                    if (p.id === projectId)
-                      setClosed((c) => ({ ...c, [p.id]: open }));
-                    else selectProject(p.id);
-                  }}
-                >
-                  <IconChevron size={14} open={open} />
-                  <b className="ell">{p.name}</b>
-                  {!open && <small>{list.length} 路车</small>}
-                </button>
-                <button className={css.projectMore} aria-label={`${p.name} 的菜单`} aria-expanded={projectMenu === p.id} onClick={() => setProjectMenu(projectMenu === p.id ? null : p.id)}>
-                  <IconMore />
-                </button>
+                  <button
+                    className={css.project}
+                    aria-expanded={open}
+                    onClick={() => {
+                      if (p.id === projectId)
+                        setClosed((c) => ({ ...c, [p.id]: open }));
+                      else selectProject(p.id);
+                    }}
+                  >
+                    <IconChevron size={14} open={open} />
+                    <b className="ell">{p.name}</b>
+                    {!open && <small>{list.length} 路车</small>}
+                  </button>
+                  <button
+                    className={css.projectMore}
+                    aria-label={`${p.name} 的菜单`}
+                    aria-expanded={projectMenu === p.id}
+                    onClick={() =>
+                      setProjectMenu(projectMenu === p.id ? null : p.id)
+                    }
+                  >
+                    <IconMore />
+                  </button>
                 </div>
                 {projectMenu === p.id && (
                   <>
-                    <div className={css.backdrop} onClick={() => setProjectMenu(null)} />
-                    <div ref={projectMenuBox} className={`${css.menu} ${css.projectMenu}`} role="menu">
-                      <button role="menuitem" onClick={() => (setProjectMenu(null), selectProject(p.id), openNewRoute())}>
+                    <div
+                      className={css.backdrop}
+                      onClick={() => setProjectMenu(null)}
+                    />
+                    <div
+                      ref={projectMenuBox}
+                      className={`${css.menu} ${css.projectMenu}`}
+                      role="menu"
+                    >
+                      <button
+                        role="menuitem"
+                        onClick={() => (
+                          setProjectMenu(null),
+                          selectProject(p.id),
+                          openNewRoute()
+                        )}
+                      >
                         在此项目开新对话
                       </button>
-                      <button role="menuitem" onClick={() => (setProjectMenu(null), viewLog(p.id))}>
+                      <button
+                        role="menuitem"
+                        onClick={() => (setProjectMenu(null), viewLog(p.id))}
+                      >
                         同步记录
                       </button>
-                      <button role="menuitem" onClick={() => (setProjectMenu(null), openImport(p.id))}>
+                      <button
+                        role="menuitem"
+                        onClick={() => (setProjectMenu(null), openImport(p.id))}
+                      >
                         导入终端里的会话…
                       </button>
                       {archived.length > 0 && (
-                        <button role="menuitem" onClick={() => (setProjectMenu(null), setClosed((c) => ({ ...c, [p.id]: false })), setShowArchived((v) => ({ ...v, [p.id]: true })))}>
+                        <button
+                          role="menuitem"
+                          onClick={() => (
+                            setProjectMenu(null),
+                            setClosed((c) => ({ ...c, [p.id]: false })),
+                            setShowArchived((v) => ({ ...v, [p.id]: true }))
+                          )}
+                        >
                           已归档 · {archived.length}
                         </button>
                       )}
-                      <button role="menuitem" onClick={() => (setProjectMenu(null), void openLocal(p.id))}>
+                      <button
+                        role="menuitem"
+                        onClick={() => (
+                          setProjectMenu(null),
+                          void openLocal(p.id)
+                        )}
+                      >
                         在文件夹中打开 Local
                       </button>
                       <hr />
-                      <button role="menuitem" className={css.danger} onClick={() => (setProjectMenu(null), openRemoveProject(p.id))}>
+                      <button
+                        role="menuitem"
+                        className={css.danger}
+                        onClick={() => (
+                          setProjectMenu(null),
+                          openRemoveProject(p.id)
+                        )}
+                      >
                         从 Branchwork 移除…
                       </button>
                     </div>
@@ -216,7 +265,14 @@ export function ProjectRail({
                         className={css.route}
                         onClick={() => selectRoute(r.id)}
                       >
-                        {depth > 0 && <i className={css.branch} data-express={!!r.express} style={{ marginLeft: (depth - 1) * 14 }} aria-hidden />}
+                        {depth > 0 && (
+                          <i
+                            className={css.branch}
+                            data-express={!!r.express}
+                            style={{ marginLeft: (depth - 1) * 14 }}
+                            aria-hidden
+                          />
+                        )}
                         <Plate route={r} />
                         <span className={`ell ${css.label}`}>{r.name}</span>
                         {r.pinned && (
@@ -224,17 +280,36 @@ export function ProjectRail({
                             <IconPin size={12} />
                           </span>
                         )}
-                        {Object.values(terminals).some((t) => t.routeId === r.id && t.status === "running") && (
+                        {Object.values(terminals).some(
+                          (t) => t.routeId === r.id && t.status === "running",
+                        ) && (
                           <span className={css.term} title="有后台终端在跑">
                             <IconTerminal size={13} />
                           </span>
                         )}
-                        <RouteBadge route={r} syncing={pendingAsk[r.id] !== undefined} />
+                        <RouteBadge
+                          route={r}
+                          syncing={pendingAsk[r.id] !== undefined}
+                        />
                         {(() => {
-                          const mine = (queue[p.id] ?? []).filter((q) => q.routeId === r.id);
+                          const mine = (queue[p.id] ?? []).filter(
+                            (q) => q.routeId === r.id,
+                          );
                           if (mine.length === 0) return null;
-                          const boardable = (r.status === "idle" || r.status === "interrupted") && mine.some((q) => q.mode === "manual");
-                          return boardable ? <em className={css.board}>可登车</em> : <b className={css.count} title={`候车 ${mine.length} 条`}>{mine.length}</b>;
+                          const boardable =
+                            (r.status === "idle" ||
+                              r.status === "interrupted") &&
+                            mine.some((q) => q.mode === "manual");
+                          return boardable ? (
+                            <em className={css.board}>可登车</em>
+                          ) : (
+                            <b
+                              className={css.count}
+                              title={`候车 ${mine.length} 条`}
+                            >
+                              {mine.length}
+                            </b>
+                          );
                         })()}
                       </button>
                       <button
@@ -243,7 +318,10 @@ export function ProjectRail({
                         aria-expanded={menuFor === r.id}
                         onClick={(e) => {
                           const box = e.currentTarget.getBoundingClientRect();
-                          setMenuAt({ top: box.bottom + 4, left: Math.max(8, box.right - 240) });
+                          setMenuAt({
+                            top: box.bottom + 4,
+                            left: Math.max(8, box.right - 240),
+                          });
                           setMenuFor(menuFor === r.id ? null : r.id);
                         }}
                       >
@@ -252,20 +330,48 @@ export function ProjectRail({
                       {menuFor === r.id && (
                         <RouteMenu
                           route={r}
-                          stopCount={Object.values(stops).filter((x) => x.routeId === r.id && x.kind !== "summary").length}
-                          syncNote={r.status === "conflict" ? "有改动没法自动合进 Local，等你处理" : r.status === "interrupted" ? "上一站没答完，改动留在工作区，没进 Local" : r.status === "answering" || r.status === "awaiting_permission" ? "正在回答，答完后改动同步进 Local" : "自己的工作区，改动都已进 Local"}
-                          syncTone={r.status === "conflict" || r.status === "interrupted" ? "warn" : "ok"}
+                          stopCount={
+                            Object.values(stops).filter(
+                              (x) => x.routeId === r.id && x.kind !== "summary",
+                            ).length
+                          }
+                          syncNote={
+                            r.status === "conflict"
+                              ? "有改动没法自动合进 Local，等你处理"
+                              : r.status === "interrupted"
+                                ? "上一站没答完，改动留在工作区，没进 Local"
+                                : r.status === "answering" ||
+                                    r.status === "awaiting_permission"
+                                  ? "正在回答，答完后改动同步进 Local"
+                                  : "自己的工作区，改动都已进 Local"
+                          }
+                          syncTone={
+                            r.status === "conflict" ||
+                            r.status === "interrupted"
+                              ? "warn"
+                              : "ok"
+                          }
                           onRename={(name) => void renameRoute(r.id, name)}
                           onColor={(color) => void setRouteColor(r.id, color)}
                           onArchive={() => requestArchive(r.id)}
                           onCompressAll={(() => {
-                            const last = Object.values(stops).filter((x) => x.routeId === r.id).sort((x, y) => y.seq - x.seq)[0];
-                            return last && last.status !== "answering" && last.lastMessageId ? () => openCompress(last.id) : undefined;
+                            const last = Object.values(stops)
+                              .filter((x) => x.routeId === r.id)
+                              .sort((x, y) => y.seq - x.seq)[0];
+                            return last &&
+                              last.status !== "answering" &&
+                              last.lastMessageId
+                              ? () => openCompress(last.id)
+                              : undefined;
                           })()}
                           onExport={() => void exportRoute(r.id)}
                           onDelete={() => onDelete(r.id)}
-                          onPin={(pinned) => void setRouteFlags(r.id, { pinned })}
-                          onFold={(folded) => void setRouteFlags(r.id, { folded })}
+                          onPin={(pinned) =>
+                            void setRouteFlags(r.id, { pinned })
+                          }
+                          onFold={(folded) =>
+                            void setRouteFlags(r.id, { folded })
+                          }
                           onClose={() => setMenuFor(null)}
                           at={menuAt}
                         />
@@ -289,26 +395,60 @@ export function ProjectRail({
                     </button>
                     {showArchived[p.id] &&
                       archived.map((r) => {
-                        const count = Object.values(stops).filter((x) => x.routeId === r.id && x.kind !== "summary").length;
-                        const dirty = Object.values(stops).some((x) => x.routeId === r.id && (x.syncState === "unsynced" || x.syncState === "conflict")) || lastSync[r.id]?.status === "conflict";
+                        const count = Object.values(stops).filter(
+                          (x) => x.routeId === r.id && x.kind !== "summary",
+                        ).length;
+                        const dirty =
+                          Object.values(stops).some(
+                            (x) =>
+                              x.routeId === r.id &&
+                              (x.syncState === "unsynced" ||
+                                x.syncState === "conflict"),
+                          ) || lastSync[r.id]?.status === "conflict";
                         const on = archivedOpen === r.id;
                         return (
-                          <div key={r.id} className={css.archived} data-open={on}>
-                            <button className={css.archivedHead} aria-expanded={on} onClick={() => setArchivedOpen(on ? null : r.id)}>
+                          <div
+                            key={r.id}
+                            className={css.archived}
+                            data-open={on}
+                          >
+                            <button
+                              className={css.archivedHead}
+                              aria-expanded={on}
+                              onClick={() => setArchivedOpen(on ? null : r.id)}
+                            >
                               <Plate route={r} />
                               <span className="ell">{r.name}</span>
-                              {dirty && !on ? <i className={css.half} title="还有改动没进 Local" /> : <small>{r.archivedAt ? ago(r.archivedAt) : ""}</small>}
+                              {dirty && !on ? (
+                                <i
+                                  className={css.half}
+                                  title="还有改动没进 Local"
+                                />
+                              ) : (
+                                <small>
+                                  {r.archivedAt ? ago(r.archivedAt) : ""}
+                                </small>
+                              )}
                             </button>
                             {on && (
                               <>
                                 <p>
-                                  {count} 站 · {dirty ? "还有改动留在工作区，没进 Local" : "改动都已进 Local"}
+                                  {count} 站 ·{" "}
+                                  {dirty
+                                    ? "还有改动留在工作区，没进 Local"
+                                    : "改动都已进 Local"}
                                 </p>
                                 <div>
-                                  <button className={css.restore} onClick={() => void unarchiveRoute(r.id)}>
+                                  <button
+                                    className={css.restore}
+                                    onClick={() => void unarchiveRoute(r.id)}
+                                  >
                                     恢复
                                   </button>
-                                  <button className={css.danger} onClick={() => onDelete(r.id)}>
+                                  <button
+                                    className={css.danger}
+                                    onClick={() => onDelete(r.id)}
+                                  >
                                     删除
                                   </button>
                                 </div>
@@ -336,14 +476,14 @@ export function ProjectRail({
   );
 }
 
-
 /** 把路排成树：分叉出来的路跟在它的父路后面，记下深了几层 */
 function asTree(list: Route[]): { route: Route; depth: number }[] {
   const ids = new Set(list.map((r) => r.id));
   const out: { route: Route; depth: number }[] = [];
   const walk = (parentId: string | null, depth: number) => {
     for (const r of list) {
-      const parent = r.parentRouteId && ids.has(r.parentRouteId) ? r.parentRouteId : null;
+      const parent =
+        r.parentRouteId && ids.has(r.parentRouteId) ? r.parentRouteId : null;
       if (parent !== parentId) continue;
       if (depth === 0 && pass !== !!r.pinned) continue;
       out.push({ route: r, depth });
@@ -360,7 +500,15 @@ function asTree(list: Route[]): { route: Route; depth: number }[] {
 
 function RouteBadge({ route, syncing }: { route: Route; syncing?: boolean }) {
   // 站前同步中：还没开始回答，正在从 Local 拿更新
-  if (syncing) return <i className={css.syncing} title="同步中" role="img" aria-label="同步中" />;
+  if (syncing)
+    return (
+      <i
+        className={css.syncing}
+        title="同步中"
+        role="img"
+        aria-label="同步中"
+      />
+    );
   if (route.status === "answering")
     return (
       <i
@@ -371,7 +519,15 @@ function RouteBadge({ route, syncing }: { route: Route; syncing?: boolean }) {
     );
   if (route.status === "awaiting_permission")
     return <em className={css.amber}>等你批准</em>;
-  if (route.status === "interrupted") return <i className={css.halfDark} title="没答完" role="img" aria-label="没答完" />;
+  if (route.status === "interrupted")
+    return (
+      <i
+        className={css.halfDark}
+        title="没答完"
+        role="img"
+        aria-label="没答完"
+      />
+    );
   if (route.status === "conflict")
     return (
       <em className={css.red}>

@@ -23,37 +23,35 @@ import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
-import { BusMark, IconChat, IconFolder, IconPlus, IconSearch, IconSliders } from "../ui/icons";
+import {
+  BusMark,
+  IconChat,
+  IconFolder,
+  IconSearch,
+  IconSliders,
+} from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { modeInfo } from "../ui/claude-options";
 import css from "./App.module.css";
 import { useTier } from "./use-tier";
-import { PANES, dividerTarget, flexPane, loadLayout, move, sameSlot, saveLayout, setWidth, slotAt, toggle, visible, type Layout, type PaneId } from "./layout";
-import { PaneDragOverlay, PaneHeader, PaneToggles, type DragHandlers } from "./Panes";
+import {
+  PANES,
+  dividerTarget,
+  edgeHidden,
+  flexPane,
+  hiddenBetween,
+  loadLayout,
+  saveLayout,
+  setWidth,
+  targetWidths,
+  toggle,
+  visible,
+  type Layout,
+  type PaneId,
+} from "./layout";
+import { EdgeOpener, LayoutButton, PaneDivider } from "./Panes";
 
 const EMPTY_QUEUE: QueueItem[] = [];
-
-/** 两栏之间的分隔条：拖动改宽度，双击恢复默认 */
-function Divider({ label, start, onDrag, onReset }: { label: string; start(): number; onDrag(dx: number, start: number): void; onReset(): void }) {
-  const from = useRef<{ x: number; start: number } | null>(null);
-  return (
-    <div
-      className={css.divider}
-      role="separator"
-      aria-orientation="vertical"
-      aria-label={label}
-      title={`${label}；双击恢复默认`}
-      onPointerDown={(e) => {
-        from.current = { x: e.clientX, start: start() };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }}
-      onPointerMove={(e) => from.current && onDrag(e.clientX - from.current.x, from.current.start)}
-      onPointerUp={() => (from.current = null)}
-      onPointerCancel={() => (from.current = null)}
-      onDoubleClick={onReset}
-    />
-  );
-}
 
 export function App() {
   const init = useStore((s) => s.init);
@@ -116,7 +114,13 @@ export function App() {
   const viewChanges = useStore((s) => s.viewChanges);
   const setRouteModel = useStore((s) => s.setRouteModel);
   const renameStop = useStore((s) => s.renameStop);
-  const routeTerminals = useMemo(() => Object.values(terminals).filter((t) => t.routeId === routeId).sort((a, b) => a.startedAt - b.startedAt), [terminals, routeId]);
+  const routeTerminals = useMemo(
+    () =>
+      Object.values(terminals)
+        .filter((t) => t.routeId === routeId)
+        .sort((a, b) => a.startedAt - b.startedAt),
+    [terminals, routeId],
+  );
   const viewed = terminalView ? terminals[terminalView.id] : undefined;
   const dialog = useStore((s) => s.dialog);
   const pickDirectory = useStore((s) => s.pickDirectory);
@@ -138,7 +142,10 @@ export function App() {
   const viewing = useStore((s) => s.viewing);
   const viewStop = useStore((s) => s.viewStop);
   const truncate = useStore((s) => s.truncate);
-  const [truncating, setTruncating] = useState<{ stop: Stop; requeue: boolean } | null>(null);
+  const [truncating, setTruncating] = useState<{
+    stop: Stop;
+    requeue: boolean;
+  } | null>(null);
   /** 正从候车区拖出来的问题 */
   const [dragging, setDragging] = useState<QueueItem | null>(null);
   const [firstQuestion, setFirstQuestion] = useState("");
@@ -151,8 +158,13 @@ export function App() {
   useEffect(() => {
     if (tier === "narrow") setDrawer(false);
   }, [tier]);
-  const searchData = useMemo(() => ({ projects, routes: allRoutes, stops: allStops, queue: allQueues }), [projects, allRoutes, allStops, allQueues]);
-  const queue = useStore((s) => (projectId ? s.queue[projectId] : undefined)) ?? EMPTY_QUEUE;
+  const searchData = useMemo(
+    () => ({ projects, routes: allRoutes, stops: allStops, queue: allQueues }),
+    [projects, allRoutes, allStops, allQueues],
+  );
+  const queue =
+    useStore((s) => (projectId ? s.queue[projectId] : undefined)) ??
+    EMPTY_QUEUE;
   const queueAdd = useStore((s) => s.queueAdd);
   const queueAssign = useStore((s) => s.queueAssign);
   const queueRemove = useStore((s) => s.queueRemove);
@@ -177,16 +189,34 @@ export function App() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const paneEls = useRef<Partial<Record<PaneId, HTMLElement | null>>>({});
   /** 面板现在的宽度（拖分隔条时从这里开始算） */
-  const paneWidth = (id: PaneId) => paneEls.current[id]?.getBoundingClientRect().width ?? PANES[id].base;
-  const paneWidthStyle = (id: PaneId) => layout.width[id] ?? (id === "chat" ? (tier === "wide" ? 420 : 380) : PANES[id].base);
-  const resizePane = (left: PaneId, right: PaneId, dx: number, start: number) => {
+  const paneWidth = (id: PaneId) =>
+    paneEls.current[id]?.getBoundingClientRect().width ?? PANES[id].base;
+  const resizePane = (
+    left: PaneId,
+    right: PaneId,
+    dx: number,
+    start: number,
+  ) => {
     const { pane, sign } = dividerTarget(left, right, flex);
     updateLayout((l) => setWidth(l, pane, start + sign * dx));
   };
-  /** 正在拖哪个面板换位置 */
-  const [paneDrag, setPaneDrag] = useState<{ id: PaneId; x: number; y: number; slot: number | null; lineX: number | null; hint: string | null } | null>(null);
-  const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
-  const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + ordinal(stop, allStops);
+  /** “布局”小窗开着没有 */
+  const [layoutOpen, setLayoutOpen] = useState(false);
+  /** 收起 / 打开时的宽度动画：这段时间里每个面板用固定的像素宽度，从旧的滑到新的（320ms） */
+  const [anim, setAnim] = useState<{
+    ids: PaneId[];
+    widths: Record<string, number>;
+    full: Record<string, number>;
+    run: boolean;
+  } | null>(null);
+  const animTimer = useRef<number>(undefined);
+  const [deleting, setDeleting] = useState<{
+    routeId: string;
+    unsynced: SyncFile[] | null;
+  } | null>(null);
+  const stopNumber = (stop: Stop) =>
+    stopOffset(allRoutes[stop.routeId], allRoutes, allStops) +
+    ordinal(stop, allStops);
 
   useEffect(() => {
     void init();
@@ -194,19 +224,30 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ctrl+Alt+1/2/3（Mac 上 ⌘⌥）：显示 / 收起项目列表、地图、对话
-      if ((e.ctrlKey || e.metaKey) && e.altKey && !e.shiftKey && /^Digit[123]$/.test(e.code)) {
-        e.preventDefault();
-        const id = (["rail", "map", "chat"] as const)[Number(e.code.slice(5)) - 1]!;
-        updateLayout((l) => toggle(l, id));
-        return;
+      // Ctrl+Alt+L（Mac 上 ⌘⌥L）：打开“布局”小窗；Ctrl+Alt+1/2/3：收起 / 打开项目列表、地图、对话
+      if ((e.ctrlKey || e.metaKey) && e.altKey && !e.shiftKey) {
+        if (e.code === "KeyL") {
+          e.preventDefault();
+          setLayoutOpen((v) => !v);
+          return;
+        }
+        if (/^Digit[123]$/.test(e.code)) {
+          e.preventDefault();
+          togglePaneRef.current(
+            (["rail", "map", "chat"] as const)[Number(e.code.slice(5)) - 1]!,
+          );
+          return;
+        }
       }
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = e.key.toLowerCase();
       if (key === "k") {
         e.preventDefault();
         setPalette((v) => !v);
-      } else if (key === "n" && !document.querySelector('[aria-modal="true"]')) {
+      } else if (
+        key === "n" &&
+        !document.querySelector('[aria-modal="true"]')
+      ) {
         e.preventDefault();
         openNewRoute();
       }
@@ -227,101 +268,213 @@ export function App() {
   const isMac = /Mac/.test(navigator.platform);
 
   /** 冲突的文件在 Local 里上一次是谁改的 */
-  const whoChanged = (by: { routeId: string | null; stopId: string | null }) => {
+  const whoChanged = (by: {
+    routeId: string | null;
+    stopId: string | null;
+  }) => {
     const r = by.routeId ? allRoutes[by.routeId] : undefined;
     const s = by.stopId ? allStops[by.stopId] : undefined;
     if (!by.routeId) return "Local 里这一处是你自己直接改的";
     if (!r) return "Local 里这一处是一条已经删掉的线路改的";
     return `Local 里这一处刚被 ${r.express ? `快${r.express}` : `${r.number}路`}${s ? ` 第 ${stopNumber(s)} 站` : ""}改过`;
   };
-  const projectStops = Object.values(allStops).filter((s) => routes.some((r) => r.id === s.routeId));
+  const projectStops = Object.values(allStops).filter((s) =>
+    routes.some((r) => r.id === s.routeId),
+  );
   /** 这个项目里在建的快线：正在提炼的，和摘要好了还没开出的。编号接着已有的快线往下排 */
-  const expressBase = Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === projectId).map((r) => r.express ?? 0));
+  const expressBase = Math.max(
+    0,
+    ...Object.values(allRoutes)
+      .filter((r) => r.projectId === projectId)
+      .map((r) => r.express ?? 0),
+  );
   const building: Building[] = Object.entries(distills)
-    .filter(([stopId, d]) => allStops[stopId] && routes.some((r) => r.id === d.routeId) && (d.status === "running" || !!d.summary))
+    .filter(
+      ([stopId, d]) =>
+        allStops[stopId] &&
+        routes.some((r) => r.id === d.routeId) &&
+        (d.status === "running" || !!d.summary),
+    )
     .sort((a, b) => a[1].startedAt - b[1].startedAt)
     .map(([stopId, d], i) => {
       const source = allRoutes[d.routeId]!;
-      return { stopId, express: expressBase + 1 + i, name: d.name.trim() || `${source.name} · 续`, ready: d.status !== "running", source, upto: stopNumber(allStops[stopId]!), startedAt: d.startedAt, direct: d.direct };
+      return {
+        stopId,
+        express: expressBase + 1 + i,
+        name: d.name.trim() || `${source.name} · 续`,
+        ready: d.status !== "running",
+        source,
+        upto: stopNumber(allStops[stopId]!),
+        startedAt: d.startedAt,
+        direct: d.direct,
+      };
     });
 
   // 实际摆出来的面板：还没有项目时地图（欢迎页）一定在；没选路时对话只在没有地图时占个位；窄窗口里对话改成从右边滑出
-  const shown = projects.length === 0 && !visible(layout).includes("map") ? layout.order.filter((p) => p === "map" || visible(layout).includes(p)) : visible(layout);
-  const chatAsDrawer = tier === "narrow" && shown.includes("map");
-  const flowPanes = shown.filter((p) => !(p === "chat" && (chatAsDrawer || (!route && shown.includes("map")))));
-  const flex = flexPane(flowPanes);
-  const dragHandlers: DragHandlers = {
-    onDragStart: (id, x, y) => setPaneDrag({ id, x, y, slot: null, lineX: null, hint: null }),
-    onDragMove: (x, y) =>
-      setPaneDrag((d) => {
-        if (!d) return d;
-        const ids = visible(layout);
-        const rects = ids.map((p) => paneEls.current[p]?.getBoundingClientRect() ?? { left: 0, right: 0 });
-        const slot = slotAt(x, rects);
-        if (sameSlot(layout, d.id, slot)) return { ...d, x, y, slot: null, lineX: null, hint: null };
-        const lineX = slot === 0 ? rects[0]!.left + 2 : slot >= rects.length ? rects[rects.length - 1]!.right - 2 : rects[slot]!.left;
-        const before = ids[slot - 1];
-        const after = ids[slot];
-        const hint = before && after ? `放到${PANES[before].label}和${PANES[after].label}之间` : before ? "放到最右边" : "放到最左边";
-        return { ...d, x, y, slot, lineX, hint };
-      }),
-    onDragEnd: (commit) => {
-      setPaneDrag((d) => {
-        if (d && commit && d.slot !== null) updateLayout((l) => move(l, d.id, d.slot!));
-        return null;
-      });
-    },
+  const flowOf = (l: Layout) => {
+    const shown =
+      projects.length === 0 && !visible(l).includes("map")
+        ? l.order.filter((p) => p === "map" || visible(l).includes(p))
+        : visible(l);
+    const asDrawer = tier === "narrow" && shown.includes("map");
+    return {
+      asDrawer,
+      flow: shown.filter(
+        (p) =>
+          !(p === "chat" && (asDrawer || (!route && shown.includes("map")))),
+      ),
+    };
   };
+  const { asDrawer: chatAsDrawer, flow: flowPanes } = flowOf(layout);
+  const flex = flexPane(flowPanes);
+  const compactRail = (p: PaneId | undefined) =>
+    p === "rail" && tier !== "wide";
+  /** 不占剩下宽度时，这个面板在某个布局里该多宽 */
+  const ownWidth = (l: Layout, id: PaneId) =>
+    compactRail(id)
+      ? 56
+      : (l.width[id] ??
+        (id === "chat" ? (tier === "wide" ? 420 : 380) : PANES[id].base));
+
+  /**
+   * 换布局，收起 / 打开的面板宽度动起来（设计稿 9-7：两边的往两边靠，中间的被两边挤）。
+   * 先量现在每个面板多宽，算出新布局里每个面板该多宽，320ms 里从旧的滑到新的；窄窗口、系统要求减少动效时直接换
+   */
+  const animateTo = (next: Layout) => {
+    const body = bodyRef.current;
+    const reduce = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const { flow: nextFlow } = flowOf(next);
+    if (!body || reduce || tier === "narrow" || overview || anim) {
+      updateLayout(() => next);
+      return;
+    }
+    const from: Record<string, number> = {};
+    for (const id of flowPanes) from[id] = paneWidth(id);
+    const to = targetWidths(
+      nextFlow,
+      flexPane(nextFlow),
+      (id) => ownWidth(next, id),
+      body.clientWidth,
+    );
+    // 收起的面板也留在原来的位置，宽度滑到 0
+    const ids = next.order.filter(
+      (p) => nextFlow.includes(p) || flowPanes.includes(p),
+    );
+    const start = Object.fromEntries(ids.map((p) => [p, from[p] ?? 0]));
+    const end = Object.fromEntries(ids.map((p) => [p, to[p] ?? 0]));
+    // 动画里每个面板的内容按它“打开时”的宽度排，面板只是在外面收窄 / 放宽，内容不会被挤
+    const full = Object.fromEntries(
+      ids.map((p) => [p, Math.max(start[p]!, end[p]!)]),
+    );
+    updateLayout(() => next);
+    setAnim({ ids, widths: start, full, run: false });
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setAnim({ ids, widths: end, full, run: true }),
+      ),
+    );
+    window.clearTimeout(animTimer.current);
+    animTimer.current = window.setTimeout(() => setAnim(null), 340);
+  };
+  const togglePane = (id: PaneId) => animateTo(toggle(layout, id));
+  const togglePaneRef = useRef(togglePane);
+  togglePaneRef.current = togglePane;
+  /** 现在每个面板的宽度（“布局”小窗里方块按这个比例画） */
+  const liveWidths = Object.fromEntries(
+    flowPanes.map((p) => [
+      p,
+      paneEls.current[p]?.getBoundingClientRect().width ?? ownWidth(layout, p),
+    ]),
+  ) as Partial<Record<PaneId, number>>;
+  const edges = edgeHidden(layout);
 
   const waitingArea = (floating: boolean) => (
     <WaitingArea
-                buttonOnlyWhenOpen={floating}
-                items={Object.values(allQueues).flat()}
-                routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
-                project={{ id: projectId!, name: projects.find((p) => p.id === projectId)?.name ?? "" }}
-                projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
-                selectedRoute={route ?? undefined}
-                onAdd={(text) => projectId && void queueAdd(projectId, text)}
-                onAssign={(itemId, toRoute, mode) => void queueAssign(itemId, toRoute, mode)}
-                onRemove={(itemId) => void queueRemove(itemId)}
-                onBoard={(itemId) => void queueBoard(itemId)}
-                onStartNew={(itemId) => void queueStartNew(itemId)}
-                openSignal={waitingSignal}
-                onDrag={setDragging}
-                building={building}
-                onOpenBuilding={(stopId) => openCompress(stopId)}
-                onCancelBuilding={(stopId) => dropDistill(stopId)}
-              />
+      buttonOnlyWhenOpen={floating}
+      items={Object.values(allQueues).flat()}
+      routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
+      project={{
+        id: projectId!,
+        name: projects.find((p) => p.id === projectId)?.name ?? "",
+      }}
+      projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
+      selectedRoute={route ?? undefined}
+      onAdd={(text) => projectId && void queueAdd(projectId, text)}
+      onAssign={(itemId, toRoute, mode) =>
+        void queueAssign(itemId, toRoute, mode)
+      }
+      onRemove={(itemId) => void queueRemove(itemId)}
+      onBoard={(itemId) => void queueBoard(itemId)}
+      onStartNew={(itemId) => void queueStartNew(itemId)}
+      openSignal={waitingSignal}
+      onDrag={setDragging}
+      building={building}
+      onOpenBuilding={(stopId) => openCompress(stopId)}
+      onCancelBuilding={(stopId) => dropDistill(stopId)}
+    />
   );
   const noticesEl = (
     <Notices
-            notices={notices}
-            routes={allRoutes}
-            stops={allStops}
-            projects={projects}
-            currentProjectId={projectId}
-            stopNumber={stopNumber}
-            onDismiss={dismissNotice}
-            onViewSummary={openCompress}
-            onGoToRoute={goToRoute}
-            onContinue={(id) => {
-              goToRoute(id);
-              void ask(id, "接着上一站没做完的地方继续，把它做完。");
-            }}
-            onResync={(id) => void resync(id)}
-            onViewChanges={viewChanges}
-            onJump={goToStop}
-            onStop={stopRoute}
-            onBoard={(itemId) => void queueBoard(itemId)}
-            onEditFirst={(itemId, id, text) => {
-              setDraft(id, text);
-              void queueRemove(itemId);
-              goToRoute(id);
-            }}
-          />
+      notices={notices}
+      routes={allRoutes}
+      stops={allStops}
+      projects={projects}
+      currentProjectId={projectId}
+      stopNumber={stopNumber}
+      onDismiss={dismissNotice}
+      onViewSummary={openCompress}
+      onGoToRoute={goToRoute}
+      onContinue={(id) => {
+        goToRoute(id);
+        void ask(id, "接着上一站没做完的地方继续，把它做完。");
+      }}
+      onResync={(id) => void resync(id)}
+      onViewChanges={viewChanges}
+      onJump={goToStop}
+      onStop={stopRoute}
+      onBoard={(itemId) => void queueBoard(itemId)}
+      onEditFirst={(itemId, id, text) => {
+        setDraft(id, text);
+        void queueRemove(itemId);
+        goToRoute(id);
+      }}
+    />
   );
   const chatEl = route ? (
-    <ChatPanel key={route!.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />
+    <ChatPanel
+      key={route!.id}
+      whoChanged={whoChanged}
+      viewing={viewing ? allStops[viewing] : undefined}
+      onBackToLatest={() => viewStop(null)}
+      onModel={(model, effort) => void setRouteModel(route.id, model, effort)}
+      claudeOptions={allOptions[route.projectId]}
+      terminals={routeTerminals}
+      onOpenTerminal={viewTerminal}
+      onStopTerminal={(id) => void stopTerminal(id)}
+      onViewChanges={() => viewChanges(route.id)}
+      onDiscard={() => void discardChanges(route.id)}
+      focus={focus}
+      onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined}
+      route={route}
+      stops={stops}
+      offset={stopOffset(route, allRoutes, allStops)}
+      parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined}
+      onGoToRoute={selectRoute}
+      permissionMode={route.permissionMode}
+      onPermissionMode={(mode) => void setRouteMode(route.id, mode)}
+      waiting={queue.filter((q) => q.routeId === route.id)}
+      onOpenWaiting={() => setWaitingSignal((n) => n + 1)}
+      onQueue={(text, mode) =>
+        void queueAdd(
+          route.projectId,
+          text,
+          mode === "unassigned" ? null : route.id,
+          mode,
+        )
+      }
+    />
   ) : null;
 
   return (
@@ -332,7 +485,11 @@ export function App() {
           <b>Branchwork</b>
         </div>
         <nav className={css.crumbs} aria-label="位置">
-          <button className={css.crumbLink} aria-current={overview ? "page" : undefined} onClick={() => setOverview(true)}>
+          <button
+            className={css.crumbLink}
+            aria-current={overview ? "page" : undefined}
+            onClick={() => setOverview(true)}
+          >
             全部项目
           </button>
           {project && (
@@ -349,19 +506,53 @@ export function App() {
             </>
           )}
         </nav>
-        <button className={css.search} data-compact={tier === "narrow"} onClick={() => setPalette(true)} aria-label="搜索" title={`搜索（${isMac ? "⌘" : "Ctrl+"}K）`}>
+        <button
+          className={css.search}
+          data-compact={tier === "narrow"}
+          onClick={() => setPalette(true)}
+          aria-label="搜索"
+          title={`搜索（${isMac ? "⌘" : "Ctrl+"}K）`}
+        >
           <IconSearch size={16} />
           <span>搜索提问、候车区、命令</span>
           <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
         </button>
-        {tier !== "narrow" && <PaneToggles layout={layout} onToggle={(id) => updateLayout((l) => toggle(l, id))} />}
-        <button className={css.gear} aria-label="设置" aria-expanded={settings} onClick={() => setSettings(!settings)}>
+        {tier !== "narrow" && (
+          <LayoutButton
+            layout={layout}
+            widths={liveWidths}
+            open={layoutOpen}
+            onOpen={setLayoutOpen}
+            onChange={(next, animate) =>
+              animate ? animateTo(next) : updateLayout(() => next)
+            }
+            onToggle={togglePane}
+          />
+        )}
+        <button
+          className={css.gear}
+          aria-label="设置"
+          aria-expanded={settings}
+          onClick={() => setSettings(!settings)}
+        >
           <IconSliders size={18} />
         </button>
       </header>
-      {settings && <Settings load={environment} onClose={() => setSettings(false)} />}
+      {settings && (
+        <Settings load={environment} onClose={() => setSettings(false)} />
+      )}
 
-      <div ref={bodyRef} className={css.body} data-tier={tier} data-overview={overview} style={layout.width.rail ? ({ "--rail-w": `${layout.width.rail}px` } as React.CSSProperties) : undefined}>
+      <div
+        ref={bodyRef}
+        className={css.body}
+        data-tier={tier}
+        data-overview={overview}
+        style={
+          layout.width.rail
+            ? ({ "--rail-w": `${layout.width.rail}px` } as React.CSSProperties)
+            : undefined
+        }
+      >
         {overview && (
           <Overview
             projects={projects}
@@ -371,7 +562,11 @@ export function App() {
             currentProjectId={projectId}
             onOpenProject={(id) => (selectProject(id), setOverview(false))}
             onOpenRoute={goToRoute}
-            onNewRoute={(id) => (selectProject(id), setOverview(false), openNewRoute())}
+            onNewRoute={(id) => (
+              selectProject(id),
+              setOverview(false),
+              openNewRoute()
+            )}
             onAddProject={() => void openAddProject()}
           />
         )}
@@ -382,158 +577,283 @@ export function App() {
             queue={allQueues}
             currentProjectId={projectId}
             onAdd={(pid, text) => void queueAdd(pid, text)}
-            onAssign={(id, routeId, mode) => void queueAssign(id, routeId, mode)}
+            onAssign={(id, routeId, mode) =>
+              void queueAssign(id, routeId, mode)
+            }
             onBoard={(id) => void queueBoard(id)}
             onStartNew={(id) => void queueStartNew(id)}
             onRemove={(id) => void queueRemove(id)}
           />
         )}
-        {flowPanes.map((id, i) => {
-          const left = flowPanes[i - 1];
-          const compactRail = (p: PaneId | undefined) => p === "rail" && tier !== "wide";
+        {(anim ? anim.ids : flowPanes).map((id, i, list) => {
+          const left = list[i - 1];
+          const hiddenNow = !flowPanes.includes(id);
           return (
             <Fragment key={id}>
-              {left && !overview && (compactRail(left) || compactRail(id) ? null : <Divider label={`拖动调整${PANES[dividerTarget(left, id, flex).pane].label}的宽度`} onDrag={(dx, start) => resizePane(left, id, dx, start)} start={() => paneWidth(dividerTarget(left, id, flex).pane)} onReset={() => updateLayout((l) => setWidth(l, dividerTarget(left, id, flex).pane, null))} />)}
+              {left && !overview && (
+                <PaneDivider
+                  left={left}
+                  right={id}
+                  between={hiddenBetween(layout, left, id)}
+                  layout={layout}
+                  resizable={!anim && !compactRail(left) && !compactRail(id)}
+                  start={() => paneWidth(dividerTarget(left, id, flex).pane)}
+                  onDrag={(dx, start) => resizePane(left, id, dx, start)}
+                  onReset={() =>
+                    updateLayout((l) =>
+                      setWidth(l, dividerTarget(left, id, flex).pane, null),
+                    )
+                  }
+                  onHide={togglePane}
+                  onShow={togglePane}
+                />
+              )}
               <section
                 ref={(el) => void (paneEls.current[id] = el)}
                 className={css.pane}
                 data-pane={id}
                 data-first={i === 0 || undefined}
-                data-edge={i === flowPanes.length - 1 && i > 0 ? "right" : undefined}
-                data-flex={id === flex || undefined}
-                data-dragging={paneDrag?.id === id || undefined}
-                style={id === flex || compactRail(id) ? undefined : { width: paneWidthStyle(id) }}
+                data-edge={i === list.length - 1 && i > 0 ? "right" : undefined}
+                data-flex={(!anim && id === flex) || undefined}
+                data-anim={anim ? (anim.run ? "run" : "start") : undefined}
+                data-slide={
+                  anim
+                    ? i === 0 && list.length > 1
+                      ? "left"
+                      : i === list.length - 1 && list.length > 1
+                        ? "right"
+                        : "middle"
+                    : undefined
+                }
+                aria-hidden={hiddenNow || undefined}
+                style={
+                  anim
+                    ? ({
+                        width: anim.widths[id] ?? 0,
+                        "--anim-w": `${anim.full[id] ?? 0}px`,
+                      } as React.CSSProperties)
+                    : id === flex || compactRail(id)
+                      ? undefined
+                      : { width: ownWidth(layout, id) }
+                }
                 aria-label={PANES[id].label}
               >
-                <PaneHeader
-                  id={id}
-                  layout={layout}
-                  compact={compactRail(id)}
-                  drag={dragHandlers}
-                  onHide={() => updateLayout((l) => toggle(l, id))}
-                  extra={
-                    id === "rail" ? (
-                      <button className={css.paneAction} aria-label="添加项目" title="添加项目" onClick={() => void openAddProject()}>
-                        <IconPlus size={14} />
-                      </button>
-                    ) : undefined
-                  }
-                />
-                {id === "rail" && <ProjectRail compact={tier !== "wide"} hideHead={tier === "wide"} onDelete={(rid) => setDeleting({ routeId: rid, unsynced: null })} />}
+                {id === "rail" && (
+                  <ProjectRail
+                    compact={tier !== "wide"}
+                    onDelete={(rid) =>
+                      setDeleting({ routeId: rid, unsynced: null })
+                    }
+                  />
+                )}
                 {id === "map" && (
                   <main className={css.center}>
-          {!ready ? null : projects.length === 0 ? (
-            <Welcome
-              onPick={() => void openAddProject()}
-              onDrop={addDropped}
-              loadEnvironment={environment}
-            />
-          ) : routes.length === 0 ? (
-            <form
-              className={css.first}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (projectId) void startRoute({ projectId, question: firstQuestion });
-                setFirstQuestion("");
-              }}
-            >
-              <div className={css.firstLine} aria-hidden>
-                <span>
-                  <b>1路</b>
-                  <i>等你发车</i>
-                </span>
-                <em />
-              </div>
-              <h1>{project?.name} 还没有车</h1>
-              <p>问第一个问题，就开出 1路。之后从任何一站都能分出新的一路。</p>
-              <div className={css.firstCard}>
-                <label htmlFor="first-stop">第一站</label>
-                <textarea
-                  id="first-stop"
-                  rows={3}
-                  value={firstQuestion}
-                  onChange={(e) => setFirstQuestion(e.target.value)}
-                  placeholder="比如：先帮我梳理一下现在的认证结构"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                />
-                <div>
-                  <span>动手前：{modeInfo(project?.permissionMode ?? "ask").label}</span>
-                  <button type="button" className={css.firstMore} onClick={() => openNewRoute()}>
-                    更多选项…
-                  </button>
-                  <button type="submit" className={css.firstGo}>
-                    {firstQuestion.trim() ? "发车" : "开出 1路"}
-                  </button>
-                </div>
-              </div>
-              <p className={css.firstNote}>
-                <IconFolder size={16} />
-                <span>
-                  1路 在自己的工作区里改代码，每站答完，改动自动同步进 <code>{project?.localDir}</code>。
-                </span>
-              </p>
-            </form>
-          ) : (
-            <>
-              <RouteMap routes={routes} stops={projectStops} queue={queue} selectedRouteId={routeId} onSelectRoute={selectRoute} stopNumber={stopNumber} onFork={setForkFrom} onCompress={(stop) => openCompress(stop.id)} onRenameStop={(stop, name) => void renameStop(stop.id, name)}
-                viewingStopId={viewing}
-                onViewStop={(stop) => viewStop(stop?.id ?? null)}
-                preview={(stop) => {
-                  const items = content[stop.id];
-                  return items ? { answer: items.filter((it) => it.kind === "text").map((it) => it.text).join(" "), tools: items.filter((it) => it.kind === "tool").length } : null;
-                }}
-                onHoverStop={(stop) => ensureHistory(stop.routeId)}
-                onTruncate={(stop, requeue) => setTruncating({ stop, requeue })}
-                onParkAnswer={(stop) => {
-                  const text = (content[stop.id] ?? []).filter((it) => it.kind === "text").map((it) => it.text).join("\n").trim();
-                  if (projectId && text) void queueAdd(projectId, text.slice(0, 4000));
-                  setWaitingSignal((n) => n + 1);
-                }}
-                onQueueMode={(item, mode) => void queueAssign(item.id, item.routeId, mode)}
-                onQueueEdit={(item) => {
-                  if (!item.routeId) return;
-                  setDraft(item.routeId, item.text);
-                  void queueRemove(item.id);
-                  goToRoute(item.routeId);
-                }}
-                onQueueRemove={(item) => void queueRemove(item.id)}
-                dragging={dragging}
-                onDropItem={(item, id, mode) => (setDragging(null), void queueAssign(item.id, id, mode))} focus={focus}
-                range={compressFrom && !distills[compressFrom.id]?.summary ? { stopId: compressFrom.id, kind: "compress" } : forkFrom ? { stopId: forkFrom.id, kind: "fork" } : null}
-                building={building.map((b) => ({ stopId: b.stopId, express: b.express, name: b.name, ready: b.ready }))}
-                onOpenBuilding={(stopId) => openCompress(stopId)}
-                onJumpStop={goToStop}
-                conflicts={Object.fromEntries(routes.filter((r) => r.status === "conflict" && lastSync[r.id]?.status === "conflict").map((r) => [r.id, lastSync[r.id]!.files]))}
-                whoChanged={whoChanged}
-                onResolve={(id) => void resolveConflict(id)}
-                hint={!hintGone && routes.length === 1 && projectStops.length <= 3}
-                onDismissHint={() => {
-                  setHintGone(true);
-                  try {
-                    localStorage.setItem("bw.hint.first", "1");
-                  } catch {
-                    // 记不住就下次再提示一次
-                  }
-                }} />
-              {waitingArea(false)}
-              {chatAsDrawer && route && !drawer && (
-                <button className={css.drawerButton} onClick={() => setDrawer(true)}>
-                  <IconChat size={14} /> 对话
-                </button>
-              )}
-            </>
-          )}
-          {/* 窄窗口里对话栏盖在地图上：点地图收回 */}
-          {chatAsDrawer && drawer && route && <div className={css.drawerBackdrop} onPointerDown={() => setDrawer(false)} />}
-          {flowPanes.includes("map") && noticesEl}
-        </main>
+                    {!ready ? null : projects.length === 0 ? (
+                      <Welcome
+                        onPick={() => void openAddProject()}
+                        onDrop={addDropped}
+                        loadEnvironment={environment}
+                      />
+                    ) : routes.length === 0 ? (
+                      <form
+                        className={css.first}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (projectId)
+                            void startRoute({
+                              projectId,
+                              question: firstQuestion,
+                            });
+                          setFirstQuestion("");
+                        }}
+                      >
+                        <div className={css.firstLine} aria-hidden>
+                          <span>
+                            <b>1路</b>
+                            <i>等你发车</i>
+                          </span>
+                          <em />
+                        </div>
+                        <h1>{project?.name} 还没有车</h1>
+                        <p>
+                          问第一个问题，就开出
+                          1路。之后从任何一站都能分出新的一路。
+                        </p>
+                        <div className={css.firstCard}>
+                          <label htmlFor="first-stop">第一站</label>
+                          <textarea
+                            id="first-stop"
+                            rows={3}
+                            value={firstQuestion}
+                            onChange={(e) => setFirstQuestion(e.target.value)}
+                            placeholder="比如：先帮我梳理一下现在的认证结构"
+                            onKeyDown={(e) => {
+                              if (
+                                e.key === "Enter" &&
+                                !e.shiftKey &&
+                                !e.nativeEvent.isComposing
+                              ) {
+                                e.preventDefault();
+                                e.currentTarget.form?.requestSubmit();
+                              }
+                            }}
+                          />
+                          <div>
+                            <span>
+                              动手前：
+                              {modeInfo(project?.permissionMode ?? "ask").label}
+                            </span>
+                            <button
+                              type="button"
+                              className={css.firstMore}
+                              onClick={() => openNewRoute()}
+                            >
+                              更多选项…
+                            </button>
+                            <button type="submit" className={css.firstGo}>
+                              {firstQuestion.trim() ? "发车" : "开出 1路"}
+                            </button>
+                          </div>
+                        </div>
+                        <p className={css.firstNote}>
+                          <IconFolder size={16} />
+                          <span>
+                            1路 在自己的工作区里改代码，每站答完，改动自动同步进{" "}
+                            <code>{project?.localDir}</code>。
+                          </span>
+                        </p>
+                      </form>
+                    ) : (
+                      <>
+                        <RouteMap
+                          resizing={!!anim}
+                          routes={routes}
+                          stops={projectStops}
+                          queue={queue}
+                          selectedRouteId={routeId}
+                          onSelectRoute={selectRoute}
+                          stopNumber={stopNumber}
+                          onFork={setForkFrom}
+                          onCompress={(stop) => openCompress(stop.id)}
+                          onRenameStop={(stop, name) =>
+                            void renameStop(stop.id, name)
+                          }
+                          viewingStopId={viewing}
+                          onViewStop={(stop) => viewStop(stop?.id ?? null)}
+                          preview={(stop) => {
+                            const items = content[stop.id];
+                            return items
+                              ? {
+                                  answer: items
+                                    .filter((it) => it.kind === "text")
+                                    .map((it) => it.text)
+                                    .join(" "),
+                                  tools: items.filter(
+                                    (it) => it.kind === "tool",
+                                  ).length,
+                                }
+                              : null;
+                          }}
+                          onHoverStop={(stop) => ensureHistory(stop.routeId)}
+                          onTruncate={(stop, requeue) =>
+                            setTruncating({ stop, requeue })
+                          }
+                          onParkAnswer={(stop) => {
+                            const text = (content[stop.id] ?? [])
+                              .filter((it) => it.kind === "text")
+                              .map((it) => it.text)
+                              .join("\n")
+                              .trim();
+                            if (projectId && text)
+                              void queueAdd(projectId, text.slice(0, 4000));
+                            setWaitingSignal((n) => n + 1);
+                          }}
+                          onQueueMode={(item, mode) =>
+                            void queueAssign(item.id, item.routeId, mode)
+                          }
+                          onQueueEdit={(item) => {
+                            if (!item.routeId) return;
+                            setDraft(item.routeId, item.text);
+                            void queueRemove(item.id);
+                            goToRoute(item.routeId);
+                          }}
+                          onQueueRemove={(item) => void queueRemove(item.id)}
+                          dragging={dragging}
+                          onDropItem={(item, id, mode) => (
+                            setDragging(null),
+                            void queueAssign(item.id, id, mode)
+                          )}
+                          focus={focus}
+                          range={
+                            compressFrom && !distills[compressFrom.id]?.summary
+                              ? { stopId: compressFrom.id, kind: "compress" }
+                              : forkFrom
+                                ? { stopId: forkFrom.id, kind: "fork" }
+                                : null
+                          }
+                          building={building.map((b) => ({
+                            stopId: b.stopId,
+                            express: b.express,
+                            name: b.name,
+                            ready: b.ready,
+                          }))}
+                          onOpenBuilding={(stopId) => openCompress(stopId)}
+                          onJumpStop={goToStop}
+                          conflicts={Object.fromEntries(
+                            routes
+                              .filter(
+                                (r) =>
+                                  r.status === "conflict" &&
+                                  lastSync[r.id]?.status === "conflict",
+                              )
+                              .map((r) => [r.id, lastSync[r.id]!.files]),
+                          )}
+                          whoChanged={whoChanged}
+                          onResolve={(id) => void resolveConflict(id)}
+                          hint={
+                            !hintGone &&
+                            routes.length === 1 &&
+                            projectStops.length <= 3
+                          }
+                          onDismissHint={() => {
+                            setHintGone(true);
+                            try {
+                              localStorage.setItem("bw.hint.first", "1");
+                            } catch {
+                              // 记不住就下次再提示一次
+                            }
+                          }}
+                        />
+                        {waitingArea(false)}
+                        {chatAsDrawer && route && !drawer && (
+                          <button
+                            className={css.drawerButton}
+                            onClick={() => setDrawer(true)}
+                          >
+                            <IconChat size={14} /> 对话
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {/* 窄窗口里对话栏盖在地图上：点地图收回 */}
+                    {chatAsDrawer && drawer && route && (
+                      <div
+                        className={css.drawerBackdrop}
+                        onPointerDown={() => setDrawer(false)}
+                      />
+                    )}
+                    {flowPanes.includes("map") && noticesEl}
+                  </main>
                 )}
-                {id === "chat" && (route ? chatEl : <div className={css.noChat}>在{flowPanes.includes("rail") ? "项目列表" : "左上角"}里选一路车，这里显示它的对话</div>)}
+                {id === "chat" &&
+                  (route ? (
+                    chatEl
+                  ) : (
+                    <div className={css.noChat}>
+                      在{flowPanes.includes("rail") ? "项目列表" : "左上角"}
+                      里选一路车，这里显示它的对话
+                    </div>
+                  ))}
               </section>
             </Fragment>
           );
@@ -545,19 +865,33 @@ export function App() {
             {noticesEl}
           </div>
         )}
+        {/* 收起后贴在窗口最左、最右的面板：鼠标贴到边上才探出打开按钮 */}
+        {!overview && !anim && tier !== "narrow" && (
+          <>
+            <EdgeOpener side="left" panes={edges.left} onShow={togglePane} />
+            <EdgeOpener side="right" panes={edges.right} onShow={togglePane} />
+          </>
+        )}
         {/* 窄窗口：对话从右边滑出盖在地图上 */}
         {chatAsDrawer && route && drawer && (
-          <section className={`${css.pane} ${css.drawer}`} data-pane="chat" aria-label="对话">
+          <section
+            className={`${css.pane} ${css.drawer}`}
+            data-pane="chat"
+            aria-label="对话"
+          >
             {chatEl}
           </section>
         )}
       </div>
-      {paneDrag && <PaneDragOverlay id={paneDrag.id} x={paneDrag.x} y={paneDrag.y} lineX={paneDrag.lineX} hint={paneDrag.hint} />}
 
       {deleting && allRoutes[deleting.routeId] && (
         <DeleteDialog
           route={allRoutes[deleting.routeId]!}
-          stopCount={Object.values(allStops).filter((s) => s.routeId === deleting.routeId).length}
+          stopCount={
+            Object.values(allStops).filter(
+              (s) => s.routeId === deleting.routeId,
+            ).length
+          }
           unsynced={deleting.unsynced}
           onCancel={() => setDeleting(null)}
           onArchive={() => {
@@ -566,7 +900,9 @@ export function App() {
           }}
           onConfirm={async (force, keep) => {
             const left = await deleteRoute(deleting.routeId, force, keep);
-            setDeleting(left ? { routeId: deleting.routeId, unsynced: left } : null);
+            setDeleting(
+              left ? { routeId: deleting.routeId, unsynced: left } : null,
+            );
           }}
         />
       )}
@@ -577,16 +913,32 @@ export function App() {
           source={allRoutes[compressFrom.routeId]!}
           stop={compressFrom}
           stopNumber={stopNumber(compressFrom)}
-          nextExpress={building.find((b) => b.stopId === compressFrom.id)?.express ?? expressBase + building.length + 1}
+          nextExpress={
+            building.find((b) => b.stopId === compressFrom.id)?.express ??
+            expressBase + building.length + 1
+          }
           distill={distills[compressFrom.id]}
           choices={projectStops
-            .filter((s) => s.routeId === compressFrom.routeId && s.status !== "answering" && !!s.lastMessageId)
+            .filter(
+              (s) =>
+                s.routeId === compressFrom.routeId &&
+                s.status !== "answering" &&
+                !!s.lastMessageId,
+            )
             .sort((a, b) => a.seq - b.seq)
             .map((s) => ({ stop: s, number: stopNumber(s) }))}
           contextTokens={allRoutes[compressFrom.routeId]!.contextTokens}
           waiting={queue.filter((q) => !q.routeId)}
           onRange={(id) => openCompress(id)}
-          onStart={(keep, name, direct) => startDistill(compressFrom.routeId, compressFrom.id, keep, name, direct)}
+          onStart={(keep, name, direct) =>
+            startDistill(
+              compressFrom.routeId,
+              compressFrom.id,
+              keep,
+              name,
+              direct,
+            )
+          }
           onSummaryChange={(text) => setSummary(compressFrom.id, text)}
           onDiscard={() => {
             dropDistill(compressFrom.id);
@@ -595,7 +947,15 @@ export function App() {
           onClose={() => openCompress(null)}
           claudeOptions={allOptions[allRoutes[compressFrom.routeId]!.projectId]}
           onCreate={(summary, name, question, itemId, run) => {
-            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question, itemId, run);
+            void createExpress(
+              compressFrom.routeId,
+              compressFrom.id,
+              summary,
+              name,
+              question,
+              itemId,
+              run,
+            );
             openCompress(null);
           }}
         />
@@ -606,8 +966,23 @@ export function App() {
           parent={allRoutes[forkFrom.routeId]!}
           stop={forkFrom}
           stopNumber={stopNumber(forkFrom)}
-          nextNumber={Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === allRoutes[forkFrom.routeId]!.projectId).map((r) => r.number)) + 1}
-          contextTokens={projectStops.filter((s) => s.routeId === forkFrom.routeId).every((s) => s.seq <= forkFrom.seq) ? allRoutes[forkFrom.routeId]!.contextTokens : null}
+          nextNumber={
+            Math.max(
+              0,
+              ...Object.values(allRoutes)
+                .filter(
+                  (r) => r.projectId === allRoutes[forkFrom.routeId]!.projectId,
+                )
+                .map((r) => r.number),
+            ) + 1
+          }
+          contextTokens={
+            projectStops
+              .filter((s) => s.routeId === forkFrom.routeId)
+              .every((s) => s.seq <= forkFrom.seq)
+              ? allRoutes[forkFrom.routeId]!.contextTokens
+              : null
+          }
           waiting={queue.filter((q) => !q.routeId)}
           claudeOptions={allOptions[allRoutes[forkFrom.routeId]!.projectId]}
           onCancel={() => setForkFrom(null)}
@@ -618,29 +993,65 @@ export function App() {
         />
       )}
 
-      {dialog?.kind === "add-project" && <AddProjectDialog dir={dialog.dir} onPick={pickDirectory} onInspect={inspectDirectory} loadSessions={terminalSessions} onAdd={(dir, name, ids) => void addProjectAt(dir, name, ids)} onCancel={closeDialog} />}
-      {dialog?.kind === "remove-project" && projects.some((p) => p.id === dialog.projectId) && (() => {
-        const mine = Object.values(allRoutes).filter((r) => r.projectId === dialog.projectId);
-        return (
-          <RemoveProjectDialog
-            project={projects.find((p) => p.id === dialog.projectId)!}
-            routeCount={mine.length}
-            archivedCount={mine.filter((r) => r.status === "archived").length}
-            queueCount={(allQueues[dialog.projectId] ?? []).length}
-            busy={mine.filter((r) => r.status === "answering" || r.status === "awaiting_permission").map((r) => `${r.express ? `快${r.express}` : `${r.number}路`} ${r.name}`)}
-            blocked={dialog.blocked}
-            error={dialog.error}
-            onCancel={closeDialog}
-            onConfirm={removeProject}
-          />
-        );
-      })()}
-      {dialog?.kind === "import" && <ImportDialog project={projects.find((p) => p.id === dialog.projectId)!} load={terminalSessions} onImport={(ids) => void importSessions(dialog.projectId, ids)} onCancel={closeDialog} />}
+      {dialog?.kind === "add-project" && (
+        <AddProjectDialog
+          dir={dialog.dir}
+          onPick={pickDirectory}
+          onInspect={inspectDirectory}
+          loadSessions={terminalSessions}
+          onAdd={(dir, name, ids) => void addProjectAt(dir, name, ids)}
+          onCancel={closeDialog}
+        />
+      )}
+      {dialog?.kind === "remove-project" &&
+        projects.some((p) => p.id === dialog.projectId) &&
+        (() => {
+          const mine = Object.values(allRoutes).filter(
+            (r) => r.projectId === dialog.projectId,
+          );
+          return (
+            <RemoveProjectDialog
+              project={projects.find((p) => p.id === dialog.projectId)!}
+              routeCount={mine.length}
+              archivedCount={mine.filter((r) => r.status === "archived").length}
+              queueCount={(allQueues[dialog.projectId] ?? []).length}
+              busy={mine
+                .filter(
+                  (r) =>
+                    r.status === "answering" ||
+                    r.status === "awaiting_permission",
+                )
+                .map(
+                  (r) =>
+                    `${r.express ? `快${r.express}` : `${r.number}路`} ${r.name}`,
+                )}
+              blocked={dialog.blocked}
+              error={dialog.error}
+              onCancel={closeDialog}
+              onConfirm={removeProject}
+            />
+          );
+        })()}
+      {dialog?.kind === "import" && (
+        <ImportDialog
+          project={projects.find((p) => p.id === dialog.projectId)!}
+          load={terminalSessions}
+          onImport={(ids) => void importSessions(dialog.projectId, ids)}
+          onCancel={closeDialog}
+        />
+      )}
       {dialog?.kind === "new-route" && projectId && (
         <NewRouteDialog
           projects={projects}
           projectId={projectId}
-          nextNumber={(id) => Math.max(0, ...Object.values(allRoutes).filter((r) => r.projectId === id).map((r) => r.number)) + 1}
+          nextNumber={(id) =>
+            Math.max(
+              0,
+              ...Object.values(allRoutes)
+                .filter((r) => r.projectId === id)
+                .map((r) => r.number),
+            ) + 1
+          }
           parked={(id) => (allQueues[id] ?? []).filter((q) => !q.routeId)}
           onAddProject={() => void openAddProject()}
           claudeOptions={(id) => allOptions[id]}
@@ -649,13 +1060,36 @@ export function App() {
           onCancel={closeDialog}
         />
       )}
-      {dialog?.kind === "log" && projects.find((p) => p.id === dialog.projectId) && (
-        <SyncLogDialog project={projects.find((p) => p.id === dialog.projectId)!} entries={dialog.entries} kept={dialog.kept} onOpenKept={openKept} onRemoveKept={(id) => void removeKept(id)} routes={allRoutes} stops={allStops} stopNumber={stopNumber} onViewRoute={goToRoute} onClose={closeDialog} />
-      )}
+      {dialog?.kind === "log" &&
+        projects.find((p) => p.id === dialog.projectId) && (
+          <SyncLogDialog
+            project={projects.find((p) => p.id === dialog.projectId)!}
+            entries={dialog.entries}
+            kept={dialog.kept}
+            onOpenKept={openKept}
+            onRemoveKept={(id) => void removeKept(id)}
+            routes={allRoutes}
+            stops={allStops}
+            stopNumber={stopNumber}
+            onViewRoute={goToRoute}
+            onClose={closeDialog}
+          />
+        )}
 
       {archiveAsk && allRoutes[archiveAsk] && (
-        <div className={css.askScrim} onMouseDown={(e) => e.target === e.currentTarget && useStore.setState({ archiveAsk: null })}>
-          <div className={css.askBox} role="alertdialog" aria-modal aria-label="这一路还在回答">
+        <div
+          className={css.askScrim}
+          onMouseDown={(e) =>
+            e.target === e.currentTarget &&
+            useStore.setState({ archiveAsk: null })
+          }
+        >
+          <div
+            className={css.askBox}
+            role="alertdialog"
+            aria-modal
+            aria-label="这一路还在回答"
+          >
             <h2>「{allRoutes[archiveAsk]!.name}」还在回答</h2>
             <p>归档会把这一路收进“已归档”。它正在回答，你想怎么办？</p>
             <button onClick={() => archiveBusy(archiveAsk, "later")}>
@@ -666,7 +1100,10 @@ export function App() {
               <b>现在停下并归档</b>
               <small>这一站算没答完，它的改动留在工作区，不进 Local</small>
             </button>
-            <button className={css.askCancel} onClick={() => useStore.setState({ archiveAsk: null })}>
+            <button
+              className={css.askCancel}
+              onClick={() => useStore.setState({ archiveAsk: null })}
+            >
               不归档了
             </button>
           </div>
@@ -678,8 +1115,20 @@ export function App() {
           route={allRoutes[truncating.stop.routeId]!}
           stop={truncating.stop}
           stopNumber={stopNumber(truncating.stop)}
-          lastNumber={stopNumber(truncating.stop) + Object.values(allStops).filter((s) => s.routeId === truncating.stop.routeId && s.seq > truncating.stop.seq).length}
-          forks={Object.values(allRoutes).filter((r) => r.parentRouteId === truncating.stop.routeId && r.forkStopId && (allStops[r.forkStopId]?.seq ?? 0) >= truncating.stop.seq)}
+          lastNumber={
+            stopNumber(truncating.stop) +
+            Object.values(allStops).filter(
+              (s) =>
+                s.routeId === truncating.stop.routeId &&
+                s.seq > truncating.stop.seq,
+            ).length
+          }
+          forks={Object.values(allRoutes).filter(
+            (r) =>
+              r.parentRouteId === truncating.stop.routeId &&
+              r.forkStopId &&
+              (allStops[r.forkStopId]?.seq ?? 0) >= truncating.stop.seq,
+          )}
           requeue={truncating.requeue}
           onCancel={() => setTruncating(null)}
           onConfirm={(requeue) => {
@@ -689,14 +1138,24 @@ export function App() {
         />
       )}
 
-      {changesView && allRoutes[changesView.routeId] && <ChangesDialog route={allRoutes[changesView.routeId]!} files={changesView.files} onClose={() => viewChanges(null)} />}
+      {changesView && allRoutes[changesView.routeId] && (
+        <ChangesDialog
+          route={allRoutes[changesView.routeId]!}
+          files={changesView.files}
+          onClose={() => viewChanges(null)}
+        />
+      )}
 
       {viewed && terminalView && allRoutes[viewed.routeId] && (
         <TerminalDialog
           terminal={viewed}
           route={allRoutes[viewed.routeId]!}
           output={terminalView.output}
-          stopLabel={viewed.stopId && allStops[viewed.stopId] ? `第 ${stopNumber(allStops[viewed.stopId]!)} 站` : null}
+          stopLabel={
+            viewed.stopId && allStops[viewed.stopId]
+              ? `第 ${stopNumber(allStops[viewed.stopId]!)} 站`
+              : null
+          }
           onStop={() => void stopTerminal(viewed.id)}
           onOpenSystem={() => void openSystemTerminal(viewed.id)}
           onClose={() => viewTerminal(null)}
@@ -746,7 +1205,9 @@ export function App() {
               {toast.action.label}
             </button>
           )}
-          {toast.countdown && <i style={{ animationDuration: `${toast.countdown}ms` }} />}
+          {toast.countdown && (
+            <i style={{ animationDuration: `${toast.countdown}ms` }} />
+          )}
         </div>
       )}
 

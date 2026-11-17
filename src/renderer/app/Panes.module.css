@@ -1,125 +1,383 @@
 /* 面板布局（设计稿 9-7） */
-.toggles {
+
+/* ---- 顶栏的“布局”按钮和小窗 ---- */
+.layoutWrap {
+  position: relative;
   flex: none;
-  display: flex;
-  gap: var(--sp-2);
-  padding: var(--sp-2);
+}
+.layoutButton {
+  height: var(--h-40);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
-}
-.toggles button {
-  width: 32px;
-  height: var(--h-32);
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-8);
-  color: var(--line-1);
-}
-.toggles button[aria-pressed="true"] {
-  background: var(--surface-2);
-  color: var(--fg-1);
-}
-.toggles button:disabled {
-  opacity: 1;
-  cursor: default;
-}
-
-/* 面板顶上那一条：高 36，⠿ + 名字，右边 × */
-.head {
-  flex: none;
-  height: var(--h-36);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: 0 var(--sp-6) 0 var(--sp-6);
-  border-bottom: 1px solid var(--divider);
   background: var(--surface);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  transition:
+    background var(--t-fast) ease-out,
+    color var(--t-fast) ease-out;
 }
-.head[data-compact] {
-  justify-content: center;
-  gap: 0;
-  padding: 0;
+.layoutButton:hover {
+  border-color: var(--line-1);
 }
-.grip {
+.layoutButton[aria-expanded="true"] {
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+}
+.popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + var(--sp-8));
+  right: 0;
+  width: 380px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  box-shadow: var(--e4);
+  animation: pop var(--t-base) var(--ease);
+}
+.popover header {
+  display: flex;
+  align-items: baseline;
   gap: var(--sp-8);
-  min-width: 0;
-  height: var(--h-28);
-  padding: 0 var(--sp-6);
-  border-radius: var(--r-6);
-  color: var(--fg-4);
+}
+.popover h2 {
+  margin: 0;
+  font-size: var(--fs-16);
+  line-height: var(--lh-24);
+  font-weight: 700;
+}
+.popover header span {
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+.mini {
+  display: flex;
+  gap: var(--sp-6);
+  padding: var(--sp-8);
+  border-radius: var(--r-12);
+  background: var(--surface-2);
+}
+.block {
+  position: relative;
+  flex: none;
+  height: 112px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  overflow: hidden;
   cursor: grab;
   touch-action: none;
   user-select: none;
+  transition:
+    transform var(--t-base) var(--ease),
+    width var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease);
 }
-.grip:hover {
-  background: var(--surface-2);
-  color: var(--fg-3);
+.block[data-pane="rail"],
+.block[data-pane="chat"] {
+  background: var(--surface);
 }
-.grip:active {
+.block[data-pane="map"] {
+  background: var(--canvas);
+}
+.block[data-hidden] {
+  border: 1.5px dashed var(--line-1);
+  background: transparent;
+}
+.block[data-dragging] {
+  z-index: 2;
   cursor: grabbing;
+  box-shadow: var(--e3);
+  transition: box-shadow var(--t-base) var(--ease);
 }
-.grip b {
-  font-size: var(--fs-12);
+.mini[data-settling] .block {
+  transition: none;
+}
+/* 方块里的缩略：项目是两行、地图是两条线、对话是头部和一个气泡 */
+.thumb {
+  position: absolute;
+  inset: 0 0 28px;
+}
+.block[data-hidden] .thumb {
+  display: none;
+}
+.thumb[data-pane="rail"] {
+  background:
+    linear-gradient(var(--route-1-bg), var(--route-1-bg)) 8px 22px / calc(100% - 16px) 8px no-repeat,
+    linear-gradient(var(--surface-2), var(--surface-2)) 8px 36px / calc(100% - 16px) 8px no-repeat;
+}
+.thumb[data-pane="map"] {
+  background:
+    linear-gradient(var(--route-1), var(--route-1)) 0 30px / 72% 5px no-repeat,
+    linear-gradient(var(--route-2), var(--route-2)) 0 54px / 50% 5px no-repeat;
+}
+.thumb[data-pane="chat"] {
+  background:
+    linear-gradient(var(--route-1-bg), var(--route-1-bg)) right 8px top 44px / 55% 8px no-repeat;
+}
+.thumb[data-pane="chat"]::before {
+  content: "";
+  position: absolute;
+  top: 22px;
+  left: 8px;
+  right: 8px;
+  height: 14px;
+  border: 2px solid var(--route-1);
+  border-radius: var(--r-4);
+}
+.blockFoot {
+  position: absolute;
+  left: var(--sp-6);
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.blockFoot b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-11);
   font-weight: 600;
-  color: var(--fg-3);
+  color: var(--fg-2);
   white-space: nowrap;
 }
-.spacer {
-  flex: 1;
+.block[data-hidden] .blockFoot b {
+  color: var(--fg-4);
 }
-.hide {
+.blockFoot button {
   flex: none;
-  width: 28px;
-  height: var(--h-28);
+  width: 22px;
+  height: 22px;
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
-  color: var(--fg-4);
+  background: var(--surface);
+  color: var(--fg-3);
 }
-.hide:hover:not(:disabled) {
-  background: var(--surface-2);
+.blockFoot button:hover:not(:disabled) {
   color: var(--fg-1);
 }
-.hide:disabled {
-  visibility: hidden;
+.blockFoot button:disabled {
+  opacity: 0.4;
 }
-
-/* 拖动中 */
-.dropLine {
-  position: fixed;
-  z-index: 40;
-  top: 60px;
-  bottom: 0;
-  width: 4px;
-  border-radius: var(--r-4);
-  background: var(--info);
-  box-shadow: 0 0 0 4px var(--focus-ring);
-  pointer-events: none;
-}
-.ghost {
-  position: fixed;
-  z-index: 41;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-8);
-  height: var(--h-36);
-  padding: 0 var(--sp-12) 0 var(--sp-10);
-  border-radius: var(--r-10);
-  background: var(--surface);
-  box-shadow: var(--e3);
+.block[data-hidden] .blockFoot button {
   color: var(--fg-4);
-  rotate: -2deg;
-  pointer-events: none;
-  white-space: nowrap;
 }
-.ghost b {
+.presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.presets > span {
   font-size: var(--fs-12);
   font-weight: 600;
   color: var(--fg-3);
 }
-.ghost span {
+.presets div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+.presets button {
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
   font-size: var(--fs-12);
-  color: var(--fg-4);
+  transition:
+    background var(--t-fast) ease-out,
+    border-color var(--t-fast) ease-out,
+    color var(--t-fast) ease-out;
+}
+.presets button[aria-pressed="true"] {
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+}
+.popover footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding-top: var(--sp-10);
+  border-top: 1px solid var(--divider);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.popover footer span {
+  flex: 1;
+}
+.popover footer button {
+  flex: none;
+  height: var(--h-28);
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-6);
+  color: var(--fg-3);
+  font-size: var(--fs-12);
+}
+.popover footer button:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+
+/* ---- 分隔处：拖动改宽度；悬停变蓝、浮出胶囊 ---- */
+.divider {
+  position: relative;
+  flex: none;
+  width: 7px;
+  margin: 0 -3px;
+  z-index: 5;
+  touch-action: none;
+}
+.divider[data-resizable] {
+  cursor: col-resize;
+}
+.divider[data-hover],
+.divider[data-resizable]:active {
+  background: linear-gradient(90deg, transparent 2px, var(--info) 2px, var(--info) 5px, transparent 5px);
+}
+.capsuleWrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  cursor: default;
+  animation: capsuleIn var(--t-fast) ease-out;
+}
+.capsule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 3px; /* 例外：胶囊里按钮和外框之间的细缝 */
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.capsule button {
+  width: 22px;
+  height: var(--h-28);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--fg-3);
+}
+.capsule button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.capsule button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.openPill,
+.edgeButtons button {
+  height: var(--h-32);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-pill);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--e-dark);
+}
+.openPill span {
+  padding: 0 var(--sp-4);
+}
+
+/* ---- 窗口边上：收起的面板，鼠标贴过来才探出按钮 ---- */
+.edge {
+  position: absolute;
+  z-index: 7;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+}
+.edge[data-side="left"] {
+  left: 0;
+}
+.edge[data-side="right"] {
+  right: 0;
+}
+.edge[data-hover] {
+  width: 24px;
+}
+.edge[data-hover][data-side="left"] {
+  background: linear-gradient(to right, var(--focus-ring), transparent);
+}
+.edge[data-hover][data-side="right"] {
+  background: linear-gradient(to left, var(--focus-ring), transparent);
+}
+.edgeButtons {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  translate: 0 -50%;
+}
+.edge[data-side="left"] .edgeButtons {
+  left: 0;
+  animation: edgeInLeft var(--t-fast) ease-out;
+}
+.edge[data-side="right"] .edgeButtons {
+  right: 0;
+  align-items: flex-end;
+  animation: edgeInRight var(--t-fast) ease-out;
+}
+.edge[data-side="left"] .edgeButtons button {
+  padding: 0 var(--sp-10) 0 var(--sp-6);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+.edge[data-side="right"] .edgeButtons button {
+  padding: 0 var(--sp-6) 0 var(--sp-10);
+  border-radius: var(--r-pill) 0 0 var(--r-pill);
+}
+
+/* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */
+@keyframes pop {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+@keyframes capsuleIn {
+  from {
+    opacity: 0;
+    scale: 0.85;
+  }
+}
+@keyframes edgeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+@keyframes edgeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .block,
+  .capsuleWrap,
+  .edgeButtons,
+  .popover {
+    transition: none;
+    animation: none;
+  }
 }

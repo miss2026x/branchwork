@@ -59,18 +59,4 @@ export const IconShield = (p: P) => <Icon {...p}><path d="M12 3l7 3v6c0 4.5-3 7.
 export const IconSpark = (p: P) => <Icon {...p}><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></Icon>;
 export const IconGauge = (p: P) => <Icon {...p}><path d="M4 16a8 8 0 0116 0M12 16l4-5" /></Icon>;
 export const IconDown = (p: P) => <Icon {...p}><path d="M6 9l6 6 6-6" /></Icon>;
-/** 面板开关：左栏、地图、对话三个 */
-export const IconPaneRail = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></Icon>;
-export const IconPaneMap = (p: P) => <Icon {...p}><path d="M3 9h18M3 16h9c3 0 4-7 9-7" /></Icon>;
-export const IconPaneChat = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" /></Icon>;
-/** 拖动把手：两列六个点 */
-export const IconGrip = ({ size = 14 }: P) => (
-  <svg width={(size * 10) / 14} height={size} viewBox="0 0 10 14" fill="currentColor" aria-hidden>
-    <circle cx="2.5" cy="2.5" r="1.3" />
-    <circle cx="7.5" cy="2.5" r="1.3" />
-    <circle cx="2.5" cy="7" r="1.3" />
-    <circle cx="7.5" cy="7" r="1.3" />
-    <circle cx="2.5" cy="11.5" r="1.3" />
-    <circle cx="7.5" cy="11.5" r="1.3" />
-  </svg>
-);
+export const IconEyeOff = (p: P) => <Icon {...p}><path d="M3 3l18 18M10.6 5.1A10 10 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.3 4.2M6.6 6.6A17 17 0 002 12s3.5 7 10 7a9.6 9.6 0 005.4-1.6" /></Icon>;
