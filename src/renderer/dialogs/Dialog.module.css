@@ -1,4 +1,5 @@
 .scrim {
+  animation: fadeIn var(--t-base) ease-out;
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -8,6 +9,7 @@
   background: rgba(22, 27, 34, 0.42);
 }
 .dialog {
+  animation: dialogIn var(--t-slow) var(--ease);
   width: min(540px, 100%);
   padding: 20px;
   border-radius: var(--r-16);
@@ -243,4 +245,28 @@
   font-size: 12px;
   line-height: 18px;
   color: var(--text-4);
+}
+
+/* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
 }

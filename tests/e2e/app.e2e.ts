@@ -86,7 +86,7 @@ describe("应用", () => {
     await page.locator("textarea").fill("记一笔：接入 GitHub 登录");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("alertdialog", { name: "等你批准" }).isVisible(), { timeout: 30000 }).toBe(true);
-    expect(await page.getByText("第 1 站 · 等你批准").isVisible()).toBe(true);
+    expect(await page.getByText("第 1 站暂停，等你批准").isVisible()).toBe(true);
     expect(fs.existsSync(path.join(local, "demo-notes.md"))).toBe(false);
     await shot("3-permission");
     await page.getByRole("button", { name: /允许这一次/ }).click();
@@ -454,7 +454,7 @@ describe("应用", () => {
     await page.locator("textarea").fill("这一条要我点了才发");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: /本路候车 1 条/ }).isVisible()).toBe(true);
-    expect(await page.getByText(/下一站等你登车/).isVisible()).toBe(true);
+    expect(await page.getByText(/下一站 \d+ 等你登车/).isVisible()).toBe(true);
     await shot("24-header");
     // 到站后不会自己发，等通知里点登车
     const notices = page.getByRole("region", { name: "通知" });

@@ -55,12 +55,11 @@
   right: 0;
   bottom: 0;
   box-shadow: -12px 0 32px rgba(22, 27, 34, 0.16);
-  animation: slide var(--t-base) var(--ease);
+  animation: slide var(--t-slow) var(--ease);
 }
 @keyframes slide {
   from {
-    transform: translateX(40px);
-    opacity: 0;
+    transform: translateX(100%);
   }
 }
 .drawerBackdrop {
@@ -166,6 +165,7 @@
   font-weight: 600;
 }
 .toast {
+  animation: toastIn var(--t-base) var(--ease);
   position: fixed;
   left: 50%;
   bottom: 24px;
@@ -467,4 +467,12 @@
 .divider:hover,
 .divider:active {
   background: linear-gradient(90deg, transparent 2px, var(--route-1) 2px, var(--route-1) 5px, transparent 5px);
+}
+
+/* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+  }
 }

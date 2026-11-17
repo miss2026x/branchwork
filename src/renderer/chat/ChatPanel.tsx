@@ -171,7 +171,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             )}
             {!viewing && busy && <i className={css.statusDot} style={{ background: colors.line }} />}
             {!viewing && <StatusLine route={route} n={total} phase={pending !== undefined ? "syncing" : currentLive?.phase} />}
-            {!viewing && busy && waiting[0] && <span className={css.next}>下一站{waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
+            {!viewing && busy && waiting[0] && <span className={css.next}>下一站 {total + 1} {waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
           </p>
         </div>
         {onCollapse && (
@@ -197,7 +197,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         <div className={css.stripLabels}>
           {offset > 0 && parent && <span>{offset > 1 ? `1–${offset}` : "1"} 随 {parent.express ? `快${parent.express}` : `${parent.number}路`} 带来</span>}
           {(() => {
-            const done = busy ? stops.length - 1 : stops.length;
+            // 短确认（小点）不占站号，这里也不数它
+            const done = busy ? counted - (stops.at(-1)?.kind === "minor" ? 0 : 1) : counted;
             const range = (from: number, to: number) => (to > from ? `${from}–${to}` : String(from));
             return (
               <>
@@ -273,12 +274,14 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           }
           return (
             <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id} data-viewing={viewing?.id === s.id}>
+              {/* 设计稿：站号小字在提问上方靠右；短确认（小点）不占站号 */}
+              <div className={`${css.askNo} ell`}>
+                {s.kind === "minor" ? `接着第 ${num(s)} 站` : `第 ${num(s)} 站`} · {s.name}
+              </div>
               <div className={css.ask} style={{ background: colors.tint }}>
                 {s.prompt}
               </div>
-              <div className={css.who}>
-                Claude <span>第 {num(s)} 站 · {s.name}</span>
-              </div>
+              <div className={css.who}>Claude</div>
               <Items items={items} streaming={l?.phase === "answering"} />
               {l && items.length === 0 && <p className={css.waiting}>{l.phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>}
               {s.status === "interrupted" && (
@@ -469,8 +472,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
 
 function StatusLine({ route, n, phase }: { route: Route; n: number; phase?: LiveStop["phase"] | "syncing" }) {
   if (phase === "syncing") return <>第 {n + 1} 站 · 正在同步 Local</>;
-  if (route.status === "awaiting_permission") return <b>第 {n} 站 · 等你批准</b>;
-  if (route.status === "answering") return <b>第 {n} 站 · {phase === "starting" ? "正在启动 Claude" : phase === "finishing" ? "正在收尾" : "回答中"}</b>;
+  if (route.status === "awaiting_permission") return <b>第 {n} 站暂停，等你批准</b>;
+  if (route.status === "answering") return <b>第 {n} 站{phase === "starting" ? "正在启动 Claude" : phase === "finishing" ? "正在收尾" : "回答中"}</b>;
   if (route.status === "interrupted") return <>第 {n} 站没答完</>;
   if (route.status === "conflict") return <>有同步冲突</>;
   return <>{n === 0 ? "还没发车" : `已到第 ${n} 站`}</>;

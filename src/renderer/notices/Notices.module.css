@@ -24,7 +24,7 @@
 @keyframes in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(16px);
   }
 }
 .card[data-tone="amber"] {

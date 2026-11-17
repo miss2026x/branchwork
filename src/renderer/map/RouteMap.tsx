@@ -725,7 +725,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
         // 折叠的路只留分叉站和正在回答的那一站
         if (lane.route.folded && !junction && !answering) return null;
         return (
-          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id}>
+          <div key={stop.id} className={css.stop} style={{ left: x, top: y }} data-status={stop.status} data-latest={on && latest} data-junction={junction} data-kind={stop.kind} data-name={stop.nameState} data-ringed={ringed === stop.id} data-viewing={viewingStopId === stop.id} data-new={Date.now() - stop.startedAt < 1500}>
             {answering && (
               // 设计稿：站上方一行字，用线路的颜色；等批准时换成琥珀色。还在起名就并排放一个“起名中”
               <span className={css.live}>

@@ -28,6 +28,9 @@ export function useFit(ref: RefObject<HTMLElement | null>, deps: DependencyList)
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // 先量没挪过的位置；挪的量放进 --fx / --fy，浮层出现的动画（上移 6px）叠加在它上面
+    el.style.setProperty("--fx", "0px");
+    el.style.setProperty("--fy", "0px");
     el.style.translate = "";
     const r = el.getBoundingClientRect();
     const box = visibleBox(el);
@@ -37,7 +40,11 @@ export function useFit(ref: RefObject<HTMLElement | null>, deps: DependencyList)
     if (r.left + dx < box.left + MARGIN) dx = box.left + MARGIN - r.left;
     if (r.bottom > box.bottom - MARGIN) dy = box.bottom - MARGIN - r.bottom;
     if (r.top + dy < box.top + MARGIN) dy = box.top + MARGIN - r.top;
-    if (dx || dy) el.style.translate = `${Math.round(dx)}px ${Math.round(dy)}px`;
+    if (dx || dy) {
+      el.style.setProperty("--fx", `${Math.round(dx)}px`);
+      el.style.setProperty("--fy", `${Math.round(dy)}px`);
+      el.style.translate = "var(--fx) var(--fy)";
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

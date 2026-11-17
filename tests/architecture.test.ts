@@ -62,6 +62,22 @@ describe("模块规则", () => {
   });
 });
 
+describe("界面的动效", () => {
+  it("CSS Modules 里用到的动画名，同一个文件里都有 @keyframes（模块会把名字按文件改掉，用别处定义的会悄悄失效）", () => {
+    const problems: string[] = [];
+    for (const f of files(path.join(SRC, "renderer")).filter((x) => x.endsWith(".module.css"))) {
+      const text = fs.readFileSync(f, "utf8");
+      const defined = new Set([...text.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]));
+      for (const m of text.matchAll(/animation(?:-name)?\s*:\s*([\w-]+)/g)) {
+        const name = m[1]!;
+        if (["none", "inherit", "initial", "unset"].includes(name)) continue;
+        if (!defined.has(name)) problems.push(`${path.relative(SRC, f)}：${name}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+});
+
 describe("安装能跑通（pnpm 11）", () => {
   const root = path.resolve(__dirname, "..");
 

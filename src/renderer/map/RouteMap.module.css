@@ -139,6 +139,10 @@
   background: var(--surface-0);
   transition: transform var(--t-fast) var(--ease);
 }
+/* 刚发出的一站：线先到位，站点再弹出来（设计稿“动效”：站点 200ms，晚 120ms） */
+.stop[data-new="true"] .node {
+  animation: stopPop var(--t-base) var(--ease) var(--t-fast) both;
+}
 .node:not(:disabled):hover {
   filter: none;
 }
@@ -292,6 +296,7 @@
 
 /* 站点菜单 */
 .menu {
+  animation: pop var(--t-base) var(--ease);
   position: absolute;
   /* 压在候车区的浮窗上面：菜单是刚点出来的，不能被挡住 */
   z-index: 9;
@@ -407,6 +412,7 @@
 
 /* 悬停卡片 */
 .card {
+  animation: pop var(--t-base) var(--ease);
   position: absolute;
   z-index: 8;
   width: 420px;
@@ -676,7 +682,7 @@
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--express) 30%, transparent);
   border-top-color: var(--express);
-  animation: buildingSpin 900ms linear infinite;
+  animation: buildingSpin 800ms linear infinite;
 }
 .building[data-ready="true"] {
   border-style: solid;
@@ -746,7 +752,7 @@
   border-radius: 50%;
   border: 2px solid var(--line);
   border-top-color: var(--text-2);
-  animation: buildingSpin 900ms linear infinite;
+  animation: buildingSpin 800ms linear infinite;
 }
 
 /* 冲突站的卡片 */
@@ -835,4 +841,31 @@
 }
 .hint button:hover {
   background: var(--surface-2);
+}
+
+/* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */
+@keyframes pop {
+  from {
+    opacity: 0;
+    translate: var(--fx, 0px) calc(var(--fy, 0px) + 6px);
+  }
+}
+@keyframes stopPop {
+  from {
+    scale: 0;
+  }
+  70% {
+    scale: 1.15;
+  }
 }
