@@ -201,42 +201,6 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
       </header>
 
       <div className={css.meta}>
-        {/* 缩略线路：带来的站、自己的站、候车的问题 */}
-        <div className={css.strip} aria-hidden style={{ ["--c" as string]: colors.line, ["--p" as string]: parent ? routeColors(parent).line : colors.line }}>
-          {Array.from({ length: Math.min(offset, 6) }, (_, i) => (
-            <i key={`p${i}`} data-kind="inherited" />
-          ))}
-          {stops.slice(-12).map((s) => (
-            <i key={s.id} data-kind={s.status === "answering" ? "current" : s.kind === "minor" ? "minor" : "own"} data-viewing={viewing?.id === s.id} data-after={!!viewing && s.seq > viewing.seq} />
-          ))}
-          {waiting.slice(0, 4).map((q) => (
-            <i key={q.id} data-kind="waiting" data-after={!!viewing} />
-          ))}
-        </div>
-        {viewing ? (
-          // 设计稿：看以前的某一站时，下面一行改成“看到第几站 / 这一路共几站”
-          <div className={css.stripLabels}>
-            <span>看到第 {num(viewing)} 站</span>
-            <span>这一路共 {total} 站</span>
-          </div>
-        ) : (
-        <div className={css.stripLabels}>
-          {offset > 0 && parent && <span>{offset > 1 ? `1–${offset}` : "1"} 随 {parent.express ? `快${parent.express}` : `${parent.number}路`} 带来</span>}
-          {(() => {
-            // 短确认（小点）不占站号，这里也不数它
-            const done = busy ? counted - (stops.at(-1)?.kind === "minor" ? 0 : 1) : counted;
-            const range = (from: number, to: number) => (to > from ? `${from}–${to}` : String(from));
-            return (
-              <>
-                {stops.length === 0 && <span>还没有自己的站</span>}
-                {done > 0 && <span>{range(offset + 1, offset + done)} {offset > 0 ? "本对话" : "已到站"}</span>}
-                {busy && stops.length > 0 && <span>{total} 回答中</span>}
-              </>
-            );
-          })()}
-          {queued > 0 && <span>{queued > 1 ? `${total + 1}–${total + queued}` : total + 1} 候车</span>}
-        </div>
-        )}
         <div className={css.metaRow}>
           <span className="ell">
             {parent && !route.express && offset > 0 ? `从 ${parent.number}路第 ${offset} 站分出` : parent && route.express ? `从 ${parent.number}路 提炼开出` : "自己的工作区"}
