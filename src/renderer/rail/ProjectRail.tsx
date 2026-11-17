@@ -7,6 +7,7 @@ import { RouteMenu } from "./RouteMenu";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./ProjectRail.module.css";
+import { ago } from "../ui/ago";
 
 /** 左栏：项目和每个项目里的路 */
 export function ProjectRail({
@@ -330,16 +331,6 @@ export function ProjectRail({
   );
 }
 
-/** 多久以前：今天 / 昨天 / N 天前 / 上周 / 月日 */
-function ago(at: number): string {
-  const days = Math.floor((Date.now() - at) / 86_400_000);
-  if (days <= 0) return "今天";
-  if (days === 1) return "昨天";
-  if (days < 7) return `${days} 天前`;
-  if (days < 14) return "上周";
-  const d = new Date(at);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
 
 /** 把路排成树：分叉出来的路跟在它的父路后面，记下深了几层 */
 function asTree(list: Route[]): { route: Route; depth: number }[] {

@@ -82,11 +82,16 @@
 }
 .item {
   margin-bottom: var(--sp-6);
-  border-radius: var(--r-10);
+  border-radius: var(--r-12);
   background: var(--surface-2);
 }
+/* 没派车的：虚线框（设计稿“候车区”）；展开“派车”时变成实线框 */
 .item[data-kind="none"] {
-  border: 1px dashed var(--line-2);
+  border: 1.5px dashed var(--line-1);
+  background: var(--surface);
+}
+.item[data-open="true"] {
+  border: 1.5px solid var(--fg-1);
   background: var(--surface);
 }
 .line {
@@ -100,12 +105,17 @@
   flex: 1;
   min-width: 0;
 }
+/* 问题最多两行，太长的折行再省略（设计稿 t-clamp2），悬停看全文 */
 .text b {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  font-weight: 400;
 }
 .text span {
   display: block;
@@ -143,43 +153,101 @@
   background: var(--surface);
   font-size: var(--fs-12);
 }
-.more {
-  padding: var(--sp-2) var(--sp-10) var(--sp-10) var(--sp-12);
-  border-top: 1px solid var(--divider);
-}
-.more p {
-  margin: var(--sp-8) 0 var(--sp-4);
-  font-size: var(--fs-12);
-  color: var(--fg-4);
-}
-.target {
-  height: var(--h-menu);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-8);
-}
-.target span {
-  flex: 1;
-  font-size: var(--fs-13);
-}
-.target button {
+/* 没派车的两个按钮：开新车是文字按钮，派车有框；展开时派车变深色 */
+.ghost,
+.dispatch {
   flex: none;
-  height: var(--h-28);
-  padding: 0 var(--sp-8);
-  border: 1px solid var(--border);
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
   border-radius: var(--r-6);
-  background: var(--surface);
   font-size: var(--fs-12);
 }
-.target button[aria-pressed="true"] {
+.ghost {
+  color: var(--fg-3);
+}
+.ghost:hover {
+  background: var(--press);
+}
+.dispatch {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.dispatch[aria-expanded="true"] {
   border-color: var(--fg-1);
   background: var(--fg-1);
   color: var(--fg-on-color);
+  font-weight: 600;
+}
+
+/* 派给哪一路：每一路一行，路牌 + 线路名 + 自动/手动两档 */
+.more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-8);
+  border-top: 1px solid var(--divider);
+}
+.more p {
+  margin: 0;
+  padding: 0 var(--sp-4) var(--sp-4);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.more p span {
+  display: block;
+  font-size: var(--fs-11);
+  line-height: var(--lh-16);
+  color: var(--fg-4);
+}
+.target {
+  min-height: var(--h-36);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-8);
+  border-radius: var(--r-8);
+}
+.target[aria-current="true"] {
+  background: var(--surface-2);
+}
+.targetName {
+  flex: 1;
+  font-size: var(--fs-13);
+}
+.seg {
+  flex: none;
+  display: inline-flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--r-8);
+  background: var(--surface-2);
+}
+.target[aria-current="true"] .seg {
+  background: var(--divider);
+}
+.seg button {
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-6);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+.seg button:hover {
+  color: var(--fg-1);
+}
+.seg button[aria-checked="true"] {
+  background: var(--surface);
+  box-shadow: var(--e1);
+  color: var(--fg-1);
+  font-weight: 600;
 }
 .moreActions {
   display: flex;
   gap: var(--sp-6);
-  margin-top: var(--sp-8);
+  margin-top: var(--sp-4);
+  padding: var(--sp-6) var(--sp-4) 0;
+  border-top: 1px solid var(--divider);
 }
 .moreActions button {
   height: var(--h-28);

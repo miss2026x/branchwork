@@ -81,8 +81,9 @@ export function installMockBw(): void {
     queue = [
       { id: "w1", projectId: p.id, text: "把错误码映射成用户能看懂的提示", routeId: r2.id, mode: "auto", createdAt: 1 },
       { id: "w2", projectId: p.id, text: "README 补上 GitHub 环境变量说明", routeId: r2.id, mode: "manual", createdAt: 2 },
-      { id: "w3", projectId: p.id, text: "登录失败要不要加限流？", routeId: null, mode: "unassigned", createdAt: 3 },
-      { id: "w4", projectId: p.id, text: "CI 缓存老是失效，每次都重新装依赖", routeId: null, mode: "unassigned", createdAt: 4 },
+      { id: "w3", projectId: p.id, text: "登录失败要不要加限流？", routeId: null, mode: "unassigned", createdAt: Date.now() - 2 * 86_400_000 },
+      { id: "w4", projectId: p.id, text: "CI 缓存老是失效，每次都重新装依赖", routeId: null, mode: "unassigned", createdAt: Date.now() - 3 * 3_600_000 },
+      { id: "w5", projectId: p.id, text: "日志里这串请求 ID 对不上：req_7f3a9c0e1b2d4f6a8c0e1b2d4f6a8c0e1b2d4f6a8c0e1b2d4f6a8c0e1b2d，查一下是哪一层把它截断了，顺便看看网关和服务之间的透传逻辑", routeId: null, mode: "unassigned", createdAt: Date.now() - 25 * 60_000 },
     ];
   }
 

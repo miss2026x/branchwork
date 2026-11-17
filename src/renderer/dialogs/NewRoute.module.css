@@ -206,32 +206,75 @@
   font-size: var(--fs-11);
   color: var(--fg-3);
 }
+/* 从候车区选：每条最多两行，太长的折行、不横向撑开；下面一行写什么时候放进来的，选中的打勾 */
 .pickList {
   animation: pop var(--t-base) var(--ease);
   position: absolute;
   z-index: 8;
   right: 0;
-  top: calc(100% + 4px);
-  width: 320px;
-  max-height: 260px;
-  overflow-y: auto;
-  padding: var(--sp-4);
+  top: calc(100% + var(--sp-4));
+  width: 360px;
+  display: flex;
+  flex-direction: column;
   border-radius: var(--r-10);
   background: var(--surface);
   box-shadow: var(--e3);
+  overflow: hidden;
 }
-.pickList button {
-  display: block;
+.pickList header {
+  padding: var(--sp-10) var(--sp-12) var(--sp-6);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  font-weight: 600;
+  color: var(--fg-3);
+}
+.pickList [role="listbox"] {
+  max-height: 280px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+.pickList [role="option"] {
   width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
   padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-6);
   text-align: left;
+}
+.pickList [role="option"] > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.pickText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   font-size: var(--fs-13);
   line-height: var(--lh-20);
+  overflow-wrap: anywhere;
 }
-.pickList button:hover,
-.pickList button[aria-selected="true"] {
+.pickList small {
+  font-size: var(--fs-11);
+  line-height: var(--lh-16);
+  color: var(--fg-4);
+}
+.pickList [role="option"] svg {
+  flex: none;
+  margin-top: var(--sp-2);
+  color: var(--info);
+}
+.pickList [role="option"]:hover {
   background: var(--surface-2);
+}
+.pickList [role="option"][aria-selected="true"] {
+  background: var(--info-bg);
 }
 .warn {
   display: flex;

@@ -3,6 +3,7 @@ import type { DirectoryInfo, Project, TerminalSession } from "../../shared";
 import { IconClose } from "../ui/icons";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
+import { ago } from "../ui/ago";
 
 interface Props {
   /** 一开始选好的文件夹 */
@@ -17,17 +18,6 @@ interface Props {
   onCancel(): void;
 }
 
-/** 多久以前：今天 / 昨天 / N 天前 / 上周 / 上个月 / 更早 */
-function ago(at: number): string {
-  const days = Math.floor((Date.now() - at) / 86_400_000);
-  if (days <= 0) return "今天";
-  if (days === 1) return "昨天";
-  if (days < 7) return `${days} 天前`;
-  if (days < 14) return "上周";
-  if (days < 31) return `${Math.floor(days / 7)} 周前`;
-  if (days < 62) return "上个月";
-  return `${Math.floor(days / 30)} 个月前`;
-}
 
 /** 可以勾选的会话列表 */
 function SessionList({ sessions, picked, onToggle }: { sessions: TerminalSession[]; picked: string[]; onToggle(id: string): void }) {

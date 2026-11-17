@@ -93,6 +93,7 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
         key={it.id}
         className={css.item}
         data-kind={route ? "assigned" : "none"}
+        data-open={expanded === it.id}
         draggable={!!onDrag}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", it.text);
@@ -109,37 +110,41 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
             {(sub || it.projectId !== project.id) && <span>{[it.projectId !== project.id ? projectNames[it.projectId] : "", sub].filter(Boolean).join(" · ")}</span>}
           </div>
           {action}
-          <button className={css.icon} aria-label={`「${it.text}」的更多操作`} aria-expanded={expanded === it.id} onClick={() => setExpanded(expanded === it.id ? null : it.id)}>
-            <IconMore />
-          </button>
+          {/* 没派车的，“派车”展开的就是这一块，不再多一个“…” */}
+          {route && (
+            <button className={css.icon} aria-label={`「${it.text}」的更多操作`} aria-expanded={expanded === it.id} onClick={() => setExpanded(expanded === it.id ? null : it.id)}>
+              <IconMore />
+            </button>
+          )}
         </div>
         {expanded === it.id && (
-          <div className={css.more}>
-            <p>派给哪一路</p>
+          <div className={css.more} ref={(el) => el?.scrollIntoView({ block: "nearest" })}>
+            <p>
+              {route ? "改派给哪一路？" : "派给哪一路？"}
+              <span>自动：那一路正常到站就发；手动：到站后等你点</span>
+            </p>
             {allRoutes.filter((r) => r.projectId === it.projectId).map((r) => (
               <div key={r.id} className={css.target} aria-current={r.id === it.routeId}>
                 <Plate route={r} />
-                <span className="ell">{r.name}</span>
-                <button
-                  aria-pressed={r.id === it.routeId && it.mode === "auto"}
-                  title="那一路正常到站后自动发出"
-                  onClick={() => {
-                    onAssign(it.id, r.id, "auto");
-                    setExpanded(null);
-                  }}
-                >
-                  自动登车
-                </button>
-                <button
-                  aria-pressed={r.id === it.routeId && it.mode === "manual"}
-                  title="到站后等你点“登车”"
-                  onClick={() => {
-                    onAssign(it.id, r.id, "manual");
-                    setExpanded(null);
-                  }}
-                >
-                  手动登车
-                </button>
+                <span className={`${css.targetName} ell`} title={r.name}>
+                  {r.name}
+                </span>
+                <span className={css.seg} role="radiogroup" aria-label={`派给 ${r.express ? `快${r.express}` : `${r.number}路`} 的登车方式`}>
+                  {(["auto", "manual"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      role="radio"
+                      aria-checked={r.id === it.routeId && it.mode === mode}
+                      title={mode === "auto" ? "那一路正常到站后自动发出" : "到站后等你点“登车”"}
+                      onClick={() => {
+                        onAssign(it.id, r.id, mode);
+                        setExpanded(null);
+                      }}
+                    >
+                      {mode === "auto" ? "自动登车" : "手动登车"}
+                    </button>
+                  ))}
+                </span>
               </div>
             ))}
             <div className={css.moreActions}>
@@ -311,10 +316,10 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
                       it,
                       "",
                       <>
-                        <button className={css.small} onClick={() => onStartNew(it.id)} title="为它新开一路并发出">
+                        <button className={css.ghost} onClick={() => onStartNew(it.id)} title="为它新开一路并发出">
                           开新车
                         </button>
-                        <button className={css.small} onClick={() => setExpanded(expanded === it.id ? null : it.id)}>
+                        <button className={css.dispatch} aria-expanded={expanded === it.id} onClick={() => setExpanded(expanded === it.id ? null : it.id)}>
                           派车
                         </button>
                       </>,

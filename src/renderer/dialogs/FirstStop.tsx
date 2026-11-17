@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Effort, PermissionMode, QueueItem } from "../../shared";
 import { EffortControl } from "../chat/EffortControl";
 import { ModelControl } from "../chat/ModelControl";
 import { PermissionModeControl } from "../chat/PermissionModeControl";
 import { currentModel, modeItems, type OptionsState } from "../ui/claude-options";
-import { IconClose, IconWait, IconWarn } from "../ui/icons";
+import { agoFine } from "../ui/ago";
+import { IconCheck, IconClose, IconWait, IconWarn } from "../ui/icons";
 import { ROUTE_COLORS } from "../ui/route-color";
 import { useFit } from "../ui/useFit";
 import own from "./NewRoute.module.css";
@@ -76,7 +77,16 @@ interface Props {
 export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, onRun, options, routeLabel, waiting, picked, onPick }: Props) {
   const [picking, setPicking] = useState(false);
   const list = useRef<HTMLDivElement>(null);
+  const pickWrap = useRef<HTMLDivElement>(null);
   useFit(list, [picking]);
+  useEffect(() => {
+    if (!picking) return;
+    const onDown = (e: PointerEvent) => pickWrap.current?.contains(e.target as Node) || setPicking(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), setPicking(false));
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey, true);
+    return () => (window.removeEventListener("pointerdown", onDown), window.removeEventListener("keydown", onKey, true));
+  }, [picking]);
   const model = run ? currentModel(options, run.model) : null;
   const fromQueue = picked && value.trim() === picked.text;
   return (
@@ -105,17 +115,24 @@ export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, 
             )}
           </div>
           {waiting.length > 0 && (
-            <div className={own.pickWrap}>
+            <div ref={pickWrap} className={own.pickWrap}>
               <button type="button" className={own.pick} aria-expanded={picking} onClick={() => setPicking(!picking)}>
                 <IconWait size={13} /> 从候车区选 <span>{waiting.length}</span>
               </button>
               {picking && (
-                <div ref={list} className={own.pickList} role="listbox" aria-label="候车区里没派车的问题">
-                  {waiting.map((q) => (
-                    <button key={q.id} type="button" role="option" aria-selected={picked?.id === q.id} onClick={() => (onPick(q), onChange(q.text), setPicking(false))}>
-                      {q.text}
-                    </button>
-                  ))}
+                <div ref={list} className={own.pickList}>
+                  <header>候车区里还没派车的 {waiting.length} 个问题</header>
+                  <div role="listbox" aria-label="候车区里没派车的问题">
+                    {waiting.map((q) => (
+                      <button key={q.id} type="button" role="option" aria-selected={picked?.id === q.id} title={q.text} onClick={() => (onPick(q), onChange(q.text), setPicking(false))}>
+                        <span>
+                          <span className={own.pickText}>{q.text}</span>
+                          <small>放进来 {agoFine(q.createdAt)}</small>
+                        </span>
+                        {picked?.id === q.id && <IconCheck size={14} />}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
