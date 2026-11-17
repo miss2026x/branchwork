@@ -14,6 +14,8 @@ export interface PendingPermission {
   stopId: string;
   tool: string;
   detail: string;
+  /** Claude 自己写的一句说明（命令的 description），没有就不显示 */
+  reason?: string;
   canRemember: boolean;
 }
 
@@ -367,7 +369,7 @@ export const useStore = create<State>((set, get) => {
         break;
       case "permission.request":
         set((s) => ({
-          permissions: { ...s.permissions, [e.routeId]: { requestId: e.requestId, stopId: e.stopId, tool: e.tool, detail: summarize(e.input), canRemember: e.canRemember } },
+          permissions: { ...s.permissions, [e.routeId]: { requestId: e.requestId, stopId: e.stopId, tool: e.tool, detail: summarize(e.input), reason: typeof e.input.command === "string" && typeof e.input.description === "string" ? e.input.description : undefined, canRemember: e.canRemember } },
         }));
         break;
       case "queue.updated":

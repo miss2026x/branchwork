@@ -111,7 +111,7 @@
   border: 1px solid var(--border);
   border-radius: var(--r-4);
   background: var(--surface);
-  font: 11px/18px var(--mono);
+  font: var(--fs-11) / var(--lh-18) var(--mono);
   color: var(--fg-3);
 }
 .search[data-compact="true"] {
@@ -327,7 +327,7 @@
   margin-top: var(--sp-2);
 }
 .firstNote code {
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
 }
 
 /* 两三个选项的小弹窗 */

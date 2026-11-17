@@ -125,7 +125,7 @@
 .enter {
   flex: none;
   color: var(--fg-3);
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
 }
 .slot {
   flex: none;
@@ -266,7 +266,7 @@
   padding: 0 var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--r-4);
-  font: 11px/18px var(--mono);
+  font: var(--fs-11) / var(--lh-18) var(--mono);
   text-align: center;
   color: var(--fg-2);
 }

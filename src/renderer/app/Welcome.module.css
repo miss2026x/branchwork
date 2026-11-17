@@ -112,7 +112,7 @@
   color: var(--fg-3);
 }
 .checks code {
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
 }
 /* 顶栏右上角的设置面板 */
 .settings {

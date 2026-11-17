@@ -9,7 +9,7 @@ import { EffortControl } from "./EffortControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { useStore, type LiveStop } from "../stores/store";
-import { IconChevron, IconEye, IconSend, IconStop, IconWait, IconWarn } from "../ui/icons";
+import { IconChevron, IconEdit, IconEye, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
@@ -97,6 +97,11 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   useEffect(() => {
     stick.current = true;
   }, [route.id]);
+  // 有命令等批准：卡片在对话末尾，滚过去让它露出来
+  useLayoutEffect(() => {
+    const el = log.current;
+    if (el && permission) (el.scrollTop = el.scrollHeight), (stick.current = true);
+  }, [permission?.requestId]);
 
   // 从搜索或通知跳过来：滚到那一站，闪一下
   const [flash, setFlash] = useState<string | null>(null);
@@ -329,6 +334,40 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           );
         })}
 
+        {/* 等你批准（设计稿“权限请求”）：卡片排在对话里，紧跟着这一站，不挤占对话的高度 */}
+        {permission && (
+          <section className={css.permission} role="alertdialog" aria-label="等你批准" aria-describedby={permission.reason ? "perm-reason" : undefined}>
+            <header>
+              <span>{/bash|终端|command/i.test(permission.tool) ? <IconTerminal size={16} /> : /write|edit/i.test(permission.tool) ? <IconEdit size={16} /> : <IconWarn size={16} />}</span>
+              <h3>Claude 想{/bash|终端|command/i.test(permission.tool) ? "运行一条命令" : /write|edit/i.test(permission.tool) ? "改一个文件" : `用 ${permission.tool}`}</h3>
+            </header>
+            <code>{permission.detail}</code>
+            {permission.reason && <p id="perm-reason">{permission.reason}</p>}
+            <div className={css.choices}>
+              <button className={css.allow} onClick={() => answerPermission(route.id, "allow")}>
+                <kbd>1</kbd>
+                <span className="ell">允许这一次</span>
+              </button>
+              {permission.canRemember && (
+                <button onClick={() => answerPermission(route.id, "allow-always")}>
+                  <kbd>2</kbd>
+                  <span className="ell">这一路以后都允许</span>
+                </button>
+              )}
+              <div className={css.deny}>
+                <label htmlFor="perm-deny">
+                  <kbd>3</kbd> 不允许，告诉 Claude 换个做法
+                </label>
+                <div>
+                  <input id="perm-deny" ref={denyNote} aria-label="告诉 Claude 换个做法" placeholder="可以不写，比如：别装新库，用自带的" maxLength={500} onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && answerPermission(route.id, "deny", e.currentTarget.value)} />
+                  <button onClick={() => answerPermission(route.id, "deny", denyNote.current?.value)}>拒绝</button>
+                </div>
+              </div>
+            </div>
+            {queued > 0 && <small>候车区里排给 {route.express ? `快${route.express}` : `${route.number}路`} 的问题，会等这一站结束后再发。</small>}
+          </section>
+        )}
+
         {pending !== undefined && (
           <section className={css.stop}>
             <div className={css.ask} style={{ background: colors.tint }}>
@@ -338,30 +377,6 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           </section>
         )}
       </div>
-
-      {permission && (
-        <div className={css.permission} role="alertdialog" aria-label="等你批准">
-          <b>
-            <IconWarn size={16} /> Claude 想{/bash|终端|command/i.test(permission.tool) ? "运行一条命令" : /write|edit/i.test(permission.tool) ? "改一个文件" : `用 ${permission.tool}`}
-          </b>
-          <code>{permission.detail}</code>
-          <div className={css.choices}>
-            <button className={css.allow} onClick={() => answerPermission(route.id, "allow")}>
-              <kbd>1</kbd> 允许这一次
-            </button>
-            {permission.canRemember && (
-              <button onClick={() => answerPermission(route.id, "allow-always")}>
-                <kbd>2</kbd> 这一路以后都允许
-              </button>
-            )}
-            <div className={css.denyRow}>
-              <kbd>3</kbd>
-              <input ref={denyNote} aria-label="告诉 Claude 换个做法" placeholder="不允许，告诉 Claude 换个做法（可以不写）" maxLength={500} onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && answerPermission(route.id, "deny", e.currentTarget.value)} />
-              <button onClick={() => answerPermission(route.id, "deny", denyNote.current?.value)}>拒绝</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {blocked && (
         <div className={css.conflict} role="alert">
@@ -418,8 +433,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
       <footer className={css.composer} hidden={!!viewing}>
         {busy && (
           <div className={css.running}>
-            <span style={{ color: colors.tag }}>
-              <i style={{ background: colors.line }} />
+            <span style={{ color: route.status === "awaiting_permission" ? "var(--amber-text)" : colors.tag }}>
+              <i style={{ background: route.status === "awaiting_permission" ? "var(--amber)" : colors.line }} />
               {route.status === "awaiting_permission" ? "等你批准" : pending !== undefined ? "同步中" : currentLive?.phase === "starting" ? "启动中" : currentLive?.phase === "finishing" ? "收尾中" : "回答中"}
             </span>
             <button onClick={() => stop(route.id)}>

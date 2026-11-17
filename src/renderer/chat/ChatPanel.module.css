@@ -129,7 +129,7 @@
   line-height: var(--lh-24);
 }
 .md code {
-  font: 12.5px/18px var(--mono);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
   padding: 1px var(--sp-4);
   border-radius: var(--r-4);
   background: var(--surface-2);
@@ -190,7 +190,7 @@
   gap: var(--sp-12);
   height: var(--h-menu);
   padding: 0 var(--sp-12);
-  font: 12px/18px var(--mono);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
   text-align: left;
 }
 .tool + .tool,
@@ -249,53 +249,14 @@
   background: var(--red-bg);
   color: var(--red);
 }
-.permission,
 .conflict {
   flex: none;
   margin: 0 var(--sp-16) var(--sp-12);
   padding: var(--sp-12) var(--sp-12);
   border-radius: var(--r-10);
 }
-.permission {
-  border: 1px solid var(--amber);
-  background: var(--amber-strip);
-}
-.permission b {
-  display: block;
-  margin-bottom: var(--sp-6);
-  color: var(--amber-text);
-}
-.permission code {
-  display: block;
-  max-height: 96px;
-  overflow: auto;
-  padding: var(--sp-8) var(--sp-10);
-  border-radius: var(--r-6);
-  background: var(--surface);
-  font: 12px/18px var(--mono);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.permission div {
-  display: flex;
-  gap: var(--sp-8);
-  margin-top: var(--sp-10);
-}
-.permission button {
-  height: var(--h-32);
-  padding: 0 var(--sp-12);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-8);
-  background: var(--surface);
-  font-weight: 600;
-}
-.permission .allow {
-  border-color: var(--fg-1);
-  background: var(--fg-1);
-  color: var(--fg-on-color);
-}
 .conflict {
-  border: 1px solid color-mix(in srgb, var(--red) 35%, white);
+  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--surface));
   background: var(--surface);
 }
 .conflict b {
@@ -319,7 +280,7 @@
 }
 .conflict code {
   display: block;
-  font: 12.5px/18px var(--mono);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
   color: var(--fg-1);
   overflow-wrap: anywhere;
 }
@@ -581,7 +542,7 @@
   flex: none;
   display: flex;
   gap: var(--sp-8);
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
   font-style: normal;
 }
 .tool em b {
@@ -779,55 +740,6 @@
   outline-offset: 1px;
 }
 
-.permission b {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-6);
-}
-.permission code {
-  background: var(--fg-1);
-  color: var(--border);
-}
-.permission .choices {
-  flex-direction: column;
-  gap: var(--sp-6);
-}
-.choices > button {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-8);
-  height: var(--h-36);
-  text-align: left;
-}
-.choices kbd,
-.denyRow kbd {
-  flex: none;
-  min-width: 20px;
-  padding: 0 var(--sp-4);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-4);
-  background: var(--surface);
-  font: 11px/18px var(--mono);
-  text-align: center;
-  color: var(--fg-2);
-}
-.permission .denyRow {
-  margin: 0;
-  align-items: center;
-  gap: var(--sp-8);
-  padding-left: var(--sp-12);
-}
-.denyRow input {
-  flex: 1;
-  min-width: 0;
-  height: var(--h-menu);
-  padding: 0 var(--sp-10);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-8);
-  background: var(--surface);
-  font: inherit;
-  font-size: var(--fs-13);
-}
 .afterBreak {
   display: flex;
   flex-wrap: wrap;
@@ -892,4 +804,144 @@
   50% {
     opacity: 0;
   }
+}
+
+/* 等你批准（设计稿“权限请求”）：排在对话里，琥珀色 2px 外框 */
+.permission {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  margin: var(--sp-4) 0 var(--sp-8);
+  padding: var(--sp-16);
+  border: 2px solid var(--amber);
+  border-radius: var(--r-12);
+  background: var(--amber-strip);
+  box-shadow: var(--e-amber);
+}
+.permission header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+}
+.permission header span {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  background: var(--amber);
+  color: var(--fg-1);
+}
+.permission h3 {
+  margin: 0;
+  font-size: var(--fs-16);
+  line-height: var(--lh-24);
+  font-weight: 700;
+}
+.permission code {
+  display: block;
+  max-height: 120px;
+  overflow: auto;
+  padding: var(--sp-10) var(--sp-12);
+  border-radius: var(--r-8);
+  background: var(--fg-1);
+  color: var(--surface-2);
+  font: var(--fs-13) / var(--lh-20) var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.permission p {
+  margin: 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-3);
+}
+.permission small {
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.choices > button {
+  min-width: 0;
+  min-height: var(--h-40);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  font-size: var(--fs-14);
+  text-align: left;
+}
+.choices > button span {
+  flex: 1;
+}
+.choices > .allow {
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-weight: 600;
+}
+.choices kbd {
+  flex: none;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-3);
+}
+.choices > .allow kbd {
+  border-color: var(--on-dark-line);
+  color: var(--line-2);
+}
+.deny {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-10) var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface);
+}
+.deny label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  font-size: var(--fs-14);
+}
+.deny > div {
+  display: flex;
+  gap: var(--sp-6);
+}
+.deny input {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-36);
+  padding: 0 var(--sp-10);
+  border: 1px solid var(--border);
+  border-radius: var(--r-6);
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--fs-13);
+}
+.deny input:focus {
+  outline: none;
+  border-color: var(--fg-1);
+}
+.deny button {
+  flex: none;
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
+  border-radius: var(--r-6);
+  background: var(--red-bg);
+  color: var(--red-text);
+  font-size: var(--fs-13);
+  font-weight: 600;
 }

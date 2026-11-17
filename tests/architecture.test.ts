@@ -20,6 +20,9 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
 const SRC = path.resolve(__dirname, "..", "src");
 const files = (dir: string): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : []));
+/** 目录下所有样式文件（files 只收 .ts / .tsx） */
+const cssFiles = (dir: string): string[] =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? cssFiles(path.join(dir, e.name)) : e.name.endsWith(".css") ? [path.join(dir, e.name)] : []));
 const imports = (file: string) => [...fs.readFileSync(file, "utf8").matchAll(/(?:from|import)\s+["']([^"']+)["']/g)].map((m) => m[1]!);
 
 describe("模块规则", () => {
@@ -65,7 +68,7 @@ describe("模块规则", () => {
 describe("界面的动效", () => {
   it("CSS Modules 里用到的动画名，同一个文件里都有 @keyframes（模块会把名字按文件改掉，用别处定义的会悄悄失效）", () => {
     const problems: string[] = [];
-    for (const f of files(path.join(SRC, "renderer")).filter((x) => x.endsWith(".module.css"))) {
+    for (const f of cssFiles(path.join(SRC, "renderer")).filter((x) => x.endsWith(".module.css"))) {
       const text = fs.readFileSync(f, "utf8");
       const defined = new Set([...text.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]));
       for (const m of text.matchAll(/animation(?:-name)?\s*:\s*([\w-]+)/g)) {
@@ -79,7 +82,8 @@ describe("界面的动效", () => {
 });
 
 describe("设计稿的样式规范（第 0 站）：组件样式只用 tokens.css 里的变量", () => {
-  const css = () => files(path.join(SRC, "renderer")).filter((x) => x.endsWith(".module.css"));
+  const css = () => cssFiles(path.join(SRC, "renderer")).filter((x) => x.endsWith(".module.css"));
+  it("真的找到了样式文件（防止检查对着空列表通过）", () => expect(css().length).toBeGreaterThan(20));
   const tokens = fs.readFileSync(path.join(SRC, "renderer/styles/tokens.css"), "utf8");
   const defined = new Set([...tokens.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]));
 
@@ -104,7 +108,7 @@ describe("设计稿的样式规范（第 0 站）：组件样式只用 tokens.cs
     const problems: string[] = [];
     for (const f of [...css(), ...files(path.join(SRC, "renderer")).filter((x) => /\.tsx?$/.test(x))])
       for (const m of fs.readFileSync(f, "utf8").matchAll(/var\((--[\w-]+)/g))
-        if (!m[1]!.endsWith("-") && !defined.has(m[1]!) && !["--fx", "--fy", "--c", "--p", "--panel-w", "--lane", "--lane-text"].includes(m[1]!)) problems.push(`${path.relative(SRC, f)}：${m[1]}`);
+        if (!m[1]!.endsWith("-") && !defined.has(m[1]!) && !["--fx", "--fy", "--c", "--p", "--panel-w", "--lane", "--lane-text", "--rail-w"].includes(m[1]!)) problems.push(`${path.relative(SRC, f)}：${m[1]}`);
     expect([...new Set(problems)]).toEqual([]);
   });
 
@@ -113,7 +117,8 @@ describe("设计稿的样式规范（第 0 站）：组件样式只用 tokens.cs
   });
 
   it("字号和行高：只用字阶的 10 级", () => {
-    expect(check((p, v) => p === "font-size" && !/^(var\(--fs-\d+\)|inherit)$/.test(v))).toEqual([]);
+    expect(check((p, v) => p === "font-size" && !/^(var\(--fs-\d+\)|inherit)( !important)?$/.test(v))).toEqual([]);
+    expect(check((p, v) => p === "font" && /\d+px/.test(v))).toEqual([]);
     expect(check((p, v) => p === "line-height" && /\d+px/.test(v))).toEqual([]);
   });
 

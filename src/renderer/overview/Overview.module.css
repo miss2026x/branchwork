@@ -87,7 +87,7 @@
 }
 .open code {
   display: block;
-  font: 12px/18px var(--mono);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
   color: var(--fg-3);
 }
 .plates {

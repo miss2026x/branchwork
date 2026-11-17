@@ -162,7 +162,7 @@
   color: var(--fg-3);
 }
 .files code {
-  font: 12.5px/20px var(--mono);
+  font: var(--fs-12) / var(--lh-20) var(--mono);
   overflow-wrap: anywhere;
 }
 .destroy {
@@ -212,7 +212,7 @@
 }
 .field .summary {
   min-height: 220px;
-  font: 13px/20px var(--mono);
+  font: var(--fs-13) / var(--lh-20) var(--mono);
   background: var(--surface-1);
 }
 .regen {

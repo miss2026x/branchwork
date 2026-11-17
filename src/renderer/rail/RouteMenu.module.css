@@ -137,7 +137,7 @@
 .resume code {
   flex: 1;
   min-width: 0;
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
 }
 .resume div button {
   flex: none;

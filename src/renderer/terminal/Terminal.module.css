@@ -103,7 +103,7 @@ li[data-status="exited"] .rowText b {
   border-radius: var(--r-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  font: 11px/18px var(--mono);
+  font: var(--fs-11) / var(--lh-18) var(--mono);
   color: var(--fg-2);
 }
 .state {
@@ -228,7 +228,7 @@ li[data-status="exited"] .rowText b {
   border-radius: var(--r-10);
   background: var(--fg-1);
   color: var(--border);
-  font: 12px/19px var(--mono);
+  font: var(--fs-12) / var(--lh-20) var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   scrollbar-width: thin;
@@ -244,7 +244,7 @@ li[data-status="exited"] .rowText b {
 .window footer span {
   flex: 1;
   min-width: 0;
-  font: 11px var(--mono);
+  font: var(--fs-11) var(--mono);
   color: var(--fg-4);
 }
 .window footer button {

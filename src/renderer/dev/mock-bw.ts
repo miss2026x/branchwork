@@ -149,7 +149,7 @@ export function installMockBw(): void {
     if (!stopped && text.includes("批准") && routes.get(routeId)!.permissionMode !== "all") {
       const requestId = id("q");
       setRoute(routeId, { status: "awaiting_permission" });
-      emit({ type: "permission.request", requestId, routeId, stopId: stop.id, tool: "Bash", input: { command: "npm test -- auth" }, canRemember: true });
+      emit({ type: "permission.request", requestId, routeId, stopId: stop.id, tool: "Bash", input: { command: "npm test -- auth", description: "跑一遍 auth 相关的测试，会在本机起一个测试数据库" }, canRemember: true });
       const decision = await new Promise<string>((r) => permissions.set(requestId, r));
       if (!stopped) setRoute(routeId, { status: "answering" });
       if (decision === "deny") await say("你没有批准运行测试，我就不跑了。\n\n");

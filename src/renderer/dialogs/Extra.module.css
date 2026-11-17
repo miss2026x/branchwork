@@ -60,7 +60,7 @@
   color: var(--fg-3);
 }
 .checks code {
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
 }
 /* 两栏的弹窗（开一路新车）：头、底各一条通栏的分隔线，两栏各自留白，右栏浅底 */
 .two {
@@ -392,7 +392,7 @@
 .log time {
   flex: none;
   width: 76px;
-  font: 12px/22px var(--mono);
+  font: var(--fs-12) / var(--lh-22) var(--mono);
   color: var(--fg-3);
 }
 .log li > i {
@@ -431,7 +431,7 @@
   padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-8);
   background: var(--surface-1);
-  font: 12px/20px var(--mono);
+  font: var(--fs-12) / var(--lh-20) var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -565,7 +565,7 @@
 }
 .kept li code {
   display: block;
-  font: 11px var(--mono);
+  font: var(--fs-11) var(--mono);
   color: var(--fg-3);
 }
 .kept li button {
@@ -699,5 +699,5 @@
   color: var(--fg-2);
 }
 .log li p code {
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
 }

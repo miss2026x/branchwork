@@ -398,7 +398,7 @@
 }
 .menu kbd {
   flex: none;
-  font: 11px/20px var(--mono);
+  font: var(--fs-11) / var(--lh-20) var(--mono);
   color: var(--fg-4);
 }
 .menu hr {
@@ -784,7 +784,7 @@
 .cardFile code {
   display: block;
   margin-bottom: var(--sp-2);
-  font: 13px var(--mono);
+  font: var(--fs-13) var(--mono);
   color: var(--fg-1);
   overflow-wrap: anywhere;
 }

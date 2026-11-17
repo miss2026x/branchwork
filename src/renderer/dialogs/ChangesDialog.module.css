@@ -40,7 +40,7 @@ li[data-kind="deleted"] .kind {
 .files code {
   flex: 1;
   min-width: 0;
-  font: 12px var(--mono);
+  font: var(--fs-12) var(--mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -57,7 +57,7 @@ li[data-kind="deleted"] .kind {
   flex: none;
   min-width: 36px;
   text-align: right;
-  font: 600 12px var(--mono);
+  font: 600 var(--fs-12) var(--mono);
 }
 .plus {
   color: var(--green);
