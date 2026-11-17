@@ -299,9 +299,9 @@
   color: var(--text-4);
 }
 .cancel {
-  height: 38px;
-  padding: 0 12px;
-  border-radius: var(--r-10);
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-8);
   font-size: 14px;
   font-weight: 600;
   color: var(--text-3);
@@ -311,12 +311,12 @@
 }
 .go {
   flex: none;
-  height: 38px;
+  height: 44px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 16px;
-  border-radius: var(--r-10);
+  border-radius: var(--r-8);
   color: #fff;
   font-size: 14px;
   font-weight: 700;
