@@ -72,12 +72,27 @@ const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
  * 线路图。只收路和站的数据、发出“点了哪一路”；自己不取数据。
  * 线用 SVG 画，站和路牌是叠在上面的普通元素；整体放在一个可平移缩放的层里。
  */
+/** 平移量对齐到屏幕的物理像素：落在半个像素上，字和细线会发虚 */
+const snap = (v: number) => Math.round(v * (window.devicePixelRatio || 1)) / (window.devicePixelRatio || 1);
+
+const worldTransform = (v: { k: number; x: number; y: number }) => `translate(${snap(v.x)}px, ${snap(v.y)}px) scale(${v.k})`;
+
+/** 地图底下的点阵：间距 24px 跟着缩放，缩得太密就隔一个取一个（保持 12–24px），位置跟着平移 */
+function dotGrid(view: { k: number; x: number; y: number }): CSSProperties {
+  let g = 24 * view.k;
+  while (g < 12) g *= 2;
+  return { backgroundSize: `${g}px ${g}px`, backgroundPosition: `${snap(view.x)}px ${snap(view.y)}px` };
+}
+
 export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
   const viewport = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const world = useRef<HTMLDivElement>(null);
   const [focusTick, setFocusTick] = useState(0);
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   /** 点开了哪一站的菜单 */
@@ -155,7 +170,14 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
     let left = el.getBoundingClientRect().left;
     const ro = new ResizeObserver(() => {
       const now = el.getBoundingClientRect().left;
-      if (armed.current && now !== left && el.clientWidth > 0) setView((v) => ({ ...v, x: v.x + (left - now) }));
+      if (armed.current && now !== left && el.clientWidth > 0) {
+        // 这一帧就把线路挪回去（等 React 下一轮再画会晚一帧，收起动画开头走得快，能看出线路被带着跑）
+        const v = { ...viewRef.current, x: viewRef.current.x + (left - now) };
+        viewRef.current = v;
+        if (world.current) world.current.style.transform = worldTransform(v);
+        Object.assign(el.style, dotGrid(v));
+        setView(v);
+      }
       left = now;
     });
     ro.observe(el);
@@ -251,8 +273,8 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         </button>
       </div>
 
-      <div ref={viewport} className={css.viewport} data-detail={detail} onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)}>
-        <div className={css.world} style={{ width: layout.width, height: layout.height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>
+      <div ref={viewport} className={css.viewport} data-detail={detail} style={dotGrid(view)} onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)}>
+        <div ref={world} className={css.world} style={{ width: layout.width, height: layout.height, transform: worldTransform(view) }}>
           <svg width={layout.width} height={layout.height} className={css.lines}>
             {/* 选中的路最后画，压在别的线上面 */}
             {[...layout.lanes]

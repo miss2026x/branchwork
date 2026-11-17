@@ -14,6 +14,10 @@
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
+/* 地图在的时候，顶栏和两边是一整块白框，地图那块板自己有边，顶栏下面不再画线（设计稿 9-8 方案 A） */
+.app:has(.pane[data-pane="map"]:not([aria-hidden])) .top {
+  border-bottom-color: transparent;
+}
 .brand {
   display: flex;
   align-items: center;
@@ -41,6 +45,7 @@
   display: flex;
   position: relative;
   overflow: clip;
+  background: var(--surface);
   --panel-w: 420px;
 }
 .body[data-tier="mid"],
@@ -55,17 +60,37 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--border);
   background: var(--surface);
 }
-.pane[data-first] {
-  border-left: none;
+/* 两个白色面板挨着时（中间没有地图）才画一条分隔线 */
+.pane[data-seam] {
+  border-left: 1px solid var(--border);
 }
 .pane[data-flex] {
   flex: 1;
 }
+/*
+ * 地图是嵌在白框里的一块板（设计稿 9-8 方案 A）：四条边都在，圆角、细线、很浅的内阴影。
+ * 上边贴着顶栏，下边留 8px；靠窗口边上的那一侧也留 8px，挨着别的面板的那一侧不留（分隔条就在板的边线上）。
+ */
 .pane[data-pane="map"] {
+  margin-bottom: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--r-12);
   background: var(--canvas);
+  box-shadow: var(--e-inset);
+  overflow: clip;
+}
+.pane[data-pane="map"][data-outer~="left"] {
+  margin-left: var(--sp-8);
+}
+.pane[data-pane="map"][data-outer~="right"] {
+  margin-right: var(--sp-8);
+}
+/* 正在收起的地图：边线和留白一起收掉，最后不剩一条缝 */
+.pane[data-pane="map"][aria-hidden][data-anim="run"] {
+  margin-inline: 0;
+  border-width: 0;
 }
 /* 收起 / 打开时：每个面板用固定宽度，320ms 滑到新宽度 */
 .pane[data-anim] {
@@ -73,11 +98,15 @@
   overflow: hidden;
 }
 .pane[data-anim="run"] {
-  transition: width var(--t-slow) var(--ease);
+  transition:
+    width var(--t-slow) var(--ease),
+    margin var(--t-slow) var(--ease);
 }
 /* 内容保持打开时的宽度：靠左的往左滑出去，靠右的往右，中间的两边一起收 */
 .pane[data-anim] > * {
-  flex: 1 0 auto;
+  /* 高度照常占满（不能按内容撑高，否则对话的滚动条没了、一下跳回顶部） */
+  flex: 1 1 0;
+  min-height: 0;
   width: var(--anim-w);
   min-width: var(--anim-w);
 }

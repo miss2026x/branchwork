@@ -168,6 +168,10 @@ export function App() {
     widths: Record<string, number>;
     full: Record<string, number>;
     run: boolean;
+    /** 动画开始前看得见的面板（第一帧的留白、分隔线按它来，下一帧再过渡到新的） */
+    before: PaneId[];
+    /** 这次收起 / 打开的是哪个面板 */
+    toggled: PaneId | undefined;
   } | null>(null);
   const animTimer = useRef<number>(undefined);
   const [deleting, setDeleting] = useState<{
@@ -250,6 +254,32 @@ export function App() {
   };
   const { asDrawer: chatAsDrawer, flow: flowPanes } = flowOf(layout);
   const flex = flexPane(flowPanes);
+  /** 留白、分隔线看哪一组面板：动画第一帧还按旧的，跑起来就按新的（留白跟着宽度一起过渡） */
+  const shownFor = () => (anim && !anim.run ? anim.before : flowPanes);
+  /** 这个面板贴着窗口哪一边 */
+  const outer = (id: PaneId) => {
+    const shown = shownFor();
+    const at = shown.indexOf(id);
+    if (at < 0) return undefined;
+    const sides = [at === 0 && "left", at === shown.length - 1 && "right"].filter(Boolean).join(" ");
+    return sides || undefined;
+  };
+  /** 左边挨着的也是白色面板（两个都不是地图）时画分隔线 */
+  const seam = (id: PaneId) => {
+    const shown = shownFor();
+    const at = shown.indexOf(id);
+    return at > 0 && id !== "map" && shown[at - 1] !== "map";
+  };
+  /**
+   * 动画里面板内容贴哪边：收起 / 打开的那个面板，第一个往左滑、最后一个往右滑、中间的两边收；
+   * 别的面板贴着不动的那条边，比如项目列表收起时地图的右边不动，内容就贴右边，地图上的线路在屏幕上不跑
+   */
+  const slideOf = (id: PaneId, i: number, list: PaneId[]) => {
+    if (!anim) return undefined;
+    const t = anim.toggled ? list.indexOf(anim.toggled) : -1;
+    if (id !== anim.toggled && t >= 0) return t < i ? "left" : "right";
+    return i === 0 && list.length > 1 ? "left" : i === list.length - 1 && list.length > 1 ? "right" : "middle";
+  };
   const compactRail = (p: PaneId | undefined) => p === "rail" && tier !== "wide";
   /** 不占剩下宽度时，这个面板在某个布局里该多宽 */
   const ownWidth = (l: Layout, id: PaneId) => (compactRail(id) ? 56 : (l.width[id] ?? (id === "chat" ? (tier === "wide" ? 420 : 380) : PANES[id].base)));
@@ -268,7 +298,10 @@ export function App() {
     }
     const from: Record<string, number> = {};
     for (const id of flowPanes) from[id] = paneWidth(id);
-    const to = targetWidths(nextFlow, flexPane(nextFlow), (id) => ownWidth(next, id), body.clientWidth);
+    // 地图那块板靠窗口边的一侧有留白（margin，不算在宽度里），先从总宽里扣掉，动画中总宽才对得上，右边的面板不会被挤出去一下
+    const gutter = parseFloat(getComputedStyle(body).getPropertyValue("--sp-8")) || 8;
+    const margins = nextFlow.includes("map") ? gutter * (Number(nextFlow[0] === "map") + Number(nextFlow[nextFlow.length - 1] === "map")) : 0;
+    const to = targetWidths(nextFlow, flexPane(nextFlow), (id) => ownWidth(next, id), body.clientWidth - margins);
     // 收起的面板也留在原来的位置，宽度滑到 0
     const ids = next.order.filter((p) => nextFlow.includes(p) || flowPanes.includes(p));
     const start = Object.fromEntries(ids.map((p) => [p, from[p] ?? 0]));
@@ -276,8 +309,10 @@ export function App() {
     // 动画里每个面板的内容按它“打开时”的宽度排，面板只是在外面收窄 / 放宽，内容不会被挤
     const full = Object.fromEntries(ids.map((p) => [p, Math.max(start[p]!, end[p]!)]));
     updateLayout(() => next);
-    setAnim({ ids, widths: start, full, run: false });
-    requestAnimationFrame(() => requestAnimationFrame(() => setAnim({ ids, widths: end, full, run: true })));
+    const before = flowPanes;
+    const toggled = ids.find((p) => nextFlow.includes(p) !== flowPanes.includes(p));
+    setAnim({ ids, widths: start, full, run: false, before, toggled });
+    requestAnimationFrame(() => requestAnimationFrame(() => setAnim({ ids, widths: end, full, run: true, before, toggled })));
     window.clearTimeout(animTimer.current);
     animTimer.current = window.setTimeout(() => setAnim(null), 340);
   };
@@ -403,6 +438,7 @@ export function App() {
             onRemove={(id) => void queueRemove(id)}
           />
         )}
+        {/* 收起 / 打开后看得见的面板：地图那块板靠窗口边的一侧留白，两个白色面板挨着时画分隔线（设计稿 9-8） */}
         {(anim ? anim.ids : flowPanes).map((id, i, list) => {
           const left = list[i - 1];
           const hiddenNow = !flowPanes.includes(id);
@@ -427,10 +463,12 @@ export function App() {
                 className={css.pane}
                 data-pane={id}
                 data-first={i === 0 || undefined}
+                data-outer={outer(id)}
+                data-seam={seam(id) || undefined}
                 data-edge={i === list.length - 1 && i > 0 ? "right" : undefined}
                 data-flex={(!anim && id === flex) || undefined}
                 data-anim={anim ? (anim.run ? "run" : "start") : undefined}
-                data-slide={anim ? (i === 0 && list.length > 1 ? "left" : i === list.length - 1 && list.length > 1 ? "right" : "middle") : undefined}
+                data-slide={slideOf(id, i, list)}
                 aria-hidden={hiddenNow || undefined}
                 style={
                   anim

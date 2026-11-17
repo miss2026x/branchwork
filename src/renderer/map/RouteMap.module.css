@@ -78,6 +78,8 @@
   touch-action: none;
   /* 拖动地图时不要把站名、路牌当成文字选中（会整片变蓝） */
   user-select: none;
+  /* 点阵跟着地图一起平移、缩放（大小和位置由组件按视野算），一眼看出这是一块可以拖的画布 */
+  background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1.5px);
 }
 .viewport:active {
   cursor: grabbing;
@@ -87,6 +89,9 @@
   left: 0;
   top: 0;
   transform-origin: 0 0;
+}
+/* 只在按住拖动时交给显卡平移；平时不加，缩放后浏览器会按新比例重新排字，不会把 100% 的字拉糊 */
+.viewport:active .world {
   will-change: transform;
 }
 .lines {
@@ -202,6 +207,7 @@
   white-space: nowrap;
   font-size: var(--fs-12);
   line-height: var(--lh-16);
+  font-weight: 500;
   color: var(--fg-2);
 }
 .stop[data-latest="true"] .name {
