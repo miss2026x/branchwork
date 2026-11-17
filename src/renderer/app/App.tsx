@@ -14,6 +14,8 @@ import { ForkDialog } from "../dialogs/ForkDialog";
 import { TerminalDialog } from "../terminal/TerminalDialog";
 import { ordinal, stopOffset } from "../stores/numbering";
 import { ChatPanel } from "../chat/ChatPanel";
+import { ImageViewer } from "../chat/ImageViewer";
+import { StopImages } from "../chat/StopImages";
 import { Notices } from "../notices/Notices";
 import { Settings } from "./Settings";
 import { Welcome } from "./Welcome";
@@ -371,7 +373,7 @@ export function App() {
           />
   );
   const chatEl = route ? (
-    <ChatPanel key={route!.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />
+    <ChatPanel key={route!.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode, images) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode, images)} />
   ) : null;
 
   return (
@@ -548,6 +550,7 @@ export function App() {
                       <>
                         <RouteMap
                           resizing={!!anim}
+                          stopImages={(stop) => <StopImages ownerId={stop.id} count={stop.images ?? 0} title={`第 ${stopNumber(stop)} 站`} />}
                           routes={routes}
                           stops={projectStops}
                           queue={queue}
@@ -857,6 +860,7 @@ export function App() {
           <button onClick={dismissError}>知道了</button>
         </div>
       )}
+      <ImageViewer />
     </div>
   );
 }

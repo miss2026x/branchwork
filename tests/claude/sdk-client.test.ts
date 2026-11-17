@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createClaudeClient, type ClaudeEvent, type SdkFunctions } from "../../src/claude";
+import { createClaudeClient, promptBlocks, type ClaudeEvent, type SdkFunctions } from "../../src/claude";
 
 type Msg = Record<string, unknown>;
 const init = { type: "system", subtype: "init", session_id: "S1" };
@@ -40,6 +40,32 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
   };
   return fns;
 }
+
+describe("提问带图片（设计稿 4-7）", () => {
+  const png = { type: "image/png" as const, data: "AAAA", name: "a.png", width: 4, height: 4 };
+  it("图片插在提问文字里“[图 N]”的位置，作为一条用户消息的内容块发给 SDK", async () => {
+    let prompt: unknown;
+    const client = createClaudeClient(fakeSdk([init, success], { onQuery: (p) => (prompt = p.prompt) }));
+    await client.ask({ cwd: "/wt", prompt: "看[图 1]这里", images: [png] });
+    expect(typeof prompt).not.toBe("string");
+    const sent: unknown[] = [];
+    for await (const m of prompt as AsyncIterable<unknown>) sent.push(m);
+    expect(sent).toEqual([
+      {
+        type: "user",
+        parent_tool_use_id: null,
+        message: { role: "user", content: [{ type: "text", text: "看[图 1]" }, { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } }, { type: "text", text: "这里" }] },
+      },
+    ]);
+  });
+  it("没有图片时照旧只发文字", async () => {
+    let prompt: unknown;
+    const client = createClaudeClient(fakeSdk([init, success], { onQuery: (p) => (prompt = p.prompt) }));
+    await client.ask({ cwd: "/wt", prompt: "看这里", images: [] });
+    expect(prompt).toBe("看这里");
+    expect(promptBlocks("只有图", [png])).toEqual([{ type: "text", text: "只有图" }, { type: "text", text: "[图 1]" }, { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } }]);
+  });
+});
 
 describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () => {
   it("正常结束：流式文字和工具作为事件发出，结果里有完整文字、会话 ID 和这一站的起止消息", async () => {

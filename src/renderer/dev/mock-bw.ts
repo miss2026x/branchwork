@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, Project, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, Project, PromptImage, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -100,7 +100,9 @@ export function installMockBw(): void {
     return s;
   };
 
-  async function run(routeId: string, text: string) {
+  /** 站和候车问题带的图片 */
+  const images = new Map<string, PromptImage[]>();
+  async function run(routeId: string, text: string, pics: PromptImage[] = []) {
     let stopped = false;
     aborts.set(routeId, () => (stopped = true));
     setRoute(routeId, { status: "answering" });
@@ -112,7 +114,8 @@ export function installMockBw(): void {
       setRoute(routeId, { status: "conflict" });
       return;
     }
-    const stop = addStop(routeId, Array.from(text).slice(0, 6).join(""), text, [], { status: "answering", syncState: "none", nameState: "temp", endedAt: null });
+    const stop = addStop(routeId, Array.from(text.replace(/\[图 \d+\]/g, "")).slice(0, 6).join("") || "看图", text, [], { status: "answering", syncState: "none", nameState: "temp", endedAt: null, images: pics.length });
+    if (pics.length) images.set(stop.id, pics);
     emit({ type: "stop.created", stop });
     const items: ChatItem[] = [];
     const finish = (patch: Partial<Stop>, route: Partial<Route>) => {
@@ -181,7 +184,7 @@ export function installMockBw(): void {
     if (!next) return;
     queue = queue.filter((x) => x.id !== next.id);
     emitQueue(next.projectId);
-    void run(routeId, next.text).then(() => autoBoard(routeId));
+    void run(routeId, next.text, images.get(next.id)).then(() => autoBoard(routeId));
   };
 
   // 上下文用量的假数据
@@ -248,7 +251,7 @@ export function installMockBw(): void {
       const gone = [...stops.values()].filter((s) => s.routeId === routeId && s.seq >= target.seq).map((s) => s.id);
       gone.forEach((id) => stops.delete(id));
       emit({ type: "stops.removed", routeId, stopIds: gone });
-      return { prompt: target.prompt };
+      return { prompt: target.prompt, images: images.get(stopId) ?? [] };
     },
     keptWorktrees: async (projectId) => (projectId === "p1" ? [{ id: "k1", projectId, path: "/Users/demo/.branchwork/worktrees/p1/r9", label: "5路 试试 Passkey", at: Date.now() - 86_400_000 }] : []),
     openKept: async () => {},
@@ -298,11 +301,12 @@ export function installMockBw(): void {
       routes.set(r.id, named);
       return named;
     },
-    async ask(routeId, text) {
+    images: async (ownerId) => images.get(ownerId) ?? [],
+    async ask(routeId, text, pics) {
       const r = routes.get(routeId)!;
       if (r.status === "answering" || r.status === "awaiting_permission") throw new Error("这一路正在回答，等它到站或先停车");
       if (r.status === "conflict" && text !== "解决同步冲突") throw new Error("这一路有同步冲突，解决后才能问下一站");
-      void run(routeId, text).then(() => autoBoard(routeId));
+      void run(routeId, text, pics).then(() => autoBoard(routeId));
     },
     async fork(routeId, stopId, name) {
       const parent = routes.get(routeId)!;
@@ -312,8 +316,9 @@ export function installMockBw(): void {
       emit({ type: "route.updated", route: named });
       return named;
     },
-    async queueAdd(projectId, text, routeId, mode) {
-      const item: QueueItem = { id: id("w"), projectId, text: text.trim(), routeId: routeId ?? null, mode: routeId ? (mode === "manual" ? "manual" : "auto") : "unassigned", createdAt: Date.now() };
+    async queueAdd(projectId, text, routeId, mode, pics = []) {
+      const item: QueueItem = { id: id("w"), projectId, text: text.trim(), routeId: routeId ?? null, mode: routeId ? (mode === "manual" ? "manual" : "auto") : "unassigned", createdAt: Date.now(), images: pics.length };
+      if (pics.length) images.set(item.id, pics);
       queue.push(item);
       emitQueue(projectId);
       if (item.routeId && item.mode === "auto") autoBoard(item.routeId);

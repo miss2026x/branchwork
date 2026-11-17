@@ -1,0 +1,354 @@
+/* 提问里的图片（设计稿 4-7 方案 B）：输入框、提问气泡里的小标签，悬停预览，看大图 */
+
+/* ---- 输入框 ---- */
+.wrap {
+  position: relative;
+}
+.editor {
+  min-height: 76px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--sp-12) var(--sp-12) var(--sp-4);
+  border-radius: var(--r-12) var(--r-12) 0 0;
+  font-size: var(--fs-14);
+  line-height: var(--lh-22);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  cursor: text;
+}
+.editor[data-empty]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  color: var(--fg-4);
+  pointer-events: none;
+}
+.editor[contenteditable="false"] {
+  cursor: default;
+}
+/* 退格选中了一张图时的提示 */
+.hint {
+  padding: 0 var(--sp-12);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.hint b {
+  color: var(--fg-1);
+}
+/* 拖着图片经过文字时，跟着鼠标的插入线 */
+.dropLine {
+  position: absolute;
+  z-index: 3;
+  width: 2px;
+  border-radius: 1px; /* 例外：2px 宽的插入线两头圆一点 */
+  background: var(--info);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  pointer-events: none;
+}
+
+/* ---- 小标签：18px 小图 + “图 N” ---- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 22px;
+  margin: 0 var(--sp-2);
+  padding: 0 var(--sp-6) 0 var(--sp-2);
+  border-radius: var(--r-6);
+  background: var(--info-bg);
+  color: var(--info-text);
+  font-size: var(--fs-12);
+  line-height: 1;
+  font-weight: 700;
+  vertical-align: -5px; /* 例外：22px 的标签和 22px 行高的文字对齐 */
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  transition:
+    background var(--t-fast) ease-out,
+    box-shadow var(--t-fast) ease-out;
+}
+.tag img,
+.tag > i,
+.tag svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-4);
+}
+.tag img {
+  object-fit: cover;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.tag:hover,
+.tag[data-open] {
+  box-shadow: 0 0 0 2px var(--info);
+}
+.tag[data-state="loading"] {
+  background: var(--surface-2);
+  color: var(--fg-3);
+}
+.tag[data-state="loading"] > i {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin: 0 var(--sp-2);
+  border: 2px solid var(--border);
+  border-top-color: var(--info);
+  border-radius: var(--r-round);
+  animation: spin var(--t-spin) linear infinite;
+}
+.tag[data-state="bad"] {
+  background: var(--red-bg);
+  color: var(--red-text);
+}
+.tag[data-state="bad"] svg {
+  padding: var(--sp-2);
+}
+/* 按了一次退格：选中，再按一次才删 */
+.tag[data-picked] {
+  background: var(--info);
+  color: var(--fg-on-color);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+/* 提问气泡（浅色底）里的标签：白底 */
+.tag[data-sent] {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.tag[data-sent]:hover {
+  box-shadow: 0 0 0 2px var(--info);
+}
+
+/* ---- 悬停预览 ---- */
+.preview {
+  position: absolute;
+  z-index: 20;
+  width: 260px;
+  padding: var(--sp-6);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--e3);
+  animation: pop var(--t-fast) ease-out;
+}
+.preview img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: var(--r-8);
+  background: var(--surface-2);
+}
+.previewMeta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-6) var(--sp-2) 0;
+  font-size: var(--fs-11);
+  line-height: var(--lh-16);
+  color: var(--fg-3);
+}
+.previewMeta span {
+  flex: 1;
+  min-width: 0;
+}
+.previewMeta b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-12);
+  color: var(--fg-1);
+}
+.previewMeta button {
+  flex: none;
+  height: var(--h-28);
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-6);
+  color: var(--red-text);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+.previewMeta button:hover {
+  background: var(--red-bg);
+}
+.previewState {
+  display: grid;
+  place-items: center;
+  height: 96px;
+  padding: var(--sp-12);
+  border-radius: var(--r-8);
+  background: var(--surface-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+  text-align: center;
+}
+.previewState[data-bad] {
+  background: var(--red-bg);
+  color: var(--red-text);
+}
+
+/* ---- 对话栏整栏当落点 ---- */
+.dropZone {
+  position: absolute;
+  z-index: 30;
+  inset: var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-6);
+  border: 2px dashed var(--info);
+  border-radius: var(--r-12);
+  background: var(--info-bg);
+  color: var(--info-text);
+  pointer-events: none;
+  animation: pop var(--t-fast) ease-out;
+}
+.dropZone b {
+  font-size: var(--fs-16);
+}
+.dropZone span {
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+
+/* ---- 看大图 ---- */
+.viewer {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-16);
+  padding: var(--sp-48) var(--sp-48) var(--sp-24);
+  background: var(--scrim-dark);
+  animation: fade var(--t-base) ease-out;
+}
+.viewer > img {
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r-8);
+  box-shadow: var(--e-dark);
+  background: var(--surface);
+}
+.viewerBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--on-dark-2);
+}
+.viewerBar button {
+  width: 44px;
+  height: var(--h-32);
+  padding: 0;
+  border-radius: var(--r-6);
+  overflow: hidden;
+  opacity: 0.5;
+}
+.viewerBar button[aria-current="true"] {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.viewerBar button img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.viewerBar span {
+  margin-left: var(--sp-12);
+}
+.viewerClose {
+  position: absolute;
+  top: var(--sp-16);
+  right: var(--sp-16);
+  width: 36px;
+  height: var(--h-36);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-round);
+  background: var(--on-dark-hover);
+  color: var(--fg-on-color);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview,
+  .dropZone,
+  .viewer {
+    animation: none;
+  }
+}
+
+/* ---- 地图悬停卡片里的一排小图 ---- */
+.thumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  margin: var(--sp-8) 0 var(--sp-2);
+}
+.thumbs button {
+  width: 64px;
+  height: var(--h-44);
+  padding: 0;
+  border-radius: var(--r-6);
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.thumbs button:hover:not(:disabled) {
+  box-shadow: 0 0 0 2px var(--info);
+}
+.thumbs img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thumbs span {
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+/* 候车区卡片上的“2 张图” */
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 20px;
+  margin-right: var(--sp-6);
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
+  background: var(--info-bg);
+  color: var(--info-text);
+  font-size: var(--fs-11);
+  font-style: normal;
+  font-weight: 700;
+  vertical-align: 1px; /* 例外：和 13px 的文字对齐 */
+}
+/* 输入框外面的大框已经有焦点样式，里面的文字区不再画一圈 */
+.editor:focus-visible {
+  outline: none;
+}

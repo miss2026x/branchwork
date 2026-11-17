@@ -1,6 +1,8 @@
+import { withoutImageMarks } from "../../shared";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type { QueueItem, QueueMode, Route } from "../../shared";
-import { IconClose, IconMore, IconWait } from "../ui/icons";
+import { IconClose, IconMore, IconWait, IconImage } from "../ui/icons";
+import imgCss from "../chat/Images.module.css";
 import { Plate } from "../ui/Plate";
 import css from "./WaitingArea.module.css";
 
@@ -108,7 +110,15 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
         <div className={css.line}>
           {route && <Plate route={route} />}
           <div className={css.text}>
-            <b title={it.text}>{it.text}</b>
+            <b title={it.text}>
+              {(it.images ?? 0) > 0 && (
+                <em className={imgCss.count}>
+                  <IconImage size={11} />
+                  {it.images} 张图
+                </em>
+              )}
+              {(it.images ?? 0) > 0 ? withoutImageMarks(it.text) : it.text}
+            </b>
             {(sub || it.projectId !== project.id) && <span>{[it.projectId !== project.id ? projectNames[it.projectId] : "", sub].filter(Boolean).join(" · ")}</span>}
           </div>
           {action}

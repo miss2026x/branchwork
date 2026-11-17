@@ -1,4 +1,5 @@
 import type { BwListener, PermissionDecision } from "./events";
+import type { PromptImage } from "./images";
 import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
@@ -42,7 +43,7 @@ export interface BwApi {
    * 截线：删掉这一路上从这一站起的所有站（只删对话，不动代码）。
    * 返回被截掉的那一站的提问，方便放回输入框改一改重新问。
    */
-  truncate(routeId: string, stopId: string): Promise<{ prompt: string }>;
+  truncate(routeId: string, stopId: string): Promise<{ prompt: string; images: PromptImage[] }>;
   /** 改站名。改过的站不会再被自动起的名字覆盖 */
   renameStop(stopId: string, name: string): Promise<void>;
   /** 这一路以后用哪个模型；null 表示用默认的。下一站起生效 */
@@ -61,8 +62,13 @@ export interface BwApi {
   terminalOutput(terminalId: string): Promise<string>;
   /** 停掉一个后台终端；已经退出的则从列表里拿掉 */
   terminalStop(terminalId: string): Promise<void>;
-  /** 问一站。发出即返回；站的出现、回答、到站、同步都走事件。不能问时（正在回答、有冲突）抛错 */
-  ask(routeId: string, text: string): Promise<void>;
+  /**
+   * 问一站。发出即返回；站的出现、回答、到站、同步都走事件。不能问时（正在回答、有冲突）抛错。
+   * images：带的图片；text 里用“[图 N]”标出第 N 张图的位置
+   */
+  ask(routeId: string, text: string, images?: PromptImage[]): Promise<void>;
+  /** 一站的提问、或候车区一个问题带的图片 */
+  images(ownerId: string): Promise<PromptImage[]>;
   /** 从某一站开一条新的路（新会话、新工作区，带着到这一站为止的历史） */
   fork(routeId: string, stopId: string, name?: string): Promise<Route>;
   /** 压缩第一步：把到这一站为止的对话提炼成交接摘要。要等一会儿，写好后返回摘要；失败或取消则抛错 */
@@ -75,7 +81,7 @@ export interface BwApi {
   /** 重新同步一次（手工处理了冲突之后）。结果走事件 */
   resync(routeId: string): Promise<void>;
   /** 候车区：放一个问题进来。给了 routeId 就是派给那一路（默认自动登车） */
-  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): Promise<QueueItem>;
+  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode, images?: PromptImage[]): Promise<QueueItem>;
   /** 派车 / 改派 / 撤回（routeId 为空） */
   queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): Promise<QueueItem>;
   queueRemove(itemId: string): Promise<void>;

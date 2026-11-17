@@ -1,4 +1,4 @@
-import type { ClaudeOptions, Effort, PermissionDecision, PermissionMode } from "../shared";
+import type { ClaudeOptions, Effort, PermissionDecision, PermissionMode, PromptImage } from "../shared";
 
 /** 一个 Claude 进程按什么设置启动：启动后就改不了，变了就得换一个进程 */
 export interface RunSettings {
@@ -27,6 +27,8 @@ export interface AskOptions {
   /** 这一路的工作区目录 */
   cwd: string;
   prompt: string;
+  /** 提问带的图片：prompt 里的“[图 N]”标出第 N 张的位置，图片就插在那里发给 Claude */
+  images?: PromptImage[];
   /** 接着哪个会话问；不传就是新会话 */
   sessionId?: string;
   /** 上一站最后一条消息的 ID；用来在历史里找到这一站从哪开始 */

@@ -85,7 +85,7 @@ export function registerIpc(core: Core): void {
     distill: (routeId, stopId, keep) => core.distill(routeId, stopId, keep),
     cancelDistill: async (routeId) => core.cancelDistill(routeId),
     createExpress: (routeId, stopId, summary, name) => core.createExpress(routeId, stopId, summary, name),
-    queueAdd: async (projectId, text, routeId, mode) => core.queueAdd(projectId, text, routeId, mode),
+    queueAdd: async (projectId, text, routeId, mode, images) => core.queueAdd(projectId, text, routeId, mode, images),
     queueAssign: async (itemId, routeId, mode) => core.queueAssign(itemId, routeId, mode),
     queueRemove: async (itemId) => core.queueRemove(itemId),
     queueBoard: (itemId) => fire(core.queueBoard(itemId)),
@@ -109,7 +109,8 @@ export function registerIpc(core: Core): void {
       return r.canceled ? null : (r.filePaths[0] ?? null);
     },
 
-    ask: (routeId, text) => fire(core.ask(routeId, text)),
+    ask: (routeId, text, images) => fire(core.ask(routeId, text, images)),
+    images: async (ownerId) => core.images(ownerId),
   };
 
   ipcMain.handle(CALL, (_e, method: keyof Calls, args: unknown[]) => {

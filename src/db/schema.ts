@@ -74,4 +74,7 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE route ADD COLUMN effort TEXT; CREATE TABLE setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
   // 9：批准方式改成每一路各自的；已有的路沿用项目原来的
   `ALTER TABLE route ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'ask'; UPDATE route SET permission_mode = (SELECT permission_mode FROM project WHERE project.id = route.project_id);`,
+  // 10：提问带的图片（一站的提问或候车区的一个问题；owner_id 是站或候车问题的 id）
+  `CREATE TABLE image (owner_id TEXT NOT NULL, idx INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (owner_id, idx));
+   ALTER TABLE stop ADD COLUMN images INTEGER NOT NULL DEFAULT 0; ALTER TABLE queue_item ADD COLUMN images INTEGER NOT NULL DEFAULT 0;`,
 ];

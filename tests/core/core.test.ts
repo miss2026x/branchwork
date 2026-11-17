@@ -136,6 +136,50 @@ describe("问一站", () => {
   });
 });
 
+describe("提问带图片（设计稿 4-7）", () => {
+  const png = (data: string) => ({ type: "image/png" as const, data, name: `${data}.png`, width: 800, height: 600 });
+  it("图片跟着提问交给 Claude，也跟着这一站存下来；只发了图的站叫“看图”", async () => {
+    const route = await core.createRoute(project.id);
+    const r = await core.ask(route.id, "按钮被挡住了，看[图 1]", [png("a")]);
+    expect(claude.asks[0]!.images).toEqual([png("a")]);
+    expect(claude.asks[0]!.prompt).toBe("按钮被挡住了，看[图 1]");
+    expect(r).toMatchObject({ kind: "answered", stop: { images: 1, name: "按钮被挡住了" } });
+    const stop = stopsOf(route.id)[0]!;
+    expect(core.images(stop.id)).toEqual([png("a")]);
+
+    const only = await core.ask(route.id, "[图 1]", [png("b")]);
+    expect(only).toMatchObject({ kind: "answered", stop: { name: "看图", nameState: "final" } });
+  });
+  it("Claude 读不了的格式不收", async () => {
+    const route = await core.createRoute(project.id);
+    await expect(core.ask(route.id, "看[图 1]", [{ ...png("a"), type: "image/heic" as never }])).rejects.toThrow(/读不了/);
+    expect(claude.asks).toHaveLength(0);
+  });
+  it("候车区的问题带图：登车时图片跟着发出、归到那一站；拿掉问题时图片一起删", async () => {
+    const route = await core.createRoute(project.id);
+    const item = core.queueAdd(project.id, "[图 1] 这个怎么改", null, undefined, [png("q")]);
+    expect(item.images).toBe(1);
+    expect(core.images(item.id)).toEqual([png("q")]);
+    core.queueAssign(item.id, route.id, "manual");
+    await core.queueBoard(item.id);
+    expect(claude.asks[0]!.images).toEqual([png("q")]);
+    expect(core.images(stopsOf(route.id)[0]!.id)).toEqual([png("q")]);
+    expect(core.images(item.id)).toEqual([]);
+
+    const gone = core.queueAdd(project.id, "只放着[图 1]", null, undefined, [png("z")]);
+    core.queueRemove(gone.id);
+    expect(core.images(gone.id)).toEqual([]);
+  });
+  it("改站：截掉的那一站的提问和图片一起放回去", async () => {
+    const route = await core.createRoute(project.id);
+    await core.ask(route.id, "第一站");
+    await core.ask(route.id, "看[图 1]", [png("t")]);
+    const second = stopsOf(route.id)[1]!;
+    expect(await core.truncate(route.id, second.id)).toEqual({ prompt: "看[图 1]", images: [png("t")] });
+    expect(core.images(second.id)).toEqual([]);
+  });
+});
+
 describe("没答完", () => {
   it("停车：不同步，工作区保留，这一站标记没答完；接着问，下一站正常结束后一起进 Local", async () => {
     const route = await core.createRoute(project.id);

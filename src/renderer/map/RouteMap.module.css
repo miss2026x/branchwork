@@ -296,6 +296,24 @@
   top: -16px;
   background: var(--amber);
 }
+/* 带图的站：站点右上角一个小图片标（设计稿 4-7）；右上角已经有别的标时放到左上角 */
+.badgeImage {
+  position: absolute;
+  left: 8px;
+  top: -20px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-4);
+  background: var(--surface);
+  color: var(--info);
+  box-shadow: 0 0 0 1.5px var(--info);
+  pointer-events: none;
+}
+.badgeImage[data-beside] {
+  left: -26px;
+}
 
 /* 缩小后的简化显示 */
 .viewport[data-detail="dots"] .name,

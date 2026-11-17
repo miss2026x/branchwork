@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions } from "../../shared";
+import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, PromptImage, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions } from "../../shared";
+import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -82,11 +83,19 @@ interface State {
   live: Record<string, LiveStop>;
   /** 已经点了发车、站还没出现（正在做站前同步）的提问 */
   pendingAsk: Record<string, string>;
+  /** 那个提问带的图片 */
+  pendingImages: Record<string, PromptImage[]>;
   permissions: Record<string, PendingPermission>;
   lastSync: Record<string, SyncLogEntry>;
   /** 各项目候车区里的问题 */
   queue: Record<string, QueueItem[]>;
+  /** 各路输入框里写了一半的问题：文字里每张图占一个 OBJ 字符，图片按顺序在 draftImages 里 */
   drafts: Record<string, string>;
+  draftImages: Record<string, DraftImage[]>;
+  /** 站或候车问题带的图片（用到时才去取）；loading：正在取 */
+  images: Record<string, PromptImage[] | "loading">;
+  /** 正在看大图：哪几张、从第几张开始、标题写什么 */
+  viewer: { images: PromptImage[]; index: number; title: string } | null;
   /** 正开着的整块弹窗：添加项目、开一路新车、同步记录 */
   dialog:
     | null
@@ -190,7 +199,12 @@ interface State {
   viewChanges(routeId: string | null): void;
   /** 把这一路各站的回答读回来（已经读过就不再读） */
   ensureHistory(routeId: string): void;
-  ask(routeId: string, text: string): Promise<void>;
+  /** images：带的图片，text 里的“[图 N]”标出位置 */
+  ask(routeId: string, text: string, images?: PromptImage[]): Promise<void>;
+  /** 取一站或一个候车问题带的图片（取过就不再取） */
+  loadImages(ownerId: string): void;
+  openViewer(images: PromptImage[], index: number, title: string): void;
+  closeViewer(): void;
   fork(routeId: string, stopId: string, name: string, firstQuestion: string, opts?: { color?: number | null; itemId?: string; switchTo?: boolean; run?: RunSettings }): Promise<void>;
   /** itemId：第一个问题是从候车区挑的，开出后把它从候车区拿掉 */
   createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string, itemId?: string, run?: RunSettings): Promise<void>;
@@ -221,14 +235,21 @@ interface State {
   archiveBusy(routeId: string, mode: "later" | "now"): void;
   /** 这一路的批准方式（也记成项目的默认，之后新开的路沿用） */
   setRouteMode(routeId: string, mode: PermissionMode): Promise<void>;
-  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): Promise<void>;
+  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode, images?: PromptImage[]): Promise<void>;
   queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): Promise<void>;
   queueRemove(itemId: string): Promise<void>;
   queueBoard(itemId: string): Promise<void>;
   queueStartNew(itemId: string): Promise<void>;
-  setDraft(routeId: string, text: string): void;
+  /** images 不传：文字里没有图时清掉草稿的图片，有图时图片不变 */
+  setDraft(routeId: string, text: string, images?: DraftImage[]): void;
+  /** 草稿里一张图处理好了（或处理失败） */
+  patchDraftImage(routeId: string, id: string, patch: Partial<DraftImage>): void;
   dismissError(): void;
 }
+
+let draftSeq = 0;
+/** 草稿里图片的编号（只在这个窗口里用） */
+export const draftId = () => `img${++draftSeq}`;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, "");
 
@@ -270,16 +291,19 @@ export const useStore = create<State>((set, get) => {
         set((s) => {
           const pendingAsk = { ...s.pendingAsk };
           const drafts = { ...s.drafts };
+          const draftImages = { ...s.draftImages };
           // 这一站没发出去（站前冲突等）：把提问放回输入框，别弄丢
           if (idle && pendingAsk[e.route.id] !== undefined) {
-            drafts[e.route.id] = pendingAsk[e.route.id]!;
+            const back = fromPrompt(pendingAsk[e.route.id]!, s.pendingImages[e.route.id] ?? [], draftId);
+            drafts[e.route.id] = back.text;
+            draftImages[e.route.id] = back.images;
             delete pendingAsk[e.route.id];
           }
           const permissions = { ...s.permissions };
           if (e.route.status !== "awaiting_permission") delete permissions[e.route.id];
           // 刚删掉、还在等撤销的路：界面上不放回去，只把最新的样子记着
           if (s.pendingDelete?.route.id === e.route.id) return { pendingDelete: { ...s.pendingDelete, route: e.route } };
-          return { routes: { ...s.routes, [e.route.id]: e.route }, pendingAsk, drafts, permissions };
+          return { routes: { ...s.routes, [e.route.id]: e.route }, pendingAsk, drafts, draftImages, permissions };
         });
         break;
       }
@@ -441,10 +465,14 @@ export const useStore = create<State>((set, get) => {
     content: {},
     live: {},
     pendingAsk: {},
+    pendingImages: {},
     permissions: {},
     lastSync: {},
     queue: {},
     drafts: {},
+    draftImages: {},
+    images: {},
+    viewer: null,
     dialog: null,
     archiveAsk: null,
     archiveWhenDone: [],
@@ -650,20 +678,37 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    async ask(routeId, text) {
+    async ask(routeId, text, images = []) {
       const q = text.trim();
-      if (!q) return;
-      set((s) => ({ pendingAsk: { ...s.pendingAsk, [routeId]: q }, drafts: { ...s.drafts, [routeId]: "" } }));
+      if (!q && images.length === 0) return;
+      set((s) => ({ pendingAsk: { ...s.pendingAsk, [routeId]: q }, pendingImages: { ...s.pendingImages, [routeId]: images }, drafts: { ...s.drafts, [routeId]: "" }, draftImages: { ...s.draftImages, [routeId]: [] } }));
       try {
-        await window.bw.ask(routeId, q);
+        await window.bw.ask(routeId, q, images.length > 0 ? images : undefined);
       } catch (e) {
         set((s) => {
           const pendingAsk = { ...s.pendingAsk };
           delete pendingAsk[routeId];
-          return { pendingAsk, drafts: { ...s.drafts, [routeId]: q }, error: message(e) };
+          const back = fromPrompt(q, images, draftId);
+          return { pendingAsk, drafts: { ...s.drafts, [routeId]: back.text }, draftImages: { ...s.draftImages, [routeId]: back.images }, error: message(e) };
         });
       }
     },
+
+    loadImages(ownerId) {
+      if (get().images[ownerId]) return;
+      set((s) => ({ images: { ...s.images, [ownerId]: "loading" } }));
+      window.bw.images(ownerId).then(
+        (list) => set((s) => ({ images: { ...s.images, [ownerId]: list } })),
+        () =>
+          set((s) => {
+            const images = { ...s.images };
+            delete images[ownerId];
+            return { images };
+          }),
+      );
+    },
+    openViewer: (images, index, title) => set({ viewer: { images, index, title } }),
+    closeViewer: () => set({ viewer: null }),
 
     async fork(routeId, stopId, name, firstQuestion, opts = {}) {
       try {
@@ -775,8 +820,11 @@ export const useStore = create<State>((set, get) => {
 
     async truncate(routeId, stopId, requeue) {
       try {
-        const { prompt } = await window.bw.truncate(routeId, stopId);
-        if (requeue) set((s) => ({ drafts: { ...s.drafts, [routeId]: prompt } }));
+        const { prompt, images } = await window.bw.truncate(routeId, stopId);
+        if (requeue) {
+          const back = fromPrompt(prompt, images, draftId);
+          set((s) => ({ drafts: { ...s.drafts, [routeId]: back.text }, draftImages: { ...s.draftImages, [routeId]: back.images } }));
+        }
       } catch (e) {
         set({ error: message(e) });
       }
@@ -1024,8 +1072,8 @@ export const useStore = create<State>((set, get) => {
     },
 
     // 候车区的操作：结果都通过 queue.updated 事件回来，这里只管发出和报错
-    async queueAdd(projectId, text, routeId, mode) {
-      await window.bw.queueAdd(projectId, text, routeId, mode).catch((e) => set({ error: message(e) }));
+    async queueAdd(projectId, text, routeId, mode, images) {
+      await window.bw.queueAdd(projectId, text, routeId, mode, images && images.length > 0 ? images : undefined).catch((e) => set({ error: message(e) }));
     },
     async queueAssign(itemId, routeId, mode) {
       await window.bw.queueAssign(itemId, routeId, mode).catch((e) => set({ error: message(e) }));
@@ -1046,7 +1094,9 @@ export const useStore = create<State>((set, get) => {
       }
     },
 
-    setDraft: (routeId, text) => set((s) => ({ drafts: { ...s.drafts, [routeId]: text } })),
+    setDraft: (routeId, text, images) =>
+      set((s) => ({ drafts: { ...s.drafts, [routeId]: text }, draftImages: { ...s.draftImages, [routeId]: images ?? (text.includes(OBJ) ? (s.draftImages[routeId] ?? []) : []) } })),
+    patchDraftImage: (routeId, id, patch) => set((s) => ({ draftImages: { ...s.draftImages, [routeId]: (s.draftImages[routeId] ?? []).map((i) => (i.id === id ? { ...i, ...patch } : i)) } })),
     dismissError: () => set({ error: null }),
   };
 });

@@ -33,6 +33,7 @@ const api: BwApi = {
   openSystemTerminal: call("openSystemTerminal"),
   createRoute: call("createRoute"),
   truncate: call("truncate"),
+  images: call("images"),
   keptWorktrees: call("keptWorktrees"),
   openKept: call("openKept"),
   removeKept: call("removeKept"),

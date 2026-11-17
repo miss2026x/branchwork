@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
-import type { QueueItem, QueueMode, Route, Stop, SyncFile } from "../../shared";
-import { IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type WheelEvent } from "react";
+import { withoutImageMarks, type QueueItem, type QueueMode, type Route, type Stop, type SyncFile } from "../../shared";
+import { IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconImage, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { useFit } from "../ui/useFit";
@@ -62,6 +62,8 @@ interface Props {
   onDismissHint?(): void;
   /** 面板正在收起 / 打开（宽度在动画） */
   resizing?: boolean;
+  /** 带图的站：悬停卡片里放一排小图（图片由外面去取、去显示） */
+  stopImages?: (stop: Stop) => ReactNode;
 }
 
 const MIN = 0.3;
@@ -84,7 +86,7 @@ function dotGrid(view: { k: number; x: number; y: number }): CSSProperties {
   return { backgroundSize: `${g}px ${g}px`, backgroundPosition: `${snap(view.x)}px ${snap(view.y)}px` };
 }
 
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -602,7 +604,8 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
               <b>第 {stopNumber(hoverStop.spot.stop)} 站</b>
               <time>{new Date(hoverStop.spot.stop.startedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}</time>
             </header>
-            <p className={css.cardAsk}>{clip(hoverStop.spot.stop.prompt, 90)}</p>
+            <p className={css.cardAsk}>{clip((hoverStop.spot.stop.images ?? 0) > 0 ? withoutImageMarks(hoverStop.spot.stop.prompt) : hoverStop.spot.stop.prompt, 90)}</p>
+            {(hoverStop.spot.stop.images ?? 0) > 0 && stopImages?.(hoverStop.spot.stop)}
             {(() => {
               const stop = hoverStop.spot.stop;
               const pv = preview(stop);
@@ -610,6 +613,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                 <>
                   {<p className={css.cardAnswer}>{stop.status === "answering" ? "还在回答…" : pv ? clip(plainText(pv.answer), 110) || "这一站没有文字回答。" : "正在读取回答…"}</p>}
                   <p className={css.cardMeta}>
+                    {(stop.images ?? 0) > 0 && <span>带 {stop.images} 张图</span>}
                     {pv && pv.tools > 0 && <span>{pv.tools} 次工具调用</span>}
                     {stop.syncState === "synced" && <span className={css.ok}>✓ 改动已进 Local</span>}
                     {stop.syncState === "unsynced" && <span className={css.warn}>改动还没进 Local</span>}
@@ -822,6 +826,11 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
             </button>
             {stop.syncState === "conflict" && <b className={css.badgeRed}>!</b>}
             {stop.syncState === "unsynced" && <b className={css.badgeAmber} title="改动还没进 Local" />}
+            {(stop.images ?? 0) > 0 && detail === "full" && (
+              <b className={css.badgeImage} data-beside={stop.syncState === "unsynced" || stop.syncState === "conflict" || undefined} title={`带 ${stop.images} 张图`}>
+                <IconImage size={10} />
+              </b>
+            )}
             {!answering && stop.nameState === "temp" && latest && detail === "full" && (
               <em className={css.naming}>
                 <i /> 起名中

@@ -5,7 +5,7 @@ import * as sdk from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, Options } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
 import { z } from "zod";
-import type { ClaudeOptions, Effort, PermissionMode } from "../shared";
+import { splitPrompt, type ClaudeOptions, type Effort, type PermissionMode, type PromptImage } from "../shared";
 import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage, RunSettings } from "./types";
 
 /** 应用自己的工具挂在这个名字的服务下；Claude 看到的工具名是 mcp__branchwork__<name> */
@@ -30,7 +30,7 @@ interface SdkMessage {
 export interface SdkFunctions {
   query(params: { prompt: string | AsyncIterable<unknown>; options?: Options }): AsyncIterable<unknown>;
   /** 提前启动 Claude 进程；返回的对象只能问一次 */
-  startup(params: { options?: Options; initializeTimeoutMs?: number }): Promise<{ query(prompt: string): AsyncIterable<unknown>; close(): void }>;
+  startup(params: { options?: Options; initializeTimeoutMs?: number }): Promise<{ query(prompt: string | AsyncIterable<unknown>): AsyncIterable<unknown>; close(): void }>;
   forkSession(sessionId: string, options?: { upToMessageId?: string }): Promise<{ sessionId: string }>;
   getSessionMessages(sessionId: string): Promise<{ type: string; uuid: string; message: unknown }[]>;
   deleteSession(sessionId: string): Promise<void>;
@@ -59,7 +59,10 @@ const PROBE_MODE: Record<PermissionMode, SdkMode> = { ...SDK_MODE, all: "bypassP
 
 const realSdk: SdkFunctions = {
   query: (p) => sdk.query(p as Parameters<typeof sdk.query>[0]),
-  startup: (p) => sdk.startup(p),
+  startup: async (p) => {
+    const w = await sdk.startup(p);
+    return { query: (prompt) => w.query(prompt as Parameters<typeof w.query>[0]), close: () => w.close() };
+  },
   forkSession: (id, o) => sdk.forkSession(id, o),
   getSessionMessages: (id) => sdk.getSessionMessages(id),
   deleteSession: (id) => sdk.deleteSession(id),
@@ -178,7 +181,7 @@ interface Warm {
   abort: AbortController;
   turn: Turn;
   /** 启动好了得到可以提问的对象；启动失败得到 null */
-  ready: Promise<{ query(prompt: string): AsyncIterable<unknown>; close(): void } | null>;
+  ready: Promise<{ query(prompt: string | AsyncIterable<unknown>): AsyncIterable<unknown>; close(): void } | null>;
 }
 
 export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: ClaudeClientOptions = {}): ClaudeClient {
@@ -252,7 +255,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         if (q && !w.abort.signal.aborted) {
           abort = w.abort;
           turn = w.turn;
-          stream = q.query(opts.prompt);
+          stream = q.query(promptInput(opts.prompt, opts.images));
           prewarmed = true;
         }
       }
@@ -273,7 +276,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       };
 
       try {
-        stream ??= fns.query({ prompt: opts.prompt, options: processOptions(opts.cwd, opts.sessionId, opts, abort, turn, clientOpts, tools) });
+        stream ??= fns.query({ prompt: promptInput(opts.prompt, opts.images), options: processOptions(opts.cwd, opts.sessionId, opts, abort, turn, clientOpts, tools) });
         const title = titles();
         if (prewarmed) markStarted(); // 进程早就启动好了
         for await (const raw of stream) {
@@ -536,6 +539,24 @@ async function stopMessageIds(fns: SdkFunctions, sessionId: string, afterMessage
 
 function asBlocks(content: unknown): { type?: string; text?: unknown; name?: unknown; input?: unknown }[] {
   return Array.isArray(content) ? (content as { type?: string }[]) : [];
+}
+
+/**
+ * 交给 SDK 的提问：没有图片时就是那段文字；有图片时是一条用户消息，内容按顺序排：文字、图片、文字……
+ * 图片插在提问文字里“[图 N]”的位置，Claude 读到哪句话就看到哪张图（设计稿 4-7）
+ */
+export function promptBlocks(text: string, images: PromptImage[]): unknown[] {
+  return splitPrompt(text, images.length).map((p) =>
+    p.kind === "text" ? { type: "text", text: p.text } : { type: "image", source: { type: "base64", media_type: images[p.n - 1]!.type, data: images[p.n - 1]!.data } },
+  );
+}
+
+function promptInput(text: string, images?: PromptImage[]): string | AsyncIterable<unknown> {
+  if (!images || images.length === 0) return text;
+  const message = { type: "user", message: { role: "user", content: promptBlocks(text, images) }, parent_tool_use_id: null };
+  return (async function* () {
+    yield message;
+  })();
 }
 
 /** 用户自己打的提问（而不是工具结果） */

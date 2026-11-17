@@ -118,6 +118,8 @@
   --e-drawer-right: -12px 0 32px rgba(22, 27, 34, 0.16);
   /* 弹窗的遮罩：40% */
   --scrim: rgba(22, 27, 34, 0.4);
+  /* 看大图时的底：深一些，图更显眼 */
+  --scrim-dark: rgba(22, 27, 34, 0.86);
 
   /* ---- 代码高亮（shiki 的 css-variables 主题读这些变量）：颜色都取自上面的线路深字和状态色 ---- */
   --shiki-foreground: var(--fg-1);

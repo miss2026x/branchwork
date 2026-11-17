@@ -92,6 +92,32 @@ describe("数据库", () => {
     expect(db.syncLog.listByRoute("r1")).toEqual([]);
   });
 
+  it("提问带的图片按站或候车问题存；登车后归到新的站；没有主人的图片会被清掉", () => {
+    const db = openDb(":memory:");
+    db.projects.insert(project);
+    db.routes.insert(route("r1", 1));
+    const png = (data: string) => ({ type: "image/png" as const, data, name: `${data}.png`, width: 2, height: 1 });
+    db.stops.insert({ ...stop("s1", "r1", 1), images: 2 });
+    db.images.set("s1", [png("a"), png("b")]);
+    expect(db.stops.get("s1")!.images).toBe(2);
+    expect(db.images.get("s1")).toEqual([png("a"), png("b")]);
+    db.queue.insert({ id: "w1", projectId: "p1", text: "看[图 1]", mode: "unassigned", routeId: null, createdAt: 1, images: 1 });
+    db.images.set("w1", [png("c")]);
+    expect(db.queue.get("w1")!.images).toBe(1);
+    db.stops.insert(stop("s2", "r1", 2));
+    db.images.move("w1", "s2");
+    expect(db.images.get("s2")).toEqual([png("c")]);
+    expect(db.images.get("w1")).toEqual([]);
+    db.stops.deleteFrom("r1", 2);
+    db.images.prune();
+    expect(db.images.get("s2")).toEqual([]);
+    expect(db.images.get("s1")).toHaveLength(2);
+    db.routes.delete("r1");
+    db.images.prune();
+    expect(db.images.get("s1")).toEqual([]);
+    db.close();
+  });
+
   it("旧版本建的库升级后，已有的项目批准方式是“每次都问”；可以改", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bw-db-"));
     const file = path.join(dir, "bw.sqlite");

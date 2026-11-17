@@ -17,6 +17,7 @@ import type {
   PermissionMode,
   Project,
   ProjectSnapshot,
+  PromptImage,
   QueueItem,
   ClaudeOptions,
   QueueMode,
@@ -30,10 +31,11 @@ import type {
   Terminal,
   TerminalSession,
 } from "../shared";
+import { IMAGE_MAX_COUNT, withoutImageMarks } from "../shared";
 import { createSyncEngine, gitVersionText, inspectRepo, type SyncEngine, type SyncHooks } from "../sync";
 import { createTerminals, type TerminalInfo, type Terminals } from "../terminal";
 
-export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED";
+export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED" | "BAD_IMAGE";
 
 export class CoreError extends Error {
   constructor(
@@ -98,7 +100,7 @@ export interface Core {
   /** 新开一路（从 Local 当前状态建工作区） */
   createRoute(projectId: string, name?: string): Promise<Route>;
   /** 截线：删掉这一路从这一站起的所有站，会话退回到这一站之前；代码不动。返回这一站的提问 */
-  truncate(routeId: string, stopId: string): Promise<{ prompt: string }>;
+  truncate(routeId: string, stopId: string): Promise<{ prompt: string; images: PromptImage[] }>;
   renameRoute(routeId: string, name: string): Route;
   /** 换线路颜色（1–8）；null 回到按路号自动取 */
   setRouteColor(routeId: string, color: number | null): Route;
@@ -121,8 +123,10 @@ export interface Core {
   terminalOutput(terminalId: string): string;
   /** 还在跑的停掉；已经退出的从列表里拿掉 */
   terminalStop(terminalId: string): Promise<void>;
-  /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步 */
-  ask(routeId: string, text: string): Promise<AskReport>;
+  /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步。images：带的图片，text 里的“[图 N]”标出位置 */
+  ask(routeId: string, text: string, images?: PromptImage[]): Promise<AskReport>;
+  /** 一站的提问、或候车区一个问题带的图片 */
+  images(ownerId: string): PromptImage[];
   /**
    * 从某一站开一条新的路：新对话带着到这一站为止的完整历史，新的会话、新的工作区。
    * 代码从 Local 的现在开始，不回到那一站当时的样子。原来那一路不受影响。
@@ -164,7 +168,7 @@ export interface Core {
   removeKept(id: string): Promise<void>;
   // ── 候车区：准备好的问题先放着 ──
   /** 放一个问题进候车区。给了 routeId 就是派给那一路（默认自动登车）；那一路空着的话自动登车的会马上发出 */
-  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode): QueueItem;
+  queueAdd(projectId: string, text: string, routeId?: string | null, mode?: QueueMode, images?: PromptImage[]): QueueItem;
   /** 派车 / 改派 / 撤回：routeId 为空表示撤回到“未派车” */
   queueAssign(itemId: string, routeId: string | null, mode?: QueueMode): QueueItem;
   queueRemove(itemId: string): void;
@@ -379,8 +383,9 @@ export function createCore(opts: CoreOptions): Core {
       emitQueue(item.projectId);
     };
     try {
-      const report = await runStop(routeId, item.text);
+      const report = await runStop(routeId, item.text, undefined, db.images.get(item.id));
       if (report.kind === "blocked") putBack();
+      else db.images.delete(item.id); // 图片已经跟着那一站存了一份
       return report;
     } catch (e) {
       putBack();
@@ -536,7 +541,7 @@ export function createCore(opts: CoreOptions): Core {
   const tempName = stopName;
 
   /** 在一路上跑一站。resolving：这一站是在解决冲突，这一路此刻已经被占住了 */
-  const runStop = async (routeId: string, text: string, resolving?: { name: string }): Promise<AskReport> => {
+  const runStop = async (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> => {
       let route = mustRoute(routeId);
       if (!resolving) {
         if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，等它到站或先停车");
@@ -570,9 +575,10 @@ export function createCore(opts: CoreOptions): Core {
       // ── 回答 ──
       const previous = db.stops.listByRoute(routeId);
       // “继续”“好的”这类短确认：不起名，画成小点。斜杠命令：直接用命令名
-      const minor = !resolving && previous.length > 0 && previous.at(-1)!.kind !== "summary" && isShortConfirm(text);
+      const minor = !resolving && images.length === 0 && previous.length > 0 && previous.at(-1)!.kind !== "summary" && isShortConfirm(text);
       const command = resolving ? null : slashCommand(text);
-      const fixedName = minor || command !== null;
+      // 只发了图、没写字：没东西可起名，就叫“看图”
+      const fixedName = minor || command !== null || !withoutImageMarks(text);
       let stop: Stop = {
         id: id("s"),
         routeId,
@@ -588,12 +594,14 @@ export function createCore(opts: CoreOptions): Core {
         error: null,
         startedAt: Date.now(),
         endedAt: null,
+        images: images.length,
       };
       db.stops.insert(stop);
+      if (images.length > 0) db.images.set(stop.id, images);
       emit({ type: "stop.created", stop });
       // 还没起名的路，用它自己的第一站当名字
       if (route.name === NEW_ROUTE_NAME && !resolving) route = setRoute(routeId, { name: stop.name });
-      if (!resolving && !fixedName) nameStop(stop.id, routeId, text, stop.name);
+      if (!resolving && !fixedName) nameStop(stop.id, routeId, withoutImageMarks(text), stop.name);
       runningStop.set(routeId, stop.id);
 
       const stopId = stop.id;
@@ -606,6 +614,7 @@ export function createCore(opts: CoreOptions): Core {
           cwd: route.worktreePath,
           // 快线的第一个问题：连同交接摘要一起交给 Claude（这是个全新的会话，它看不到原来的对话）
           prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : text,
+          images,
           sessionId: route.sessionId ?? undefined,
           ...runFor(route),
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
@@ -803,13 +812,15 @@ export function createCore(opts: CoreOptions): Core {
       return { project: mustProject(projectId), routes: db.routes.listByProject(projectId), stops: db.stops.listByProject(projectId), queue: db.queue.listByProject(projectId) };
     },
 
-    queueAdd(projectId, text, routeId = null, mode) {
+    queueAdd(projectId, text, routeId = null, mode, given) {
       mustProject(projectId);
+      const images = checkImages(given);
       const q = text.trim();
-      if (!q) throw new CoreError("NOT_FOUND", "问题是空的");
+      if (!q && images.length === 0) throw new CoreError("NOT_FOUND", "问题是空的");
       const route = routeId ? mustRoute(routeId) : null;
-      const item: QueueItem = { id: id("w"), projectId, text: q, routeId: route?.id ?? null, mode: route ? (mode === "manual" ? "manual" : "auto") : "unassigned", createdAt: Date.now() };
+      const item: QueueItem = { id: id("w"), projectId, text: q, routeId: route?.id ?? null, mode: route ? (mode === "manual" ? "manual" : "auto") : "unassigned", createdAt: Date.now(), images: images.length };
       db.queue.insert(item);
+      if (images.length > 0) db.images.set(item.id, images);
       emitQueue(projectId);
       if (route && item.mode === "auto") setImmediate(() => dispatchNext(route.id));
       return item;
@@ -830,6 +841,7 @@ export function createCore(opts: CoreOptions): Core {
       const item = db.queue.get(itemId);
       if (!item) return;
       db.queue.delete(itemId);
+      db.images.delete(itemId);
       emitQueue(item.projectId);
     },
 
@@ -925,13 +937,15 @@ export function createCore(opts: CoreOptions): Core {
       claude.cool(route.worktreePath);
       const old = route.sessionId;
       const removed = all.filter((s) => s.seq >= target.seq).map((s) => s.id);
+      const images = db.images.get(target.id);
       db.stops.deleteFrom(routeId, target.seq);
+      db.images.prune();
       emit({ type: "stops.removed", routeId, stopIds: removed });
       // 没答完的那一站被截掉了，这一路就不再是“没答完”
       route = setRoute(routeId, { sessionId, contextTokens: null, status: route.status === "interrupted" ? "idle" : route.status });
       if (old && old !== sessionId) await claude.deleteSession(old).catch(() => {});
       warmRoute(route);
-      return { prompt: target.prompt };
+      return { prompt: target.prompt, images };
     },
 
     renameRoute(routeId, name) {
@@ -1006,7 +1020,8 @@ export function createCore(opts: CoreOptions): Core {
       else await terminals.remove(terminalId);
     },
 
-    ask: (routeId, text) => runStop(routeId, text),
+    ask: async (routeId, text, images) => runStop(routeId, text, undefined, checkImages(images)),
+    images: (ownerId) => db.images.get(ownerId),
 
     async fork(routeId, stopId, name) {
       const parent = mustRoute(routeId);
@@ -1103,6 +1118,7 @@ export function createCore(opts: CoreOptions): Core {
       // 从它分出去的路：记下父路当时的叫法，线路图上好标“从已删除的 2路 开出”
       for (const child of db.routes.listByProject(route.projectId)) if (child.parentRouteId === routeId) setRoute(child.id, { orphanOf: route.express ? `快${route.express}` : `${route.number}路` });
       db.routes.delete(routeId);
+      db.images.prune();
       emit({ type: "route.deleted", routeId, projectId: route.projectId });
       return { status: "deleted" };
     },
@@ -1137,6 +1153,7 @@ export function createCore(opts: CoreOptions): Core {
       localEdits.delete(projectId);
       await fs.rm(path.join(opts.worktreesRoot, projectId), { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
       db.projects.delete(projectId);
+      db.images.prune();
       emit({ type: "project.removed", projectId });
       return { status: "removed" };
     },
@@ -1380,6 +1397,15 @@ export function createCore(opts: CoreOptions): Core {
   return self;
 }
 
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+/** 界面送来的图片：只收 Claude 认得的格式，最多 IMAGE_MAX_COUNT 张 */
+function checkImages(images: PromptImage[] | undefined): PromptImage[] {
+  const list = (images ?? []).filter((i) => i && IMAGE_TYPES.has(i.type) && typeof i.data === "string" && i.data.length > 0);
+  if (list.length !== (images ?? []).length) throw new CoreError("BAD_IMAGE", "有图片的格式 Claude 读不了，换成 PNG / JPG 再放进来");
+  if (list.length > IMAGE_MAX_COUNT) throw new CoreError("BAD_IMAGE", `一个问题最多带 ${IMAGE_MAX_COUNT} 张图`);
+  return list.map((i) => ({ type: i.type, data: i.data, name: String(i.name || "图片").slice(0, 200), width: Number(i.width) || 0, height: Number(i.height) || 0 }));
+}
+
 function pushText(items: ChatItem[], text: string): void {
   const last = items.at(-1);
   if (last?.kind === "text") last.text += "\n\n" + text;
@@ -1427,7 +1453,8 @@ export function slashCommand(prompt: string): string | null {
 }
 
 export function stopName(prompt: string): string {
-  const text = prompt.replace(/\s+/g, " ").trim();
+  const text = withoutImageMarks(prompt).replace(/\s+/g, " ").trim();
+  if (!text && prompt.trim()) return "看图";
   // 英文的句号和逗号只有后面是空格或结尾时才算断句（b.txt、1,000 里的不算）
   const cut = text.slice(4).search(/[，。？！；?!;]|[.,](?=\s|$)/);
   const clause = cut < 0 ? text : text.slice(0, cut + 4);

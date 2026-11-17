@@ -431,6 +431,23 @@
 .box textarea::placeholder {
   color: var(--fg-4);
 }
+.attach {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  color: var(--fg-3);
+}
+.attach:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+/* 拖着图片经过时的落点盖在整栏上 */
+.panel {
+  position: relative;
+}
 .toolbar {
   display: flex;
   align-items: center;

@@ -86,6 +86,8 @@ export interface Stop {
   error: string | null;
   startedAt: number;
   endedAt: number | null;
+  /** 提问里带了几张图（图片本身用 bw.images(stop.id) 取）；没有时可以不写 */
+  images?: number;
 }
 
 /**
@@ -103,6 +105,8 @@ export interface QueueItem {
   /** 派给了哪一路；没派车时为空 */
   routeId: string | null;
   createdAt: number;
+  /** 带了几张图（图片本身用 bw.images(item.id) 取） */
+  images?: number;
 }
 
 /** local：不是同步，是发现你直接在 Local 里改了文件 */

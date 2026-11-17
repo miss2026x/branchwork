@@ -60,3 +60,5 @@ export const IconSpark = (p: P) => <Icon {...p}><path d="M12 3l1.8 4.7 4.7 1.8-4
 export const IconGauge = (p: P) => <Icon {...p}><path d="M4 16a8 8 0 0116 0M12 16l4-5" /></Icon>;
 export const IconDown = (p: P) => <Icon {...p}><path d="M6 9l6 6 6-6" /></Icon>;
 export const IconEyeOff = (p: P) => <Icon {...p}><path d="M3 3l18 18M10.6 5.1A10 10 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.3 4.2M6.6 6.6A17 17 0 002 12s3.5 7 10 7a9.6 9.6 0 005.4-1.6" /></Icon>;
+export const IconClip = (p: P) => <Icon {...p}><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 7" /></Icon>;
+export const IconImage = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-9 9" /></Icon>;

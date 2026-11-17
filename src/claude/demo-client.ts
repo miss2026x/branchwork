@@ -43,7 +43,7 @@ export function createDemoClaudeClient(): ClaudeClient {
       let outcome: AskResult["outcome"] = "completed";
       if (!stopped()) {
         opts.onEvent?.({ type: "started" });
-        await say(`这是演示模式，没有真的调用 Claude。这是这一路的第 ${n} 个问题：\n\n> ${opts.prompt}\n\n我会在工作区里往 \`demo-notes.md\` 追加一行。\n\n`);
+        await say(`这是演示模式，没有真的调用 Claude。这是这一路的第 ${n} 个问题：\n\n> ${opts.prompt}\n\n${opts.images?.length ? `看到了 ${opts.images.length} 张图。\n\n` : ""}我会在工作区里往 \`demo-notes.md\` 追加一行。\n\n`);
       }
       if (!stopped()) {
         const file = path.join(opts.cwd, "demo-notes.md");

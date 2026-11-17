@@ -16,6 +16,8 @@ let local: string;
 let app: ElectronApplication;
 let page: Page;
 
+/** 对话栏的输入框（设计稿 4-7：能放图片，是一个 contenteditable 的文本框） */
+const composer = () => page.getByRole("textbox", { name: "下一个问题" });
 const git = (...args: string[]) => execFileSync("git", args, { cwd: local, stdio: "ignore" });
 const shot = async (name: string) => {
   if (shots) await page.screenshot({ path: path.join(shots, `${name}.png`) });
@@ -52,7 +54,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -83,7 +85,7 @@ describe("应用", () => {
   });
 
   it("问一站：站出现、回答流出、等批准、到站、改动进了 Local", async () => {
-    await page.locator("textarea").fill("记一笔：接入 GitHub 登录");
+    await composer().fill("记一笔：接入 GitHub 登录");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("alertdialog", { name: "等你批准" }).isVisible(), { timeout: 30000 }).toBe(true);
     expect(await page.getByText("第 1 站暂停，等你批准").isVisible()).toBe(true);
@@ -98,7 +100,7 @@ describe("应用", () => {
   });
 
   it("第二站接着问；拒绝批准时文件不变", async () => {
-    await page.locator("textarea").fill("第二个问题");
+    await composer().fill("第二个问题");
     await page.getByRole("button", { name: "发车" }).click();
     await expect.poll(() => page.getByRole("alertdialog", { name: "等你批准" }).isVisible(), { timeout: 30000 }).toBe(true);
     // 拒绝时可以带一句话告诉 Claude 换个做法
@@ -110,7 +112,7 @@ describe("应用", () => {
   });
 
   it("停车：这一站标成没答完，可以接着问", async () => {
-    await page.locator("textarea").fill("慢慢来");
+    await composer().fill("慢慢来");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
     await page.getByRole("button", { name: "停车" }).click();
@@ -161,7 +163,7 @@ describe("应用", () => {
     await confirm.getByRole("button", { name: "开启全部不问" }).click();
     await expect.poll(() => page.getByRole("button", { name: /批准：全部不问/ }).isVisible()).toBe(true);
 
-    await page.locator("textarea").fill("不用问我");
+    await composer().fill("不用问我");
     await page.keyboard.press("Enter");
     await expect.poll(() => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8"), { timeout: 30000 }).toContain("不用问我");
     expect(await page.getByRole("alertdialog", { name: "等你批准" }).count()).toBe(0);
@@ -268,10 +270,10 @@ describe("应用", () => {
   it("候车区：这一站还在路上时排队，到站后自动发出；先放着的问题可以开新车", async () => {
     const notes = () => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
     // 项目此时是“全部不问”，所以不会停在批准上
-    await page.locator("textarea").fill("慢慢来，先占着");
+    await composer().fill("慢慢来，先占着");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
-    await page.locator("textarea").fill("排队的问题");
+    await composer().fill("排队的问题");
     expect(await page.getByRole("button", { name: "排队" }).isVisible()).toBe(true);
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: /^候车 1/ }).isVisible()).toBe(true);
@@ -318,7 +320,7 @@ describe("应用", () => {
 
   it("通知：到站时有手动登车的问题会提醒，点“登车”就发出", async () => {
     const notes = () => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8");
-    await page.locator("textarea").fill("慢慢来，再占一会儿");
+    await composer().fill("慢慢来，再占一会儿");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
     // 给正在回答的这一路放一个“手动登车”的问题
@@ -357,21 +359,65 @@ describe("应用", () => {
   it("窗口变窄：左栏收成图标，对话栏收起，点“对话”滑出来", async () => {
     await page.setViewportSize({ width: 1100, height: 700 });
     await expect.poll(() => page.getByLabel("项目和线路").isVisible()).toBe(true);
-    expect(await page.locator("textarea").isVisible()).toBe(true);
+    expect(await composer().isVisible()).toBe(true);
     await shot("17-mid");
 
     await page.setViewportSize({ width: 900, height: 620 });
-    await expect.poll(() => page.locator("textarea").count()).toBe(0);
+    await expect.poll(() => composer().count()).toBe(0);
     await shot("18-narrow");
     await page.getByRole("button", { name: "对话", exact: true }).click();
-    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+    await expect.poll(() => composer().isVisible()).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await shot("19-narrow-drawer");
     await page.getByRole("button", { name: "收起对话" }).click();
-    await expect.poll(() => page.locator("textarea").count()).toBe(0);
+    await expect.poll(() => composer().count()).toBe(0);
     await page.setViewportSize({ width: 1440, height: 900 });
-    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+    await expect.poll(() => composer().isVisible()).toBe(true);
   });
+  it("提问带图片：粘贴进来变成“图 1”小标签，退格两次才删、Ctrl+Z 找回；发出去后气泡里还是小标签，点开看大图", async () => {
+    await composer().click();
+    await page.keyboard.type("按钮被挡住了，看");
+    // 粘贴一张截图（2000 宽，发出去前会缩到长边 1568）
+    await page.evaluate(async () => {
+      const c = document.createElement("canvas");
+      c.width = 2000;
+      c.height = 1000;
+      const x = c.getContext("2d")!;
+      x.fillStyle = "#2563c9";
+      x.fillRect(0, 0, 2000, 1000);
+      const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b!), "image/png"));
+      const dt = new DataTransfer();
+      dt.items.add(new File([blob], "截图.png", { type: "image/png" }));
+      document.activeElement!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    const tag = composer().getByRole("img", { name: /^图 1：截图\.png$/ });
+    await expect.poll(() => tag.count(), { timeout: 10000 }).toBe(1);
+    // 退格一次：只选中，再按一次才删；Ctrl+Z 找回来
+    await page.keyboard.press("Backspace");
+    expect(await page.getByRole("status").filter({ hasText: "再按一次删掉" }).isVisible()).toBe(true);
+    expect(await tag.count()).toBe(1);
+    await page.keyboard.press("Backspace");
+    expect(await tag.count()).toBe(0);
+    await page.keyboard.press("Control+z");
+    expect(await tag.count()).toBe(1);
+    await page.keyboard.type("这里");
+    await shot("31-image-composer");
+    await page.getByRole("button", { name: "发车" }).click();
+    const log = page.getByRole("log");
+    // 这一路的批准方式前面改成了“全部不问”，不会停下来等批准
+    await expect.poll(() => log.getByText("看到了 1 张图。").count(), { timeout: 30000 }).toBe(1);
+    const sent = log.getByRole("button", { name: /^图 1：截图\.png，点开看大图$/ });
+    expect(await sent.count()).toBe(1);
+    await expect.poll(() => fs.readFileSync(path.join(local, "demo-notes.md"), "utf8"), { timeout: 30000 }).toContain("按钮被挡住了，看[图 1]这里");
+    await sent.click();
+    const viewer = page.getByRole("dialog", { name: "看大图" });
+    expect(await viewer.isVisible()).toBe(true);
+    expect(await viewer.getByText(/1568 × 784/).isVisible()).toBe(true);
+    await shot("32-image-viewer");
+    await page.keyboard.press("Escape");
+    expect(await viewer.count()).toBe(0);
+  });
+
   it("模型、起名、后台终端：选模型；站名稍后换成小模型起的；Claude 开的终端在一站结束后还在，能看输出、能停", async () => {
     // 列表是从 Claude Code 读的（演示模式下是假的三个）
     await page.getByRole("button", { name: /^模型：Default/ }).click();
@@ -382,7 +428,7 @@ describe("应用", () => {
     await page.getByRole("menuitemradio", { name: /^高/ }).click();
     await expect.poll(() => page.getByRole("button", { name: "强度：高" }).isVisible()).toBe(true);
 
-    await page.locator("textarea").fill("起名试试，再开一个终端");
+    await composer().fill("起名试试，再开一个终端");
     await page.keyboard.press("Enter");
     // 项目此时是“全部不问”：写文件、开后台终端都不用点批准
     const strip = page.getByRole("region", { name: "后台终端" });
@@ -408,7 +454,7 @@ describe("应用", () => {
   });
 
   it("看改了什么：没答完的一站，能列出留在工作区里的改动", async () => {
-    await page.locator("textarea").fill("写完拖一会儿");
+    await composer().fill("写完拖一会儿");
     await page.keyboard.press("Enter");
     // 等它把文件写了（工具那一行出现），在它说完之前停车
     await expect.poll(() => page.getByRole("log").locator("section").last().getByText("demo-notes.md").count(), { timeout: 60000 }).toBeGreaterThan(1);
@@ -447,11 +493,11 @@ describe("应用", () => {
   });
 
   it("对话栏头部和排队方式：回答中可以选手动登车，头部显示本路候车", async () => {
-    await page.locator("textarea").fill("慢慢答这一站");
+    await composer().fill("慢慢答这一站");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("radio", { name: "手动登车" }).isVisible(), { timeout: 30000 }).toBe(true);
     await page.getByRole("radio", { name: "手动登车" }).click();
-    await page.locator("textarea").fill("这一条要我点了才发");
+    await composer().fill("这一条要我点了才发");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: /本路候车 1 条/ }).isVisible()).toBe(true);
     expect(await page.getByText(/下一站 \d+ 等你登车/).isVisible()).toBe(true);
@@ -491,17 +537,17 @@ describe("应用", () => {
     expect(await page.getByText(/\d+ 路车/).first().isVisible()).toBe(true);
     await shot("26-overview");
     await page.getByRole("button", { name: "打开 my-project" }).click();
-    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+    await expect.poll(() => composer().isVisible()).toBe(true);
   });
   it("地图上的站：点一下看这一站的记录，悬停出卡片；截线删掉这一站和后面的站，问题可以放回输入框", async () => {
     // 前面的测试可能把候车区的浮窗留着，先收起来，免得挡住地图
     const fab = page.getByRole("button", { name: /^候车 \d/ });
     if ((await fab.getAttribute("aria-expanded")) === "true") await fab.click();
-    await page.locator("textarea").fill("截线前的一站");
+    await composer().fill("截线前的一站");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("log").getByText("截线前的一站").first().isVisible(), { timeout: 30000 }).toBe(true);
     await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
-    await page.locator("textarea").fill("要被截掉的一站");
+    await composer().fill("要被截掉的一站");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
     await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
@@ -531,7 +577,7 @@ describe("应用", () => {
     const bar = page.getByRole("toolbar", { name: "选中的站" });
     await expect.poll(() => bar.isVisible()).toBe(true);
     expect(await page.getByText(/^正在看第 \d+ 站$/).isVisible()).toBe(true);
-    expect(await page.locator("textarea").isVisible()).toBe(false);
+    expect(await composer().isVisible()).toBe(false);
     // 对话栏只显示到这一站；后面的站在地图上淡下去，但还在
     const chatLog = page.getByRole("log");
     await expect.poll(() => chatLog.getByText("截线前的一站").count()).toBeGreaterThan(0);
@@ -540,7 +586,7 @@ describe("应用", () => {
     expect(await page.locator('button[data-prompt="截线前的一站"]').getAttribute("aria-current")).toBe("step");
     await shot("28-viewing");
     await page.getByRole("button", { name: "回到最新" }).first().click();
-    await expect.poll(() => page.locator("textarea").isVisible()).toBe(true);
+    await expect.poll(() => composer().isVisible()).toBe(true);
 
     // 右键最后一站：改站（截线并把问题放回输入框）
     await page.locator('button[data-prompt="要被截掉的一站"]').click({ button: "right" });
@@ -550,9 +596,9 @@ describe("应用", () => {
     await shot("29-truncate");
     await cut.getByRole("button", { name: "截线", exact: true }).click();
     await expect.poll(() => nodes.count()).toBe(count - 1);
-    expect(await page.locator("textarea").inputValue()).toBe("要被截掉的一站");
+    expect(await composer().innerText()).toBe("要被截掉的一站");
     expect(await page.getByRole("log").getByText("要被截掉的一站").count()).toBe(0);
-    await page.locator("textarea").fill("");
+    await composer().fill("");
   });
   it("拖拽派车：把候车区里的问题拖到一路的末尾，松手选手动登车", async () => {
     await page.getByRole("button", { name: /^候车 \d/ }).click();
@@ -637,7 +683,7 @@ describe("应用", () => {
     await expect.poll(() => dialog.getByText("升级依赖").isVisible(), { timeout: 30000 }).toBe(true);
     await page.keyboard.press("Escape");
     // 接着问：第 5 站
-    await page.locator("textarea").fill("接着导入的会话问");
+    await composer().fill("接着导入的会话问");
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByText("已到第 5 站").isVisible(), { timeout: 60000 }).toBe(true);
     await shot("34-imported");

@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Project, QueueItem, Route, Stop, SyncLogEntry, KeptWorktree } from "../shared";
+import type { Project, PromptImage, QueueItem, Route, Stop, SyncLogEntry, KeptWorktree } from "../shared";
 import { MIGRATIONS } from "./schema";
 
 type Row = Record<string, unknown>;
@@ -53,6 +53,16 @@ export interface Db {
     listByProject(projectId: string): KeptWorktree[];
     delete(id: string): void;
   };
+  /** 提问带的图片，按站或候车问题的 id 存 */
+  images: {
+    set(ownerId: string, list: PromptImage[]): void;
+    get(ownerId: string): PromptImage[];
+    /** 候车的问题登车后，图片归到新的那一站 */
+    move(fromOwner: string, toOwner: string): void;
+    delete(ownerId: string): void;
+    /** 删掉已经没有主人的图片（站被截掉、路被删掉、候车的问题被拿掉之后） */
+    prune(): void;
+  };
   /** 零碎的设置和缓存：键 → 一段文字（通常是 JSON） */
   settings: {
     get(key: string): string | null;
@@ -77,7 +87,9 @@ export function openDb(file: string): Db {
     return {
       insert(obj: T) {
         const o = obj as Record<string, unknown>;
-        run(`INSERT INTO ${name} (${keys.map((k) => cols[k]).join(",")}) VALUES (${keys.map(() => "?").join(",")})`, ...keys.map((k) => encode(o[k])));
+        // 没给的可选字段不写，用列的默认值
+        const ks = keys.filter((k) => o[k] !== undefined);
+        run(`INSERT INTO ${name} (${ks.map((k) => cols[k]).join(",")}) VALUES (${ks.map(() => "?").join(",")})`, ...ks.map((k) => encode(o[k])));
       },
       get(id: string): T | null {
         const r = one(`SELECT * FROM ${name} WHERE id = ?`, id);
@@ -169,6 +181,7 @@ export function openDb(file: string): Db {
       error: "error",
       startedAt: "started_at",
       endedAt: "ended_at",
+      images: "images",
     },
     (r) => ({
       id: r.id as string,
@@ -185,16 +198,18 @@ export function openDb(file: string): Db {
       error: r.error as string | null,
       startedAt: r.started_at as number,
       endedAt: r.ended_at as number | null,
+      ...(r.images ? { images: r.images as number } : {}),
     }),
   );
 
-  const queue = table<QueueItem>("queue_item", { id: "id", projectId: "project_id", text: "text", mode: "mode", routeId: "route_id", createdAt: "created_at" }, (r) => ({
+  const queue = table<QueueItem>("queue_item", { id: "id", projectId: "project_id", text: "text", mode: "mode", routeId: "route_id", createdAt: "created_at", images: "images" }, (r) => ({
     id: r.id as string,
     projectId: r.project_id as string,
     text: r.text as string,
     mode: r.mode as QueueItem["mode"],
     routeId: r.route_id as string | null,
     createdAt: r.created_at as number,
+    ...(r.images ? { images: r.images as number } : {}),
   }));
 
   const kept = table<KeptWorktree>("kept_worktree", { id: "id", projectId: "project_id", path: "path", label: "label", at: "at" }, (r) => ({ id: r.id as string, projectId: r.project_id as string, path: r.path as string, label: r.label as string, at: r.at as number }));
@@ -257,6 +272,17 @@ export function openDb(file: string): Db {
       get: (id) => kept.where("id = ?", id)[0],
       listByProject: (pid) => kept.where("project_id = ? ORDER BY at DESC", pid),
       delete: (id) => run("DELETE FROM kept_worktree WHERE id = ?", id),
+    },
+    images: {
+      set(ownerId, list) {
+        run("DELETE FROM image WHERE owner_id = ?", ownerId);
+        list.forEach((img, i) => run("INSERT INTO image (owner_id, idx, type, data, name, width, height) VALUES (?, ?, ?, ?, ?, ?, ?)", ownerId, i, img.type, img.data, img.name, img.width, img.height));
+      },
+      get: (ownerId) =>
+        all("SELECT * FROM image WHERE owner_id = ? ORDER BY idx", ownerId).map((r) => ({ type: r.type as PromptImage["type"], data: r.data as string, name: r.name as string, width: r.width as number, height: r.height as number })),
+      move: (from, to) => run("UPDATE image SET owner_id = ? WHERE owner_id = ?", to, from),
+      delete: (ownerId) => run("DELETE FROM image WHERE owner_id = ?", ownerId),
+      prune: () => run("DELETE FROM image WHERE owner_id NOT IN (SELECT id FROM stop) AND owner_id NOT IN (SELECT id FROM queue_item)"),
     },
     settings: {
       get: (key) => (one("SELECT value FROM setting WHERE key = ?", key)?.value as string | undefined) ?? null,

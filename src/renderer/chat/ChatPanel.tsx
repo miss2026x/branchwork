@@ -1,13 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { ChatItem, Effort, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ChatItem, Effort, PermissionMode, PromptImage, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
 import { currentModel, type OptionsState } from "../ui/claude-options";
 import { TerminalStrip } from "../terminal/TerminalStrip";
 import { ModelControl } from "./ModelControl";
 import { EffortControl } from "./EffortControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
-import { useStore, type LiveStop } from "../stores/store";
-import { IconChevron, IconEdit, IconEye, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
+import { draftId, useStore, type LiveStop } from "../stores/store";
+import { draftStatus, toPrompt, type DraftImage } from "./draft";
+import { PromptInput, type PromptInputHandle } from "./PromptInput";
+import { PromptView } from "./PromptView";
+import imgCss from "./Images.module.css";
+import { IconChevron, IconClip, IconEdit, IconEye, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
@@ -47,7 +51,7 @@ interface Props {
   onOpenWaiting(): void;
   /** 这一路还在路上时“排队”：放进候车区，到站后自动发 */
   /** 这一站还在回答时写的问题：自动登车、手动登车，或者只放进候车区不派车 */
-  onQueue(text: string, mode: QueueMode): void;
+  onQueue(text: string, mode: QueueMode, images: PromptImage[]): void;
   /** 要滚到眼前的那一站 */
   focus?: { stopId: string; n: number } | null;
   /** 冲突的文件在 Local 里上一次是谁改的，说成一句话 */
@@ -55,6 +59,8 @@ interface Props {
   /** 窄窗口里面板是盖在地图上的抽屉：给了就显示收起按钮 */
   onCollapse?: () => void;
 }
+
+const NO_IMAGES: DraftImage[] = [];
 
 const REASONS: Record<string, string> = {
   "both-modified": "这一路和 Local 改了同一处",
@@ -75,7 +81,13 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const permission = useStore((s) => s.permissions[route.id]);
   const lastSync = useStore((s) => s.lastSync[route.id]);
   const draft = useStore((s) => s.drafts[route.id] ?? "");
+  const draftImages = useStore((s) => s.draftImages[route.id] ?? NO_IMAGES);
+  const pendingImages = useStore((s) => s.pendingImages[route.id]);
   const setDraft = useStore((s) => s.setDraft);
+  const patchDraftImage = useStore((s) => s.patchDraftImage);
+  const input = useRef<PromptInputHandle>(null);
+  /** 拖着图片经过对话栏：整栏变成落点，显示有几张 */
+  const [dropping, setDropping] = useState<number | null>(null);
   const ask = useStore((s) => s.ask);
   const stop = useStore((s) => s.stop);
   const answerPermission = useStore((s) => s.answerPermission);
@@ -152,25 +164,44 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permission?.requestId, route.id]);
 
+  const status = draftStatus(draft, draftImages);
   const send = () => {
-    if (blocked || !draft.trim()) return;
+    if (blocked || status !== "ok") return;
+    const q = toPrompt(draft, draftImages);
     if (busy) {
       // 这一站还在路上：进候车区
-      onQueue(draft, queueMode);
-      setDraft(route.id, "");
+      onQueue(q.text, queueMode, q.images);
+      setDraft(route.id, "", []);
     } else {
-      void ask(route.id, draft);
+      void ask(route.id, q.text, q.images);
     }
   };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      send();
-    }
-  };
+  const canDrop = !viewing && !blocked;
+  const fileCount = (e: React.DragEvent) => [...e.dataTransfer.items].filter((i) => i.kind === "file").length;
 
   return (
-    <aside className={css.panel}>
+    <aside
+      className={css.panel}
+      onDragOver={(e) => {
+        if (!canDrop || ![...e.dataTransfer.types].includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        if (dropping === null) setDropping(fileCount(e));
+      }}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropping(null)}
+      onDrop={(e) => {
+        setDropping(null);
+        if (!canDrop || ![...e.dataTransfer.types].includes("Files")) return;
+        e.preventDefault();
+        input.current?.insertFiles([...e.dataTransfer.files]);
+      }}
+    >
+      {dropping !== null && (
+        <div className={imgCss.dropZone} aria-hidden>
+          <b>松开，插在光标处</b>
+          <span>{dropping > 0 ? `${dropping} 个文件 · ` : ""}PNG、JPG、GIF、WebP</span>
+        </div>
+      )}
       <header className={css.head} style={{ borderColor: colors.tag }}>
         <Plate route={route} size="l" />
         <div className={css.headText}>
@@ -270,7 +301,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 {s.kind === "minor" ? `接着第 ${num(s)} 站` : `第 ${num(s)} 站`} · {s.name}
               </div>
               <div className={css.ask} style={{ background: colors.tint }}>
-                {s.prompt}
+                <PromptView text={s.prompt} ownerId={s.id} count={s.images ?? 0} title={`第 ${num(s)} 站`} />
               </div>
               <div className={css.who}>Claude</div>
               <Items items={items} streaming={l?.phase === "answering"} />
@@ -353,7 +384,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         {pending !== undefined && !viewing && (
           <section className={css.stop}>
             <div className={css.ask} style={{ background: colors.tint }}>
-              {pending}
+              <PromptView text={pending} images={pendingImages} title="正在发出的提问" />
             </div>
             <p className={css.waiting}>正在把 Local 的新变化带进这一路…</p>
           </section>
@@ -446,22 +477,28 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         )}
         {/* 设计稿 4-6：输入框、这一路的三个选择、发车按钮在同一个框里 */}
         <div className={css.box} data-disabled={blocked}>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(route.id, e.target.value)}
-            onKeyDown={onKey}
-            aria-label="下一个问题"
-            placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，到站后自动发" : route.status === "interrupted" ? "接着说，比如：继续，把测试也补上" : "写下一个问题。Enter 发车，Shift+Enter 换行"}
+          <PromptInput
+            ref={input}
+            text={draft}
+            images={draftImages}
+            onChange={(text, images) => setDraft(route.id, text, images)}
+            onImage={(id, patch) => patchDraftImage(route.id, id, patch)}
+            onEnter={send}
+            newId={draftId}
+            label="下一个问题"
+            placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，到站后自动发" : route.status === "interrupted" ? "接着说，比如：继续，把测试也补上" : "写下一个问题。Enter 发车，Shift+Enter 换行；图片可以直接粘贴、拖进来"}
             disabled={blocked}
-            rows={3}
           />
           <div className={css.toolbar}>
             <div className={css.controls}>
+              <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
+                <IconClip size={16} />
+              </button>
               <PermissionModeControl mode={permissionMode} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
               <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
               <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={(effort) => onModel(route.model, effort)} />
             </div>
-            <button className={css.send} style={{ background: colors.tag }} disabled={blocked || !draft.trim()} onClick={send}>
+            <button className={css.send} style={{ background: colors.tag }} disabled={blocked || status !== "ok"} title={status === "loading" ? "图片还在处理，等一下" : status === "bad" ? "有图片读不了：去掉它或换一张" : undefined} onClick={send}>
               {busy ? "排队" : route.status === "interrupted" ? "接着问" : "发车"} <kbd>↵</kbd>
             </button>
           </div>
