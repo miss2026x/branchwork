@@ -62,6 +62,8 @@
   --orange: #e0661c;
   --orange-bg: #fce9dc;
   --orange-text: #8a3b0a;
+  /* 候车区里“可以登车了”那一条的底 */
+  --orange-soft: #fff5ee;
   --amber: #e39a1f;
   --amber-bg: #fff1d6;
   --amber-text: #8a5200;

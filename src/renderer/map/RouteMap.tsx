@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
 import type { QueueItem, QueueMode, Route, Stop, SyncFile } from "../../shared";
 import { IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
@@ -459,7 +459,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
         )}
 
         {hoverStop && hoverStop.spot.stop.kind === "summary" && (
-          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot, viewingStopId))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const stop = hoverStop.spot.stop;
               const source = allSpots.find((m) => m.spot.stop.id === hoverStop.route.forkStopId);
@@ -499,7 +499,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
         {hoverStop && hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id] && (
-          <div ref={cardBox} className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot, viewingStopId))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const files = conflicts[hoverStop.route.id]!;
               const label = hoverStop.route.express ? `快${hoverStop.route.express}` : `${hoverStop.route.number}路`;
@@ -534,7 +534,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           </div>
         )}
         {hoverStop && hoverStop.spot.stop.kind !== "summary" && !(hoverStop.spot.stop.syncState === "conflict" && conflicts[hoverStop.route.id]) && (
-          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current)} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
+          <div ref={cardBox} className={css.card} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot, viewingStopId))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             <header>
               <Plate route={hoverStop.route} />
               <b>第 {stopNumber(hoverStop.spot.stop)} 站</b>
@@ -573,7 +573,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           <div
             ref={cardBox}
             className={`${css.card} ${css.cardDark}`}
-            style={cardPlace((hoverQueue.lane.end.x + hoverQueue.i * 76) * view.k + view.x, hoverQueue.lane.end.y * view.k + view.y, view.k, viewport.current, true)}
+            style={cardPlace((hoverQueue.lane.end.x + hoverQueue.i * 76) * view.k + view.x, hoverQueue.lane.end.y * view.k + view.y, view.k, viewport.current, false, true)}
             onPointerEnter={() => hoverOn(hover, 0)}
             onPointerLeave={() => hoverOn(null)}
           >
@@ -659,10 +659,16 @@ function inherited(lane: Lane, lanes: Lane[]): string[] {
 }
 
 /** 悬停卡片放哪：默认在站的上面，上面放不下就放下面；below 为真时反过来 */
-function cardPlace(x: number, y: number, k: number, box: HTMLElement | null, below = false): { left: number; top?: number; bottom?: number } {
+/** 站点上方有字（“正在看这一站”“没答完”、起名中、分叉站的站名）：悬停卡片要让开它 */
+function labelAbove(spot: { stop: Stop; junction: boolean }, viewingStopId: string | null) {
+  return spot.junction || spot.stop.id === viewingStopId || spot.stop.status === "interrupted" || spot.stop.nameState === "temp";
+}
+
+/** 悬停卡片放哪：默认在站的上面，上面放不下就放下面；站点上方有字时再高一点，不压住它 */
+function cardPlace(x: number, y: number, k: number, box: HTMLElement | null, raised = false, below = false): { left: number; top?: number; bottom?: number } {
   const W = 420;
   const H = 230;
-  const gap = 26 * Math.max(0.6, k);
+  const gap = (raised ? 46 : 26) * Math.max(0.6, k);
   const width = box?.clientWidth ?? Infinity;
   const height = box?.clientHeight ?? Infinity;
   const left = Math.max(8, Math.min(x - 60, width - W - 8));
@@ -707,7 +713,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
   const tag = colors.tag;
   const busy = lane.route.status === "answering" || lane.route.status === "awaiting_permission";
   return (
-    <div className={css.lane} data-on={on}>
+    <div className={css.lane} data-on={on} style={{ "--lane": line, "--lane-text": colors.text } as CSSProperties}>
       <button className={css.plate} style={{ left: lane.plate.x, top: lane.plate.y, borderColor: on ? tag : "var(--line-2)" }} onClick={onSelect}>
         <Plate route={lane.route} size="m" />
         <span className={`${css.plateName} ell`}>{lane.route.name}</span>

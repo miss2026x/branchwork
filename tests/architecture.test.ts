@@ -104,12 +104,12 @@ describe("设计稿的样式规范（第 0 站）：组件样式只用 tokens.cs
     const problems: string[] = [];
     for (const f of [...css(), ...files(path.join(SRC, "renderer")).filter((x) => /\.tsx?$/.test(x))])
       for (const m of fs.readFileSync(f, "utf8").matchAll(/var\((--[\w-]+)/g))
-        if (!m[1]!.endsWith("-") && !defined.has(m[1]!) && !["--fx", "--fy", "--c", "--p", "--panel-w"].includes(m[1]!)) problems.push(`${path.relative(SRC, f)}：${m[1]}`);
+        if (!m[1]!.endsWith("-") && !defined.has(m[1]!) && !["--fx", "--fy", "--c", "--p", "--panel-w", "--lane", "--lane-text"].includes(m[1]!)) problems.push(`${path.relative(SRC, f)}：${m[1]}`);
     expect([...new Set(problems)]).toEqual([]);
   });
 
   it("颜色：不写色值", () => {
-    expect(check((_, v) => /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i.test(v))).toEqual([]);
+    expect(check((p, v) => /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i.test(v) || (p !== "white-space" && /\b(white|black)\b/.test(v)))).toEqual([]);
   });
 
   it("字号和行高：只用字阶的 10 级", () => {

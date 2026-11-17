@@ -386,7 +386,7 @@
   min-width: 0;
   height: var(--h-28);
   padding: 0 var(--sp-8);
-  border: 1.5px solid var(--route-1);
+  border: 1.5px solid var(--focus);
   border-radius: var(--r-6);
   font: inherit;
   outline: none;
@@ -529,9 +529,9 @@
   color: var(--on-dark-red);
 }
 
-/* 正在看以前的某一站 */
+/* 正在看以前的某一站：光圈用这一路的线色，字用这一路的深字（设计稿 V3 主界面） */
 .stop[data-viewing="true"] .node {
-  box-shadow: 0 0 0 6px color-mix(in srgb, var(--route-1) 22%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--lane) 22%, transparent);
   transform: scale(1.15);
 }
 .viewingFlag {
@@ -543,7 +543,7 @@
   font-size: var(--fs-12);
   font-weight: 700;
   white-space: nowrap;
-  color: var(--route-1);
+  color: var(--lane-text);
 }
 .selectBar {
   position: absolute;
@@ -834,8 +834,8 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-round);
-  background: color-mix(in srgb, var(--route-1) 14%, white);
-  color: var(--route-1);
+  background: var(--info-bg);
+  color: var(--info);
   font-style: normal;
   font-weight: 800;
 }

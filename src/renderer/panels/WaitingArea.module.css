@@ -294,7 +294,7 @@
   padding: var(--sp-12);
   border: 2px dashed var(--express);
   border-radius: var(--r-12, var(--r-12));
-  background: color-mix(in srgb, var(--express) 8%, white);
+  background: var(--express-bg);
 }
 .building > div {
   display: flex;

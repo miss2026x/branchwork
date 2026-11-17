@@ -67,7 +67,7 @@
 }
 .item[data-ready="true"] {
   border: 2px solid var(--route-2);
-  background: color-mix(in srgb, var(--route-2) 7%, white);
+  background: var(--orange-soft);
 }
 .item > div {
   flex: 1;
@@ -149,7 +149,7 @@
   cursor: pointer;
 }
 .loose label[data-on="true"] {
-  background: color-mix(in srgb, var(--route-2) 14%, white);
+  background: var(--orange-bg);
 }
 .loose label input {
   flex: none;
