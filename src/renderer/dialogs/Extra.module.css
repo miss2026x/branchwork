@@ -3,11 +3,11 @@
 .path,
 .footNote code {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .dirRow {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .dirRow input {
   flex: 1;
@@ -15,25 +15,25 @@
 }
 .dirRow button {
   flex: none;
-  height: 40px;
-  padding: 0 12px;
+  height: var(--h-40);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .checks {
-  margin: -4px 0 16px;
+  margin: calc(-1 * var(--sp-4)) 0 var(--sp-16);
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-2);
+  gap: var(--sp-6);
+  font-size: var(--fs-13);
+  color: var(--fg-2);
 }
 .checks li {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .checks i {
   flex: none;
@@ -41,11 +41,11 @@
   height: 18px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: var(--green-bg);
   color: var(--green);
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 800;
 }
 .checks li[data-ok="false"] {
@@ -57,7 +57,7 @@
 }
 .checks li[data-ok="info"] i {
   background: var(--surface-2);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .checks code {
   font: 12px var(--mono);
@@ -69,12 +69,12 @@
   overflow: visible;
 }
 .two > header {
-  padding: 16px 20px;
+  padding: var(--sp-16) var(--sp-20);
   border-bottom: 1px solid var(--divider);
 }
 .two > footer {
   margin: 0;
-  padding: 12px 20px;
+  padding: var(--sp-12) var(--sp-20);
   border-top: 1px solid var(--divider);
   align-items: center;
 }
@@ -84,13 +84,13 @@
 }
 .col {
   min-width: 0;
-  padding: 20px 20px 6px;
+  padding: var(--sp-20) var(--sp-20) var(--sp-6);
 }
 /* 右栏：第一个问题占满，说明贴底 */
 .right {
   display: flex;
   flex-direction: column;
-  padding-bottom: 20px;
+  padding-bottom: var(--sp-20);
   background: var(--surface-1);
   border-left: 1px solid var(--divider);
 }
@@ -106,29 +106,29 @@
 }
 /* 这一路怎么跑：三个选择一行 */
 .run {
-  margin: 4px 0 12px;
-  padding-top: 12px;
+  margin: var(--sp-4) 0 var(--sp-12);
+  padding-top: var(--sp-12);
   border-top: 1px solid var(--divider);
 }
 .run > header {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: var(--sp-10);
+  margin-bottom: var(--sp-10);
 }
 .run > header span {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 700;
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 .run > header small {
-  font-size: 12px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .runGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0 12px;
+  gap: 0 var(--sp-12);
 }
 .runGrid > * {
   min-width: 0;
@@ -139,27 +139,27 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  min-height: 34px;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 17px;
-  color: var(--text-3);
+  min-height: var(--h-menu);
+  margin-top: var(--sp-6);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .runWarn {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  margin: 10px 0 0;
-  padding: 8px 10px;
+  gap: var(--sp-6);
+  margin: var(--sp-10) 0 0;
+  padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-8);
   background: var(--amber-bg);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
   color: var(--amber-text);
 }
 .runWarn svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 @media (max-width: 860px) {
   .cols {
@@ -171,95 +171,95 @@
   }
 }
 .ghostPlate {
-  padding: 2px 8px;
-  border: 2px dashed rgba(255, 255, 255, 0.6);
+  padding: var(--sp-2) var(--sp-8);
+  border: 2px dashed var(--on-dark-dash);
   border-radius: var(--r-6);
-  color: #fff;
+  color: var(--fg-on-color);
   font-weight: 800;
 }
 .pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 12px;
+  gap: 0 var(--sp-12);
 }
 .pair > * {
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-6);
 }
 .na {
-  height: 40px;
+  height: var(--h-40);
   margin: 0;
   display: flex;
   align-items: center;
-  font-size: 12px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .pairWarn {
   align-self: end;
-  margin: 0 0 8px;
-  padding: 6px 8px;
+  margin: 0 0 var(--sp-8);
+  padding: var(--sp-6) var(--sp-8);
   border-radius: var(--r-6);
   background: var(--amber-bg);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
   color: var(--amber-text);
 }
 .pairNote {
   align-self: end;
-  margin: 0 0 12px;
-  font-size: 12px;
-  line-height: 17px;
-  color: var(--text-3);
+  margin: 0 0 var(--sp-12);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .note {
   display: flex;
-  gap: 10px;
-  padding: 12px 12px;
+  gap: var(--sp-10);
+  padding: var(--sp-12) var(--sp-12);
   border: 1px solid var(--divider);
   border-radius: var(--r-10);
-  background: var(--surface-0);
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-2);
+  background: var(--surface);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-2);
 }
 .note svg {
   flex: none;
-  margin-top: 2px;
-  color: var(--text-3);
+  margin-top: var(--sp-2);
+  color: var(--fg-3);
 }
 .note b {
-  color: var(--text-1);
+  color: var(--fg-1);
   font-weight: 600;
 }
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .chips button {
-  height: 38px;
+  height: var(--h-row);
   max-width: 220px;
-  padding: 0 12px;
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-13);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .chips button[aria-checked="true"] {
-  border-color: var(--text-1);
-  background: var(--text-1);
-  color: #fff;
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 600;
 }
 .chips .dashed {
   border-style: dashed;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .nameColor {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 12px;
+  gap: 0 var(--sp-12);
 }
 .nameColor > :first-child {
   flex: 1 1 180px;
@@ -268,26 +268,26 @@
 .swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  min-height: 40px;
+  gap: var(--sp-6);
+  min-height: var(--h-40);
   align-items: center;
 }
 .swatches button {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  border: 2px solid var(--surface-0);
+  border-radius: var(--r-round);
+  border: 2px solid var(--surface);
 }
 .swatches button[aria-checked="true"] {
-  box-shadow: 0 0 0 2px var(--text-1);
+  box-shadow: 0 0 0 2px var(--fg-1);
 }
 .select {
   width: 100%;
-  height: 40px;
-  padding: 0 12px;
+  height: var(--h-40);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
+  background: var(--surface);
   font: inherit;
 }
 .between {
@@ -296,33 +296,33 @@
   justify-content: space-between;
 }
 .pick {
-  height: 28px;
+  height: var(--h-28);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
-  font-size: 12px;
+  background: var(--surface);
+  font-size: var(--fs-12);
   font-weight: 400;
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 .pickList {
-  margin-bottom: 8px;
-  padding: 4px;
+  margin-bottom: var(--sp-8);
+  padding: var(--sp-4);
   max-height: 160px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--r-10);
-  background: var(--surface-0);
+  background: var(--surface);
 }
 .pickList button {
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-6);
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .pickList button:hover,
 .pickList button[aria-selected="true"] {
@@ -330,52 +330,52 @@
 }
 .from {
   display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-3);
+  margin-top: var(--sp-6);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .footNote {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-6);
   min-width: 0;
   margin-right: auto;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .footNote code {
-  padding: 2px 6px;
+  padding: var(--sp-2) var(--sp-6);
   border-radius: var(--r-4);
   background: var(--surface-2);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .path {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 0 24px 12px;
+  gap: var(--sp-6);
+  margin: 0 var(--sp-24) var(--sp-12);
 }
 .filters button {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--h-28);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-12);
 }
 .filters button[aria-checked="true"] {
-  border-color: var(--text-1);
-  background: var(--text-1);
-  color: #fff;
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 600;
 }
 .log {
-  margin: 0 24px;
+  margin: 0 var(--sp-24);
   padding: 0;
   list-style: none;
   max-height: 420px;
@@ -384,16 +384,16 @@
 }
 .log li {
   display: flex;
-  gap: 10px;
-  padding: 12px 0;
+  gap: var(--sp-10);
+  padding: var(--sp-12) 0;
   border-bottom: 1px solid var(--divider);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .log time {
   flex: none;
   width: 76px;
   font: 12px/22px var(--mono);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .log li > i {
   flex: none;
@@ -402,13 +402,13 @@
   display: grid;
   place-items: center;
   font-style: normal;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .log li[data-status="ok"] > i:empty::before {
   content: "";
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: var(--green);
 }
 .log li[data-status="conflict"] > i,
@@ -421,14 +421,14 @@
 }
 .log p {
   margin: 0;
-  line-height: 22px;
+  line-height: var(--lh-22);
 }
 .log li[data-status="conflict"] b {
   color: var(--amber-text);
 }
 .log pre {
-  margin: 6px 0 0;
-  padding: 8px 10px;
+  margin: var(--sp-6) 0 0;
+  padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-8);
   background: var(--surface-1);
   font: 12px/20px var(--mono);
@@ -436,69 +436,69 @@
   overflow-wrap: anywhere;
 }
 .see {
-  margin-top: 8px;
-  height: 32px;
-  padding: 0 10px;
+  margin-top: var(--sp-8);
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--amber-line);
   border-radius: var(--r-6);
   background: var(--amber-bg);
   color: var(--amber-text);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
 }
 .empty {
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .logNote {
-  margin: 12px 24px 20px;
-  font-size: 12px;
-  color: var(--text-3);
+  margin: var(--sp-12) var(--sp-24) var(--sp-20);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 
 .plain {
-  margin: 0 24px 12px;
-  padding: 10px 12px;
+  margin: 0 var(--sp-24) var(--sp-12);
+  padding: var(--sp-10) var(--sp-12);
   border-radius: var(--r-10);
   background: var(--surface-1);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .checkRow {
   display: flex;
-  gap: 10px;
-  margin: 4px 24px 8px;
-  font-size: 14px;
+  gap: var(--sp-10);
+  margin: var(--sp-4) var(--sp-24) var(--sp-8);
+  font-size: var(--fs-14);
   cursor: pointer;
 }
 .checkRow input {
   flex: none;
   width: 16px;
   height: 16px;
-  margin-top: 3px;
-  accent-color: var(--text-1);
+  margin-top: 3px; /* 例外：复选框和第一行字对齐 */
+  accent-color: var(--fg-1);
 }
 .checkRow small {
   display: block;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 
 .options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0 24px 8px;
+  gap: var(--sp-8);
+  margin: 0 var(--sp-24) var(--sp-8);
 }
 .options label {
   display: flex;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--sp-10);
+  padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   cursor: pointer;
 }
 .options label[data-on="true"] {
-  border-color: var(--text-1);
-  box-shadow: 0 0 0 1px var(--text-1);
+  border-color: var(--fg-1);
+  box-shadow: 0 0 0 1px var(--fg-1);
 }
 .options label[data-danger="true"][data-on="true"] {
   border-color: var(--red);
@@ -506,53 +506,53 @@
 }
 .options input {
   flex: none;
-  margin-top: 3px;
-  accent-color: var(--text-1);
+  margin-top: 3px; /* 例外：复选框和第一行字对齐 */
+  accent-color: var(--fg-1);
 }
 .options b {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: var(--sp-8);
+  font-size: var(--fs-14);
 }
 .options label[data-danger="true"] b {
   color: var(--red);
 }
 .options em {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--text-1);
-  color: #fff;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-style: normal;
-  font-size: 11px;
-  line-height: 18px;
+  font-size: var(--fs-11);
+  line-height: var(--lh-18);
 }
 .options small {
   display: block;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .kept {
-  margin: 0 24px 4px;
-  padding: 12px;
+  margin: 0 var(--sp-24) var(--sp-4);
+  padding: var(--sp-12);
   border-radius: var(--r-10);
   background: var(--surface-1);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .kept h3 {
-  margin: 0 0 2px;
-  font-size: 13px;
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-13);
 }
 .kept > p {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: var(--text-3);
+  margin: 0 0 var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .kept li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 0;
+  gap: var(--sp-8);
+  padding: var(--sp-6) 0;
 }
 .kept ul {
   margin: 0;
@@ -566,16 +566,16 @@
 .kept li code {
   display: block;
   font: 11px var(--mono);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .kept li button {
   flex: none;
-  height: 28px;
-  padding: 0 10px;
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-6);
-  background: var(--surface-0);
-  font-size: 12px;
+  background: var(--surface);
+  font-size: var(--fs-12);
 }
 
 /* 分叉弹窗：编号和颜色、代码说明、开好后切过去 */
@@ -583,78 +583,78 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
+  gap: var(--sp-8);
+  height: var(--h-40);
 }
 .numberColor > button {
-  height: 32px;
-  padding: 0 10px;
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .numberColor [data-pop] {
   position: absolute;
   right: 0;
   top: 44px;
   z-index: 2;
-  padding: 10px;
+  padding: var(--sp-10);
   border-radius: var(--r-10);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
 }
 .codeNote {
   display: flex;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 12px 12px;
+  gap: var(--sp-12);
+  margin-top: var(--sp-12);
+  padding: var(--sp-12) var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-2);
 }
 .codeNote svg {
   flex: none;
-  margin-top: 2px;
-  color: var(--text-3);
+  margin-top: var(--sp-2);
+  color: var(--fg-3);
 }
 .codeNote b {
   display: block;
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 .switchTo {
   margin-right: auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-2);
+  gap: var(--sp-8);
+  font-size: var(--fs-13);
+  color: var(--fg-2);
   cursor: pointer;
 }
 .switchTo input {
   width: 16px;
   height: 16px;
-  accent-color: var(--text-1);
+  accent-color: var(--fg-1);
 }
 
 /* 导入终端里开过的会话 */
 .importBox {
-  margin-top: 4px;
-  padding: 12px;
+  margin-top: var(--sp-4);
+  padding: var(--sp-12);
   border-radius: var(--r-10);
   background: var(--surface-1);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .importBox b em {
   font-style: normal;
   font-weight: 400;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .importBox p {
-  margin: 6px 0;
-  font-size: 12px;
-  color: var(--text-2);
+  margin: var(--sp-6) 0;
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .sessions {
   margin: 0;
@@ -666,15 +666,15 @@
 .sessions label {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 38px;
+  gap: var(--sp-10);
+  height: var(--h-row);
   cursor: pointer;
 }
 .sessions input {
   flex: none;
   width: 16px;
   height: 16px;
-  accent-color: var(--text-1);
+  accent-color: var(--fg-1);
 }
 .sessions span {
   flex: 1;
@@ -682,21 +682,21 @@
 }
 .sessions small {
   flex: none;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 
 /* 同步记录里“你直接改了 Local”那一行 */
 .log li i[data-me] {
   width: 8px;
   height: 8px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: var(--text-1);
+  margin-top: var(--sp-6);
+  border-radius: var(--r-round);
+  background: var(--fg-1);
 }
 .log li small {
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .log li p code {
   font: 12px var(--mono);

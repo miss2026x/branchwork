@@ -3,17 +3,17 @@
 }
 .button {
   width: 100%;
-  height: 40px;
+  height: var(--h-40);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px 0 12px;
-  border: 1px solid var(--line);
+  gap: var(--sp-8);
+  padding: 0 var(--sp-10) 0 var(--sp-12);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-8);
-  background: var(--surface-0);
+  background: var(--surface);
   text-align: left;
-  font-size: 13px;
-  color: var(--text-1);
+  font-size: var(--fs-13);
+  color: var(--fg-1);
   transition: border-color var(--t-fast) ease-out;
 }
 .button > span {
@@ -22,15 +22,15 @@
 }
 .button svg {
   flex: none;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .button:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line-1);
 }
 .button[aria-expanded="true"],
 .button:focus-visible {
   outline: none;
-  border-color: var(--text-1);
+  border-color: var(--fg-1);
 }
 .list {
   animation: pop var(--t-base) var(--ease);
@@ -43,10 +43,10 @@
   max-height: min(340px, 60vh);
   overflow-y: auto;
   margin: 0;
-  padding: 4px;
+  padding: var(--sp-4);
   list-style: none;
   border-radius: var(--r-10);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
 }
 .list[data-up="true"] {
@@ -56,12 +56,12 @@
 .list li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 6px 10px;
+  gap: var(--sp-8);
+  min-height: var(--h-menu);
+  padding: var(--sp-6) var(--sp-10);
   border-radius: var(--r-6);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-18);
   cursor: pointer;
 }
 .list li > span {
@@ -71,9 +71,9 @@
 .list li small {
   display: block;
   font-weight: 400;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .list li[data-active="true"] {
   background: var(--surface-2);
@@ -83,7 +83,7 @@
 }
 .list li svg {
   flex: none;
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 
 /* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */

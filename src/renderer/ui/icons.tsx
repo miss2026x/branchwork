@@ -45,13 +45,13 @@ export function BusMark({ size = 28, color = "var(--route-2)" }: { size?: number
   return (
     <svg width={size} height={size * 0.72} viewBox="0 0 36 26" aria-hidden>
       <rect x="1" y="1" width="34" height="19" rx="5" fill={color} />
-      <rect x="5" y="5" width="7" height="6" rx="1.5" fill="#fff" />
-      <rect x="14.5" y="5" width="7" height="6" rx="1.5" fill="#fff" />
-      <rect x="24" y="5" width="7" height="6" rx="1.5" fill="#fff" />
-      <circle cx="10" cy="21" r="4" fill="var(--text-1)" />
-      <circle cx="26" cy="21" r="4" fill="var(--text-1)" />
-      <circle cx="10" cy="21" r="1.5" fill="#fff" />
-      <circle cx="26" cy="21" r="1.5" fill="#fff" />
+      <rect x="5" y="5" width="7" height="6" rx="1.5" fill="var(--surface)" />
+      <rect x="14.5" y="5" width="7" height="6" rx="1.5" fill="var(--surface)" />
+      <rect x="24" y="5" width="7" height="6" rx="1.5" fill="var(--surface)" />
+      <circle cx="10" cy="21" r="4" fill="var(--fg-1)" />
+      <circle cx="26" cy="21" r="4" fill="var(--fg-1)" />
+      <circle cx="10" cy="21" r="1.5" fill="var(--surface)" />
+      <circle cx="26" cy="21" r="1.5" fill="var(--surface)" />
     </svg>
   );
 }

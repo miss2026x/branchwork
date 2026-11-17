@@ -5,68 +5,68 @@
   z-index: 20;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--sp-24);
   background: var(--scrim);
 }
 .dialog {
   animation: dialogIn var(--t-slow) var(--ease);
   width: min(540px, 100%);
-  padding: 20px;
+  padding: var(--sp-20);
   border-radius: var(--r-16);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e4);
 }
 .dialog header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
 }
 .dialog h2 {
   flex: 1;
   margin: 0;
-  font-size: 18px;
-  line-height: 26px;
+  font-size: var(--fs-18);
+  line-height: var(--lh-26);
 }
 .dialog header button {
   width: 32px;
-  height: 32px;
+  height: var(--h-32);
   display: grid;
   place-items: center;
   border-radius: var(--r-8);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .dialog header button:hover {
   background: var(--surface-2);
 }
 .sub {
-  margin: 6px 0 16px;
-  font-size: 13px;
-  color: var(--text-3);
+  margin: var(--sp-6) 0 var(--sp-16);
+  font-size: var(--fs-13);
+  color: var(--fg-3);
 }
 .field {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-12);
 }
 .field > span {
   display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
+  margin-bottom: var(--sp-6);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .field input,
 .field textarea {
   display: block;
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-8);
-  background: var(--surface-0);
-  line-height: 22px;
+  background: var(--surface);
+  line-height: var(--lh-22);
   transition: border-color var(--t-fast) ease-out;
 }
 .field input {
-  height: 40px;
+  height: var(--h-40);
 }
 .field textarea {
   resize: vertical;
@@ -74,65 +74,65 @@
 }
 .field input:hover,
 .field textarea:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line-1);
 }
 .field input:focus,
 .field textarea:focus {
   outline: none;
-  border-color: var(--text-1);
+  border-color: var(--fg-1);
 }
 .field ::placeholder {
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .nameRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
 }
 .nameRow input {
   flex: 1;
 }
 .note {
-  padding: 10px 12px;
+  padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--divider);
   border-radius: var(--r-8);
   background: var(--surface-1);
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-3);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-3);
 }
 .note b {
   display: block;
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 .dialog footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--sp-8);
+  margin-top: var(--sp-16);
 }
 .ghost,
 .confirm {
-  height: 40px;
-  padding: 0 16px;
+  height: var(--h-40);
+  padding: 0 var(--sp-16);
   border-radius: var(--r-8);
   font-weight: 600;
 }
 .ghost {
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .ghost:hover {
   background: var(--surface-2);
 }
 .confirm {
-  color: #fff;
+  color: var(--fg-on-color);
 }
 .warn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0 10px;
-  padding: 10px 12px;
+  gap: var(--sp-8);
+  margin: var(--sp-12) 0 var(--sp-10);
+  padding: var(--sp-10) var(--sp-12);
   border-radius: var(--r-8);
   background: var(--amber-bg);
   color: var(--amber-text);
@@ -149,9 +149,9 @@
 }
 .files li {
   display: flex;
-  gap: 12px;
-  padding: 6px 12px;
-  font-size: 13px;
+  gap: var(--sp-12);
+  padding: var(--sp-6) var(--sp-12);
+  font-size: var(--fs-13);
 }
 .files li + li {
   border-top: 1px solid var(--divider);
@@ -159,18 +159,18 @@
 .files span {
   flex: none;
   width: 32px;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .files code {
   font: 12.5px/20px var(--mono);
   overflow-wrap: anywhere;
 }
 .destroy {
-  height: 40px;
-  padding: 0 16px;
+  height: var(--h-40);
+  padding: 0 var(--sp-16);
   border-radius: var(--r-8);
   background: var(--red);
-  color: #fff;
+  color: var(--fg-on-color);
   font-weight: 600;
 }
 .wide {
@@ -179,17 +179,17 @@
   overflow-y: auto;
 }
 .error {
-  margin: 0 0 12px;
-  padding: 8px 12px;
+  margin: 0 0 var(--sp-12);
+  padding: var(--sp-8) var(--sp-12);
   border-radius: var(--r-8);
   background: var(--red-bg);
   color: var(--red);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .working {
   display: flex;
-  gap: 12px;
-  padding: 16px 12px;
+  gap: var(--sp-12);
+  padding: var(--sp-16) var(--sp-12);
   border: 1px solid var(--divider);
   border-radius: var(--r-8);
   background: var(--surface-1);
@@ -198,17 +198,17 @@
   flex: none;
   width: 10px;
   height: 10px;
-  margin-top: 6px;
-  border-radius: 50%;
-  animation: pulse 1400ms ease-in-out infinite;
+  margin-top: var(--sp-6);
+  border-radius: var(--r-round);
+  animation: pulse var(--t-loop) ease-in-out infinite;
 }
 .working b {
   display: block;
 }
 .working span {
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-3);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-3);
 }
 .field .summary {
   min-height: 220px;
@@ -217,24 +217,24 @@
 }
 .regen {
   display: flex;
-  gap: 8px;
-  margin: -4px 0 12px;
+  gap: var(--sp-8);
+  margin: calc(-1 * var(--sp-4)) 0 var(--sp-12);
 }
 .regen input {
   flex: 1;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-8);
 }
 .regen input:focus {
   outline: none;
-  border-color: var(--text-1);
+  border-color: var(--fg-1);
 }
 .regen button {
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-8);
   font-weight: 600;
   white-space: nowrap;
@@ -242,9 +242,9 @@
 .ask {
   flex: 1;
   align-self: center;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-4);
 }
 
 /* 动效（设计稿“动效”画板）：CSS Modules 会把动画名按文件改名，所以每个用到的文件自己带一份 */

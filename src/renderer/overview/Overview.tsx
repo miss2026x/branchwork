@@ -36,7 +36,7 @@ function MiniMap({ routes, stops }: { routes: Route[]; stops: Stop[] }) {
         {layout.lanes.flatMap((l) =>
           l.stops
             .filter((s) => s.stop.kind !== "minor")
-            .map((s) => <circle key={s.stop.id} cx={s.x} cy={s.y} r={s.stop.status === "answering" ? 13 : 9} fill={s.stop.status === "answering" ? routeColors(l.route).line : "#fff"} stroke={s.junction ? "#161b22" : routeColors(l.route).line} strokeWidth={6} />),
+            .map((s) => <circle key={s.stop.id} cx={s.x} cy={s.y} r={s.stop.status === "answering" ? 13 : 9} fill={s.stop.status === "answering" ? routeColors(l.route).line : "var(--surface)"} stroke={s.junction ? "var(--fg-1)" : routeColors(l.route).line} strokeWidth={6} />),
         )}
       </svg>
     </div>

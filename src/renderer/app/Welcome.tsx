@@ -93,10 +93,10 @@ export function Welcome({ onPick, onDrop, loadEnvironment }: Props) {
           <text x="470" y="50">从某站分出 = 新一路</text>
           <path d="M 20 30 H 600" stroke="var(--route-1)" strokeWidth="5" strokeLinecap="round" />
           <path d="M 220 30 C 250 30, 255 58, 290 58 H 490" stroke="var(--route-2)" strokeWidth="5" strokeLinecap="round" fill="none" />
-          <circle cx="100" cy="30" r="8" fill="#fff" stroke="var(--route-1)" strokeWidth="4" />
-          <circle cx="360" cy="30" r="8" fill="#fff" stroke="var(--route-1)" strokeWidth="4" />
-          <circle cx="380" cy="58" r="8" fill="#fff" stroke="var(--route-2)" strokeWidth="4" />
-          <circle cx="220" cy="30" r="9" fill="#fff" stroke="var(--text-1)" strokeWidth="4" />
+          <circle cx="100" cy="30" r="8" fill="var(--surface)" stroke="var(--route-1)" strokeWidth="4" />
+          <circle cx="360" cy="30" r="8" fill="var(--surface)" stroke="var(--route-1)" strokeWidth="4" />
+          <circle cx="380" cy="58" r="8" fill="var(--surface)" stroke="var(--route-2)" strokeWidth="4" />
+          <circle cx="220" cy="30" r="9" fill="var(--surface)" stroke="var(--fg-1)" strokeWidth="4" />
         </svg>
 
         <section className={css.env} aria-label="运行环境">

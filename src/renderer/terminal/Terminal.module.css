@@ -5,16 +5,16 @@
 }
 .stripHead {
   width: 100%;
-  height: 34px;
+  height: var(--h-menu);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  font-size: 12px;
-  color: var(--text-3);
+  gap: var(--sp-8);
+  padding: 0 var(--sp-16);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .stripHead b {
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .stripHead span {
   flex: 1;
@@ -25,8 +25,8 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  margin-right: 6px;
-  border-radius: 50%;
+  margin-right: var(--sp-6);
+  border-radius: var(--r-round);
   background: var(--green);
   vertical-align: middle;
 }
@@ -38,7 +38,7 @@ li[data-status="exited"] .row {
 }
 .strip ul {
   margin: 0;
-  padding: 0 8px 8px;
+  padding: 0 var(--sp-8) var(--sp-8);
   list-style: none;
   max-height: 150px;
   overflow-y: auto;
@@ -56,20 +56,20 @@ li[data-status="exited"] .row {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 4px 6px 8px;
+  gap: var(--sp-10);
+  padding: var(--sp-6) var(--sp-4) var(--sp-6) var(--sp-8);
   text-align: left;
 }
 .dot {
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: var(--green);
   box-shadow: 0 0 0 3px var(--green-bg);
 }
 li[data-status="exited"] .dot {
-  background: var(--text-4);
+  background: var(--fg-4);
   box-shadow: none;
 }
 .rowText {
@@ -79,18 +79,18 @@ li[data-status="exited"] .dot {
   flex-direction: column;
 }
 .rowText b {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
   font-weight: 600;
 }
 li[data-status="exited"] .rowText b {
-  color: var(--text-3);
+  color: var(--fg-3);
   font-weight: 500;
 }
 .rowText small {
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--text-3);
+  font-size: var(--fs-11);
+  line-height: var(--lh-16);
+  color: var(--fg-3);
 }
 .rowText code,
 .title code {
@@ -99,31 +99,31 @@ li[data-status="exited"] .rowText b {
 }
 .row em {
   flex: none;
-  padding: 0 6px;
+  padding: 0 var(--sp-6);
   border-radius: var(--r-4);
-  background: var(--surface-0);
+  background: var(--surface);
   border: 1px solid var(--border);
   font: 11px/18px var(--mono);
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .state {
   flex: none;
-  font-size: 11px;
-  color: var(--text-3);
+  font-size: var(--fs-11);
+  color: var(--fg-3);
 }
 .rowStop {
   flex: none;
   min-width: 30px;
-  height: 28px;
-  padding: 0 8px;
+  height: var(--h-28);
+  padding: 0 var(--sp-8);
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: var(--fs-12);
   border-radius: var(--r-6);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .rowStop:hover {
-  background: var(--surface-0);
+  background: var(--surface);
   color: var(--red);
 }
 
@@ -133,7 +133,7 @@ li[data-status="exited"] .rowText b {
   z-index: 20;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--sp-24);
   background: var(--scrim);
 }
 .window {
@@ -142,7 +142,7 @@ li[data-status="exited"] .rowText b {
   display: flex;
   flex-direction: column;
   border-radius: var(--r-16);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e4);
   overflow: hidden;
 }
@@ -150,8 +150,8 @@ li[data-status="exited"] .rowText b {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 12px 12px 16px;
+  gap: var(--sp-10);
+  padding: var(--sp-12) var(--sp-12) var(--sp-12) var(--sp-16);
 }
 .title {
   flex: 1;
@@ -159,22 +159,22 @@ li[data-status="exited"] .rowText b {
 }
 .title h2 {
   margin: 0;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: var(--fs-16);
+  line-height: var(--lh-24);
 }
 .title p {
   margin: 0;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .badge,
 .port {
   flex: none;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 24px;
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-12);
+  line-height: var(--lh-24);
   white-space: nowrap;
 }
 .badge {
@@ -184,21 +184,21 @@ li[data-status="exited"] .rowText b {
 }
 .badge[data-status="exited"] {
   background: var(--surface-2);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .port {
   border: 1px solid var(--border);
   font-family: var(--mono);
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .window header > button {
   flex: none;
   width: 32px;
-  height: 32px;
+  height: var(--h-32);
   display: grid;
   place-items: center;
   border-radius: var(--r-8);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .window header > button:hover {
   background: var(--surface-2);
@@ -206,57 +206,57 @@ li[data-status="exited"] .rowText b {
 .note {
   flex: none;
   display: flex;
-  gap: 8px;
-  margin: 0 16px 12px;
-  padding: 8px 12px;
+  gap: var(--sp-8);
+  margin: 0 var(--sp-16) var(--sp-12);
+  padding: var(--sp-8) var(--sp-12);
   border-radius: var(--r-8);
   background: var(--amber-bg);
   color: var(--amber-text);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
 }
 .note svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 .output {
   flex: 1;
   min-height: 0;
-  margin: 0 16px;
-  padding: 12px 12px;
+  margin: 0 var(--sp-16);
+  padding: var(--sp-12) var(--sp-12);
   overflow: auto;
   border-radius: var(--r-10);
-  background: var(--text-1);
+  background: var(--fg-1);
   color: var(--border);
   font: 12px/19px var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   scrollbar-width: thin;
-  scrollbar-color: #4a5463 transparent;
+  scrollbar-color: var(--terminal-scrollbar) transparent;
 }
 .window footer {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px 16px;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16) var(--sp-16);
 }
 .window footer span {
   flex: 1;
   min-width: 0;
   font: 11px var(--mono);
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .window footer button {
   flex: none;
-  height: 34px;
+  height: var(--h-menu);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .window footer .stop {
   border-color: var(--red);

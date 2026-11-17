@@ -5,16 +5,16 @@
 .trigger {
   max-width: 100%;
   min-width: 0;
-  height: 28px;
+  height: var(--h-28);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-8);
   border: 1px solid transparent;
   border-radius: var(--r-8);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
-  color: var(--text-3);
+  color: var(--fg-3);
   white-space: nowrap;
 }
 .trigger svg {
@@ -25,7 +25,7 @@
 }
 .trigger[aria-expanded="true"] {
   background: var(--surface-2);
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 .trigger[data-mode="all"] {
   border-color: var(--amber-line);
@@ -48,24 +48,24 @@
   left: 0;
   bottom: 40px;
   width: 320px;
-  padding: 6px;
+  padding: var(--sp-6);
   border-radius: var(--r-12);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
 }
 .menu header {
-  padding: 6px 10px 8px;
-  font-size: 12px;
-  color: var(--text-4);
+  padding: var(--sp-6) var(--sp-10) var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .menu > button {
   width: 100%;
   display: flex;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: var(--sp-8);
+  padding: var(--sp-6) var(--sp-10);
   border-radius: var(--r-8);
   text-align: left;
-  line-height: 20px;
+  line-height: var(--lh-20);
 }
 .menu > button:hover {
   background: var(--surface-2);
@@ -74,46 +74,46 @@
 .menu i {
   flex: none;
   width: 14px;
-  padding-top: 3px;
+  padding-top: 3px; /* 例外：勾和第一行字对齐 */
   font-style: normal;
-  font-size: 11px;
-  color: var(--text-1);
+  font-size: var(--fs-11);
+  color: var(--fg-1);
 }
 .menu small {
   display: block;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+  color: var(--fg-4);
 }
 .menu b {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px 0;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-10) 0;
   color: var(--amber-text);
 }
 .menu p {
-  margin: 8px 10px;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-2);
+  margin: var(--sp-8) var(--sp-10);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-2);
 }
 .confirmRow {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 4px 6px 6px;
+  gap: var(--sp-8);
+  padding: var(--sp-4) var(--sp-6) var(--sp-6);
 }
 .confirmRow button {
-  height: 32px;
-  padding: 0 12px;
+  height: var(--h-32);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-8);
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .confirmRow .danger {
   background: var(--amber-text);
-  color: #fff;
+  color: var(--fg-on-color);
 }
 
 /* 模型菜单：列表是 Claude Code 给的，可能比较长 */
@@ -123,24 +123,24 @@
   overflow-y: auto;
 }
 .menu .loading {
-  margin: 0 10px 6px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-3);
+  margin: 0 var(--sp-10) var(--sp-6);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .menu em {
   display: block;
   font-style: normal;
-  font-size: 12px;
-  line-height: 17px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-2);
 }
 .menu > .more {
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: var(--text-3);
+  gap: var(--sp-6);
+  padding: var(--sp-6) var(--sp-10);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .menu > button[aria-disabled="true"] {
   cursor: default;
@@ -150,21 +150,21 @@
   background: none;
 }
 .tag {
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 999px;
+  margin-left: var(--sp-6);
+  padding: 1px var(--sp-6);
+  border-radius: var(--r-pill);
   background: var(--surface-2);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .note {
-  margin: 4px 10px 6px;
-  padding: 6px 8px;
+  margin: var(--sp-4) var(--sp-10) var(--sp-6);
+  padding: var(--sp-6) var(--sp-8);
   border-radius: var(--r-6);
   background: var(--amber-bg);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
   color: var(--amber-text);
 }
 

@@ -1,48 +1,48 @@
 /* 移除项目的确认 */
 .keep {
   display: grid;
-  gap: 4px;
-  margin: 12px 0 12px;
-  padding: 10px 12px;
+  gap: var(--sp-4);
+  margin: var(--sp-12) 0 var(--sp-12);
+  padding: var(--sp-10) var(--sp-12);
   border-radius: var(--r-8);
   background: var(--surface-2);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
 }
 .keep b {
   font-weight: 600;
 }
 .keep code {
   font: 12.5px/20px var(--mono);
-  color: var(--text-2);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 .keep span {
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .gone {
-  margin: 0 0 12px;
-  padding-left: 20px;
-  font-size: 13px;
-  line-height: 22px;
-  color: var(--text-2);
+  margin: 0 0 var(--sp-12);
+  padding-left: var(--sp-20);
+  font-size: var(--fs-13);
+  line-height: var(--lh-22);
+  color: var(--fg-2);
 }
 .note {
-  margin: 0 0 12px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-3);
+  margin: 0 0 var(--sp-12);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .groups {
   display: grid;
-  gap: 12px;
+  gap: var(--sp-12);
   max-height: 300px;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-12);
   overflow-y: auto;
 }
 .groups h3 {
-  margin: 0 0 6px;
-  font-size: 13px;
+  margin: 0 0 var(--sp-6);
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 .groups ul {

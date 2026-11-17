@@ -3,7 +3,7 @@
   width: var(--rail-w, 264px);
   display: flex;
   flex-direction: column;
-  background: var(--surface-0);
+  background: var(--surface);
   border-right: 1px solid var(--border);
 }
 .head {
@@ -11,18 +11,18 @@
   align-items: center;
   justify-content: space-between;
   height: 56px;
-  padding: 0 12px 0 16px;
-  font-size: 13px;
+  padding: 0 var(--sp-12) 0 var(--sp-16);
+  font-size: var(--fs-13);
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .head button {
   width: 32px;
-  height: 32px;
+  height: var(--h-32);
   display: grid;
   place-items: center;
   border-radius: var(--r-8);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .head button:hover {
   background: var(--surface-2);
@@ -31,7 +31,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
 }
 .projectHead {
   display: flex;
@@ -46,24 +46,24 @@
 .project {
   flex: 1;
   min-width: 0;
-  height: 38px;
+  height: var(--h-row);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-8);
   border-radius: var(--r-8);
   text-align: left;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .project b {
   flex: 1;
-  color: var(--text-1);
+  color: var(--fg-1);
   font-weight: 600;
 }
 .project small {
   flex: none;
-  font-size: 12px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .row {
   position: relative;
@@ -80,11 +80,11 @@
 .route {
   flex: 1;
   min-width: 0;
-  height: 38px;
+  height: var(--h-row);
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 4px 0 24px;
+  gap: var(--sp-10);
+  padding: 0 var(--sp-4) 0 var(--sp-24);
   text-align: left;
 }
 .route:not(:disabled):hover,
@@ -97,12 +97,12 @@
 .more {
   flex: none;
   width: 28px;
-  height: 28px;
-  margin-right: 4px;
+  height: var(--h-28);
+  margin-right: var(--sp-4);
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .row:hover .more,
 .more:focus-visible,
@@ -110,7 +110,7 @@
   opacity: 1;
 }
 .more:hover {
-  background: rgba(22, 27, 34, 0.08);
+  background: var(--press);
 }
 .backdrop {
   position: fixed;
@@ -124,15 +124,15 @@
   top: 36px;
   right: 4px;
   width: 232px;
-  padding: 6px;
+  padding: var(--sp-6);
   border-radius: var(--r-12);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
   font-weight: 400;
 }
 .menu button {
   width: 100%;
-  padding: 6px 10px;
+  padding: var(--sp-6) var(--sp-10);
   border-radius: var(--r-8);
   text-align: left;
 }
@@ -142,46 +142,46 @@
 }
 .menu small {
   display: block;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+  color: var(--fg-4);
 }
 .danger {
   color: var(--red);
 }
 .menu hr {
-  margin: 6px -6px;
+  margin: var(--sp-6) calc(-1 * var(--sp-6));
   border: 0;
   border-top: 1px solid var(--divider);
 }
 .archivedToggle {
-  height: 28px;
+  height: var(--h-28);
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 2px 0 0 24px;
-  padding: 0 6px;
+  gap: var(--sp-6);
+  margin: var(--sp-2) 0 0 var(--sp-24);
+  padding: 0 var(--sp-6);
   border-radius: var(--r-6);
-  font-size: 12px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .archived {
-  margin: 2px 0 2px 8px;
-  padding: 0 6px;
+  margin: var(--sp-2) 0 var(--sp-2) var(--sp-8);
+  padding: 0 var(--sp-6);
   border-radius: var(--r-10);
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: var(--fs-13);
+  color: var(--fg-2);
 }
 .archived[data-open="true"] {
-  padding-bottom: 10px;
+  padding-bottom: var(--sp-10);
   background: var(--surface-1);
 }
 .archivedHead {
   width: 100%;
-  height: 34px;
+  height: var(--h-menu);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   text-align: left;
 }
 .archivedHead span {
@@ -190,61 +190,61 @@
 }
 .archived[data-open="true"] .archivedHead span {
   font-weight: 600;
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 .archivedHead small {
   flex: none;
-  font-size: 11px;
-  color: var(--text-4);
+  font-size: var(--fs-11);
+  color: var(--fg-4);
 }
 .half {
   flex: none;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  border: 1.5px solid var(--text-3);
-  background: linear-gradient(90deg, var(--text-3) 50%, transparent 50%);
+  border-radius: var(--r-round);
+  border: 1.5px solid var(--fg-3);
+  background: linear-gradient(90deg, var(--fg-3) 50%, transparent 50%);
 }
 .archived p {
-  margin: 0 4px 8px;
-  font-size: 12px;
-  color: var(--text-2);
+  margin: 0 var(--sp-4) var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .archived > div {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 4px;
+  gap: var(--sp-6);
+  margin: 0 var(--sp-4);
 }
 .archived > div button {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--h-28);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-8);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .restore {
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
 }
 .dot {
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  animation: pulse 1400ms ease-in-out infinite;
+  border-radius: var(--r-round);
+  animation: pulse var(--t-loop) ease-in-out infinite;
 }
 .amber,
 .red {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--sp-4);
   height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
 }
 .amber {
@@ -257,21 +257,21 @@
 }
 .none {
   margin: 0;
-  padding: 6px 24px;
-  font-size: 12px;
-  color: var(--text-4);
+  padding: var(--sp-6) var(--sp-24);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .newChat {
   flex: none;
-  margin: 10px;
-  height: 44px;
+  margin: var(--sp-10);
+  height: var(--h-44);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--sp-8);
   border-radius: var(--r-10);
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 600;
 }
 
@@ -282,7 +282,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: var(--surface-0);
+  background: var(--surface);
   border-right: 1px solid var(--border);
 }
 .stripList {
@@ -291,31 +291,31 @@
   width: 100%;
   overflow-y: auto;
   scrollbar-width: none;
-  padding: 10px 0;
+  padding: var(--sp-10) 0;
 }
 .stripList section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 10px;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-10);
 }
 .avatar {
   width: 36px;
-  height: 36px;
+  height: var(--h-36);
   border-radius: var(--r-10);
   background: var(--surface-2);
-  color: var(--text-3);
+  color: var(--fg-3);
   font-weight: 700;
 }
 .avatar[aria-current="true"] {
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
 }
 .chip {
   position: relative;
   width: 44px;
-  height: 32px;
+  height: var(--h-32);
   display: grid;
   place-items: center;
   border-radius: var(--r-8);
@@ -331,8 +331,8 @@
   right: 3px;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  border: 1.5px solid var(--surface-0);
+  border-radius: var(--r-round);
+  border: 1.5px solid var(--surface);
 }
 .pipAmber {
   background: var(--amber);
@@ -343,13 +343,13 @@
 .stripNew {
   flex: none;
   width: 36px;
-  height: 36px;
-  margin: 8px 0 12px;
+  height: var(--h-36);
+  margin: var(--sp-8) 0 var(--sp-12);
   display: grid;
   place-items: center;
   border-radius: var(--r-10);
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
 }
 .stripNew:disabled {
   opacity: 0.4;
@@ -361,7 +361,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  box-shadow: 12px 0 32px rgba(22, 27, 34, 0.16);
+  box-shadow: var(--e-drawer-left);
 }
 .floatBackdrop {
   position: absolute;
@@ -374,17 +374,17 @@
 }
 .projectMore {
   flex: none;
-  margin-right: 4px;
+  margin-right: var(--sp-4);
   width: 28px;
-  height: 28px;
+  height: var(--h-28);
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .projectMore:hover,
 .projectMore[aria-expanded="true"] {
-  background: rgba(22, 27, 34, 0.08);
+  background: var(--press);
 }
 .projectMenu {
   top: 34px;
@@ -396,10 +396,10 @@
   flex: none;
   width: 10px;
   height: 12px;
-  margin-top: -8px;
-  border-left: 1.5px solid var(--line-strong);
-  border-bottom: 1.5px solid var(--line-strong);
-  border-bottom-left-radius: 5px;
+  margin-top: calc(-1 * var(--sp-8));
+  border-left: 1.5px solid var(--line-1);
+  border-bottom: 1.5px solid var(--line-1);
+  border-bottom-left-radius: 5px; /* 例外：树状连线的拐角 */
 }
 .branch[data-express="true"] {
   border-style: dotted;
@@ -407,31 +407,31 @@
 .term {
   flex: none;
   display: grid;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .count {
   flex: none;
   min-width: 18px;
   height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--text-1);
-  color: #fff;
-  font-size: 11px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-size: var(--fs-11);
   font-weight: 700;
-  line-height: 18px;
+  line-height: var(--lh-18);
   text-align: center;
 }
 .board {
   flex: none;
-  padding: 0 6px;
-  border-radius: 999px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
   background: var(--route-2-tag);
-  color: #fff;
+  color: var(--fg-on-color);
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
-  line-height: 18px;
+  line-height: var(--lh-18);
 }
 
 /* 没答完：半实心圆；同步中：转圈 */
@@ -439,18 +439,18 @@
   flex: none;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  border: 1.5px solid var(--text-2);
-  background: linear-gradient(90deg, var(--text-2) 50%, transparent 50%);
+  border-radius: var(--r-round);
+  border: 1.5px solid var(--fg-2);
+  background: linear-gradient(90deg, var(--fg-2) 50%, transparent 50%);
 }
 .syncing {
   flex: none;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--line);
-  border-top-color: var(--text-2);
-  animation: railSpin 800ms linear infinite;
+  border-radius: var(--r-round);
+  border: 2px solid var(--line-2);
+  border-top-color: var(--fg-2);
+  animation: railSpin var(--t-spin) linear infinite;
 }
 @keyframes railSpin {
   to {

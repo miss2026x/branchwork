@@ -10,9 +10,9 @@
   width: 340px;
   max-height: calc(100vh - 16px);
   overflow-y: auto;
-  padding: 12px 8px 8px 8px;
+  padding: var(--sp-12) var(--sp-8) var(--sp-8) var(--sp-8);
   border-radius: var(--r-16);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
   font-weight: 400;
   cursor: default;
@@ -20,19 +20,19 @@
 .menu label,
 .label {
   display: block;
-  margin: 0 8px 6px;
-  font-size: 12px;
+  margin: 0 var(--sp-8) var(--sp-6);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .menu input {
   width: calc(100% - 16px);
-  margin: 0 8px;
-  height: 38px;
-  padding: 0 12px;
+  margin: 0 var(--sp-8);
+  height: var(--h-row);
+  padding: 0 var(--sp-12);
   border: 1.5px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
 }
 .menu input:focus {
@@ -41,56 +41,56 @@
 }
 .info,
 .sync {
-  margin: 8px 8px 0;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-2);
+  margin: var(--sp-8) var(--sp-8) 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-2);
 }
 .sync {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .sync i {
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: var(--green);
 }
 .sync[data-tone="warn"] i {
   background: var(--amber);
 }
 .menu hr {
-  margin: 10px 0;
+  margin: var(--sp-10) 0;
   border: 0;
   border-top: 1px solid var(--divider);
 }
 .colors {
   display: flex;
-  gap: 8px;
-  margin: 0 8px;
+  gap: var(--sp-8);
+  margin: 0 var(--sp-8);
 }
 .colors button {
   width: 26px;
   height: 26px;
-  border-radius: 50%;
-  border: 2px solid var(--surface-0);
+  border-radius: var(--r-round);
+  border: 2px solid var(--surface);
 }
 .colors button[aria-checked="true"] {
-  box-shadow: 0 0 0 2px var(--text-1);
+  box-shadow: 0 0 0 2px var(--fg-1);
 }
 .item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 34px;
-  padding: 4px 8px;
+  gap: var(--sp-12);
+  min-height: var(--h-menu);
+  padding: var(--sp-4) var(--sp-8);
   border-radius: var(--r-8);
   text-align: left;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-18);
 }
 .item svg {
   flex: none;
@@ -106,33 +106,33 @@
 .resume small {
   display: block;
   font-weight: 400;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .danger {
   color: var(--red);
   font-weight: 600;
 }
 .resume {
-  margin: 6px 4px 0;
-  padding: 10px;
+  margin: var(--sp-6) var(--sp-4) 0;
+  padding: var(--sp-10);
   border-radius: var(--r-10);
   background: var(--surface-1);
 }
 .resume span {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .resume div {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 6px;
+  gap: var(--sp-8);
+  margin-top: var(--sp-6);
 }
 .resume small {
-  margin-top: 4px;
+  margin-top: var(--sp-4);
 }
 .resume code {
   flex: 1;
@@ -142,16 +142,16 @@
 .resume div button {
   flex: none;
   width: 30px;
-  height: 32px;
+  height: var(--h-32);
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
+  background: var(--surface);
 }
 
 .item:disabled {
-  color: var(--text-4);
+  color: var(--fg-4);
   cursor: default;
 }
 .item:disabled:hover {

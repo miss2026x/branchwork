@@ -1,20 +1,26 @@
-/* 设计稿 v3 的 Tokens 画板。组件只引用这些变量，不写具体色值；深色模式以后只换这一份。 */
+/*
+ * 设计稿第 0 站的样式规范（颜色、字体、动效三张画板）。
+ * 组件只引用这些变量：不写色值、字号、间距、控件高度、圆角、阴影、时长；深色模式以后只换这一份。
+ */
 :root {
-  /* 文字 */
-  --text-1: #161b22;
-  --text-2: #384250;
-  --text-3: #4f5966;
-  --text-4: #8a939e;
+  /* ---- 颜色（设计稿“颜色、边框与层级”画板，变量名照画板左边的写） ---- */
+  /* 灰阶：文字 fg-1 到 fg-4，fg-4 只用在占位和临时内容上 */
+  --fg-1: #161b22;
+  --fg-2: #384250;
+  --fg-3: #4f5966;
+  --fg-4: #8a939e;
   /* 线和边 */
-  --line-strong: #9aa4b0;
-  --line: #c8cfd8;
+  --line-1: #9aa4b0;
+  --line-2: #c8cfd8;
   --border: #dce1e7;
   --divider: #e6eaee;
   /* 面 */
   --canvas: #eef1f4;
   --surface-2: #f5f7f9;
   --surface-1: #fafbfc;
-  --surface-0: #ffffff;
+  --surface: #ffffff;
+  /* 压在线路色、深色按钮和深色浮层上的白字 */
+  --fg-on-color: #ffffff;
   /* 线路色（设计稿“颜色”画板）：每一路四个值——线、角标（压白字）、浅底、深字 */
   --route-1: #2563c9;
   --route-1-tag: #2563c9;
@@ -70,16 +76,88 @@
   --info: #2563c9;
   --info-bg: #e6eefb;
   --info-text: #1a4a9a;
-  /* 搜索命中的高亮底 */
+  /* 搜索命中的高亮底；排进候车区那一下闪的底 */
   --highlight: #ffe58a;
+  --highlight-bg: #fff8d6;
+  /* 键盘焦点 2px 外框；输入框获得焦点时外面那一圈淡蓝 */
+  --focus: #2563c9;
+  --focus-ring: rgba(37, 99, 201, 0.12);
+  /* 画布上的点阵 */
+  --grid-dot: #d5dbe2;
+  /* 白底上按下、拖动时的一层灰 */
+  --press: rgba(22, 27, 34, 0.08);
+  /* 地图上站点外面那圈白 */
+  --halo: rgba(255, 255, 255, 0.9);
+  /* 深色浮层（通知、候车按钮、终端、深色提示）上的字和线 */
+  --on-dark-2: rgba(255, 255, 255, 0.72);
+  --on-dark-line: rgba(255, 255, 255, 0.28);
+  --on-dark-divider: rgba(255, 255, 255, 0.16);
+  --on-dark-hover: rgba(255, 255, 255, 0.12);
+  --on-dark-dash: rgba(255, 255, 255, 0.6);
+  --on-dark-green: #bfe0cd;
+  --on-dark-amber-bg: #5a4310;
+  --on-dark-amber: #ffe2a3;
+  --on-dark-red: #ffb4a8;
+  --terminal-scrollbar: #4a5463;
+  /* 终端里“这是工作区的代码，不是 Local”那一条 */
+  --amber-strip: #fff6e5;
   /* 阴影：从低到高；白底浮层带一圈发丝线，深色浮层不带 */
   --e1: 0 1px 2px rgba(22, 27, 34, 0.08);
   --e2: 0 4px 12px rgba(22, 27, 34, 0.08);
   --e3: 0 12px 32px rgba(22, 27, 34, 0.16), 0 0 0 1px rgba(22, 27, 34, 0.06);
   --e4: 0 24px 60px rgba(22, 27, 34, 0.28), 0 0 0 1px rgba(22, 27, 34, 0.06);
   --e-dark: 0 12px 32px rgba(22, 27, 34, 0.28);
+  /* 窄窗口下从左右推进来的侧栏 */
+  --e-drawer-left: 12px 0 32px rgba(22, 27, 34, 0.16);
+  --e-drawer-right: -12px 0 32px rgba(22, 27, 34, 0.16);
   /* 弹窗的遮罩：40% */
   --scrim: rgba(22, 27, 34, 0.4);
+
+  /* ---- 字（设计稿“字体与长文本规范”画板）：字号只用 10 级；行高跟着字阶走 ---- */
+  --fs-36: 36px;
+  --fs-30: 30px;
+  --fs-24: 24px;
+  --fs-20: 20px;
+  --fs-18: 18px;
+  --fs-16: 16px;
+  --fs-14: 14px;
+  --fs-13: 13px;
+  --fs-12: 12px;
+  --fs-11: 11px;
+  --lh-42: 42px;
+  --lh-38: 38px;
+  --lh-32: 32px;
+  --lh-28: 28px;
+  --lh-26: 26px;
+  --lh-24: 24px;
+  --lh-22: 22px;
+  --lh-20: 20px;
+  --lh-18: 18px;
+  --lh-16: 16px;
+
+  /* ---- 间距：内边距和间隔只用这 13 个值 ---- */
+  --sp-2: 2px;
+  --sp-4: 4px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+  --sp-32: 32px;
+  --sp-40: 40px;
+  --sp-48: 48px;
+  --sp-64: 64px;
+
+  /* ---- 控件高度：按钮五档；菜单行、左栏行另算 ---- */
+  --h-28: 28px;
+  --h-32: 32px;
+  --h-36: 36px;
+  --h-40: 40px;
+  --h-44: 44px;
+  --h-menu: 34px;
+  --h-row: 38px;
   /* 圆角 */
   --r-4: 4px;
   --r-6: 6px;
@@ -88,12 +166,14 @@
   --r-12: 12px;
   --r-16: 16px;
   --r-pill: 999px;
-  /* 动效 */
+  --r-round: 50%;
+  /* 动效（设计稿“动效”画板）：只有四个时长，外加转圈 */
   --t-fast: 120ms;
   --t-base: 200ms;
   --t-slow: 320ms;
+  --t-loop: 1400ms;
+  --t-spin: 800ms;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  /* 字体 */
   /* 字体（设计稿“字体”画板）：西文和数字 Schibsted Grotesk，中文 Noto Sans SC，代码 JetBrains Mono；都打包在应用里 */
   --font: "Schibsted Grotesk Variable", "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --mono: "JetBrains Mono Variable", "Cascadia Code", "SF Mono", Consolas, "Noto Sans SC Variable", monospace;
@@ -110,8 +190,8 @@ body,
 body {
   margin: 0;
   background: var(--canvas);
-  color: var(--text-1);
-  font: 14px/20px var(--font);
+  color: var(--fg-1);
+  font: var(--fs-14) / var(--lh-20) var(--font);
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
@@ -137,13 +217,13 @@ button:disabled {
   cursor: default;
 }
 :focus-visible {
-  outline: 2px solid var(--route-1);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 /* 滚动条：细的、不带箭头（Windows 默认的很粗） */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: var(--line-2) transparent;
 }
 code,
 pre,

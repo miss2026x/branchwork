@@ -3,65 +3,65 @@
   width: 400px;
   display: flex;
   flex-direction: column;
-  padding: 24px 20px 20px;
+  padding: var(--sp-24) var(--sp-20) var(--sp-20);
   border-left: 1px solid var(--border);
-  background: var(--surface-0);
+  background: var(--surface);
 }
 .panel > header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
 }
 .panel h2 {
   margin: 0;
-  font-size: 24px;
-  line-height: 32px;
+  font-size: var(--fs-24);
+  line-height: var(--lh-32);
 }
 .panel > header i {
   min-width: 24px;
   height: 24px;
-  padding: 0 6px;
+  padding: 0 var(--sp-6);
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: var(--text-1);
-  color: #fff;
-  font-size: 12px;
+  border-radius: var(--r-pill);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-size: var(--fs-12);
   font-style: normal;
   font-weight: 700;
 }
 .panel > p {
-  margin: 8px 0 12px;
-  font-size: 12px;
-  color: var(--text-2);
+  margin: var(--sp-8) 0 var(--sp-12);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  margin: 0 -6px;
-  padding: 0 6px;
+  margin: 0 calc(-1 * var(--sp-6));
+  padding: 0 var(--sp-6);
 }
 .empty {
-  font-size: 13px;
-  color: var(--text-3);
+  font-size: var(--fs-13);
+  color: var(--fg-3);
 }
 .panel h3 {
-  margin: 12px 0 8px;
-  font-size: 13px;
+  margin: var(--sp-12) 0 var(--sp-8);
+  font-size: var(--fs-13);
 }
 .panel h3 small {
-  margin-left: 6px;
-  font-size: 12px;
+  margin-left: var(--sp-6);
+  font-size: var(--fs-12);
   font-weight: 400;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  padding: 12px;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-8);
+  padding: var(--sp-12);
   border: 1px solid var(--divider);
   border-radius: var(--r-10);
 }
@@ -73,54 +73,54 @@
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--sp-2);
 }
 .item b,
 .loose b {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 .item > div > span,
 .loose > span {
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .item[data-ready="true"] > div > span {
   color: var(--route-2);
 }
 .board {
   flex: none;
-  height: 36px;
-  padding: 0 12px;
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-8);
   background: var(--route-2);
-  color: #fff;
+  color: var(--fg-on-color);
   font-weight: 700;
 }
 .x {
   flex: none;
   width: 28px;
-  height: 28px;
+  height: var(--h-28);
   border-radius: var(--r-6);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .x:hover {
   background: var(--surface-2);
 }
 .loose {
-  margin-bottom: 8px;
-  padding: 12px;
-  border: 1px dashed var(--line-strong);
+  margin-bottom: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px dashed var(--line-1);
   border-radius: var(--r-10);
 }
 .loose[data-open="true"] {
-  border: 2px solid var(--text-1);
+  border: 2px solid var(--fg-1);
 }
 .loose > div:first-child {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .loose > div:first-child b {
   flex: 1;
@@ -128,24 +128,24 @@
 }
 .loose > div:first-child > button:not(.x) {
   flex: none;
-  height: 32px;
-  padding: 0 12px;
+  height: var(--h-32);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .loose h4 {
-  margin: 12px 0 6px;
-  font-size: 12px;
+  margin: var(--sp-12) 0 var(--sp-6);
+  font-size: var(--fs-12);
 }
 .loose label {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 40px;
-  padding: 0 10px;
+  gap: var(--sp-10);
+  height: var(--h-40);
+  padding: 0 var(--sp-10);
   border-radius: var(--r-8);
-  font-size: 13px;
+  font-size: var(--fs-13);
   cursor: pointer;
 }
 .loose label[data-on="true"] {
@@ -156,7 +156,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--text-1);
+  accent-color: var(--fg-1);
 }
 .loose label span {
   flex: 1;
@@ -164,76 +164,76 @@
 }
 .loose label small {
   flex: none;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .modes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  margin-top: 10px;
-  padding: 3px;
+  margin-top: var(--sp-10);
+  padding: var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   background: var(--surface-1);
 }
 .modes button {
-  height: 34px;
+  height: var(--h-menu);
   border-radius: var(--r-8);
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .modes button[aria-checked="true"] {
-  background: var(--surface-0);
-  color: var(--text-1);
+  background: var(--surface);
+  color: var(--fg-1);
   font-weight: 700;
   box-shadow: var(--e1);
 }
 .loose footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
 }
 .loose footer button {
-  height: 40px;
-  padding: 0 12px;
+  height: var(--h-40);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-8);
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: var(--fs-13);
+  color: var(--fg-2);
 }
 .loose footer .go {
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 700;
 }
 .panel form {
-  margin-top: 12px;
+  margin-top: var(--sp-12);
 }
 .panel form > span {
   display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--text-2);
+  margin-bottom: var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .panel form > div {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .panel form input {
   flex: 1;
   min-width: 0;
-  height: 44px;
-  padding: 0 12px;
-  border: 1px dashed var(--line-strong);
+  height: var(--h-44);
+  padding: 0 var(--sp-12);
+  border: 1px dashed var(--line-1);
   border-radius: var(--r-10);
 }
 .panel form button {
   flex: none;
-  height: 44px;
-  padding: 0 12px;
+  height: var(--h-44);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-10);
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 700;
 }
 .panel form button:disabled {

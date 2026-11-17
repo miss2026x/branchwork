@@ -11,24 +11,24 @@
   left: 16px;
   right: 190px;
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
   /* 放不下时横向滚动，不把名字挤短 */
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 2px;
-  margin: -2px;
+  padding: var(--sp-2);
+  margin: calc(-1 * var(--sp-2));
 }
 .tab {
   flex: none;
   max-width: 200px;
-  height: 36px;
+  height: var(--h-36);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 0 8px;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-12) 0 var(--sp-8);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e1);
 }
 .tab[aria-current="true"] {
@@ -39,20 +39,20 @@
   z-index: 2;
   top: 12px;
   right: 16px;
-  height: 36px;
+  height: var(--h-36);
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 4px;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e1);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .zoom button {
   width: 28px;
-  height: 28px;
+  height: var(--h-28);
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
@@ -63,12 +63,12 @@
 .zoom span {
   width: 44px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .zoom i {
   width: 1px;
   height: 16px;
-  margin: 0 4px;
+  margin: 0 var(--sp-4);
   background: var(--divider);
 }
 .viewport {
@@ -95,7 +95,7 @@
 }
 .lane[data-on="false"] .name,
 .lane[data-on="false"] .plateName {
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .lane[data-on="false"] .plate > :first-child {
   opacity: 0.55;
@@ -105,22 +105,22 @@
 .plate {
   position: absolute;
   transform: translate(-100%, -50%);
-  height: 28px;
+  height: var(--h-28);
   display: flex;
   align-items: stretch;
   overflow: hidden;
   border: 2px solid;
   border-radius: var(--r-6);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e1);
-  font-size: 13px;
+  font-size: var(--fs-13);
   white-space: nowrap;
 }
 .plateName {
   max-width: 168px;
-  padding: 0 8px;
+  padding: 0 var(--sp-8);
   font-weight: 600;
-  line-height: 24px;
+  line-height: var(--lh-24);
 }
 
 /* 站 */
@@ -140,8 +140,8 @@
   place-items: center;
   padding: 0;
   border: 4px solid;
-  border-radius: 50%;
-  background: var(--surface-0);
+  border-radius: var(--r-round);
+  background: var(--surface);
   transition: transform var(--t-fast) var(--ease);
 }
 /* 刚发出的一站：线先到位，站点再弹出来（设计稿“动效”：站点 200ms，晚 120ms） */
@@ -160,19 +160,19 @@
   width: 30px;
   height: 30px;
   border-width: 3px;
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 5px var(--halo);
 }
 .stop[data-status="answering"] .node i {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
-  animation: pulse 1400ms ease-in-out infinite;
+  border-radius: var(--r-round);
+  animation: pulse var(--t-loop) ease-in-out infinite;
 }
 /* 换乘站：有别的路从这里分叉出去 */
 .stop[data-junction="true"] .node {
   top: -17px;
-  height: 34px;
-  border-radius: 11px;
+  height: var(--h-menu);
+  border-radius: 11px; /* 例外：换乘站的圆角方块，跟站点尺寸算 */
 }
 /* 换乘站的站名放到上面：正下方是分叉出去的那条线 */
 .stop[data-junction="true"] .name {
@@ -180,7 +180,7 @@
 }
 /* 摘要站：方的 */
 .stop[data-kind="summary"] .node {
-  border-radius: 6px;
+  border-radius: var(--r-6);
 }
 /* 没答完：半实心 */
 .stop[data-status="interrupted"] .node {
@@ -192,18 +192,18 @@
   left: 0;
   transform: translateX(-50%);
   max-width: 96px;
-  padding: 0 4px;
+  padding: 0 var(--sp-4);
   border-radius: var(--r-4);
   background: var(--canvas);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+  color: var(--fg-2);
 }
 .stop[data-latest="true"] .name {
-  color: var(--text-1);
+  color: var(--fg-1);
   font-weight: 700;
 }
 .stop[data-status="answering"] .name {
@@ -216,11 +216,11 @@
   width: 20px;
   height: 20px;
   border: 3px dashed;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: var(--canvas);
 }
 .next .name {
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .live {
   position: absolute;
@@ -229,23 +229,23 @@
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   white-space: nowrap;
   pointer-events: none;
 }
 .live > em:first-child {
   font-style: normal;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
-  line-height: 18px;
+  line-height: var(--lh-18);
 }
 .live > em[data-waiting="true"] {
   height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
   background: var(--amber-bg);
   color: var(--amber-text);
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 .flagAmber {
   position: absolute;
@@ -253,14 +253,14 @@
   bottom: 18px;
   transform: translateX(-50%);
   height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
   background: var(--amber-bg);
   color: var(--amber-text);
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
-  line-height: 18px;
+  line-height: var(--lh-18);
   white-space: nowrap;
 }
 .badgeRed,
@@ -270,13 +270,13 @@
   top: -20px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   border: 2px solid var(--canvas);
-  font-size: 11px;
-  line-height: 12px;
+  font-size: var(--fs-11);
+  line-height: 12px; /* 例外：16px 的小圆里减去 2px 描边后居中 */
   font-weight: 800;
   text-align: center;
-  color: #fff;
+  color: var(--fg-on-color);
 }
 .badgeRed {
   background: var(--red);
@@ -307,38 +307,38 @@
   /* 压在候车区的浮窗上面：菜单是刚点出来的，不能被挡住 */
   z-index: 9;
   width: 280px;
-  padding: 6px;
+  padding: var(--sp-6);
   border-radius: var(--r-12);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
   cursor: default;
 }
 .menu header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px 10px;
-  margin-bottom: 4px;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-10) var(--sp-10);
+  margin-bottom: var(--sp-4);
   border-bottom: 1px solid var(--divider);
 }
 .menu header span {
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .menu button {
   width: 100%;
-  min-height: 34px;
+  min-height: var(--h-menu);
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: var(--sp-10);
+  padding: var(--sp-6) var(--sp-10);
   border-radius: var(--r-8);
   text-align: left;
-  line-height: 20px;
+  line-height: var(--lh-20);
 }
 .menu button svg {
   flex: none;
-  margin-top: 2px;
-  color: var(--text-3);
+  margin-top: var(--sp-2);
+  color: var(--fg-3);
 }
 .menu button:not(:disabled):hover {
   background: var(--surface-2);
@@ -346,9 +346,9 @@
 }
 .menu small {
   display: block;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+  color: var(--fg-4);
 }
 
 .stop[data-ringed="true"]::before {
@@ -357,11 +357,11 @@
   left: 50%;
   top: 50%;
   width: 44px;
-  height: 44px;
+  height: var(--h-44);
   margin: -22px 0 0 -22px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: var(--highlight);
-  animation: ring 1.8s var(--ease) forwards;
+  animation: ring var(--t-loop) var(--ease) forwards;
   pointer-events: none;
 }
 @keyframes ring {
@@ -382,8 +382,8 @@
 .menu header input {
   flex: 1;
   min-width: 0;
-  height: 28px;
-  padding: 0 8px;
+  height: var(--h-28);
+  padding: 0 var(--sp-8);
   border: 1.5px solid var(--route-1);
   border-radius: var(--r-6);
   font: inherit;
@@ -397,10 +397,10 @@
 .menu kbd {
   flex: none;
   font: 11px/20px var(--mono);
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .menu hr {
-  margin: 6px 4px;
+  margin: var(--sp-6) var(--sp-4);
   border: 0;
   border-top: 1px solid var(--divider);
 }
@@ -422,45 +422,45 @@
   position: absolute;
   z-index: 8;
   width: 420px;
-  padding: 12px 16px 12px;
+  padding: var(--sp-12) var(--sp-16) var(--sp-12);
   border-radius: var(--r-12);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
   cursor: default;
 }
 .card header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--sp-8);
+  font-size: var(--fs-13);
 }
 .card header time {
   margin-left: auto;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .cardAsk {
-  margin: 10px 0 0;
-  font-size: 16px;
-  line-height: 24px;
+  margin: var(--sp-10) 0 0;
+  font-size: var(--fs-16);
+  line-height: var(--lh-24);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .cardAnswer {
-  margin: 8px 0 0;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-2);
+  margin: var(--sp-8) 0 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 .cardMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 8px 0 0;
+  gap: var(--sp-4) var(--sp-12);
+  margin: var(--sp-8) 0 0;
   min-height: 0;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .cardMeta .ok {
   color: var(--green);
@@ -471,58 +471,58 @@
 .card footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-  padding-top: 12px;
+  gap: var(--sp-6);
+  margin-top: var(--sp-12);
+  padding-top: var(--sp-12);
   border-top: 1px solid var(--divider);
 }
 .card footer button {
-  height: 32px;
-  padding: 0 10px;
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .card footer button:disabled {
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .card footer .cardPrimary {
-  border-color: var(--text-1);
-  background: var(--text-1);
-  color: #fff;
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 700;
 }
 .cardDark {
   width: 320px;
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
 }
 .cardDark header em {
-  padding: 0 8px;
-  border-radius: 999px;
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-pill);
   background: var(--green-text);
-  color: #bfe0cd;
+  color: var(--on-dark-green);
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
-  line-height: 20px;
+  line-height: var(--lh-20);
 }
 .cardDark header em[data-mode="manual"] {
-  background: #5a4310;
-  color: #ffe2a3;
+  background: var(--on-dark-amber-bg);
+  color: var(--on-dark-amber);
 }
 .cardDark .cardMeta {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--on-dark-2);
 }
 .cardDark footer {
-  border-top-color: rgba(255, 255, 255, 0.16);
+  border-top-color: var(--on-dark-divider);
 }
 .cardDark footer button {
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  border-color: var(--on-dark-line);
+  color: var(--fg-on-color);
 }
 .cardDark footer .cardDanger {
-  color: #ffb4a8;
+  color: var(--on-dark-red);
 }
 
 /* 正在看以前的某一站 */
@@ -536,7 +536,7 @@
   left: 50%;
   transform: translateX(-50%);
   font-style: normal;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   white-space: nowrap;
   color: var(--route-1);
@@ -550,39 +550,39 @@
   min-height: 60px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-16);
   border-top: 1px solid var(--border);
-  background: var(--surface-0);
-  font-size: 14px;
+  background: var(--surface);
+  font-size: var(--fs-14);
 }
 .selectBar > i {
   width: 1px;
   height: 22px;
-  margin: 0 4px;
+  margin: 0 var(--sp-4);
   background: var(--border);
 }
 .selectBar .spacer {
   flex: 1;
 }
 .selectBar button {
-  height: 36px;
+  height: var(--h-36);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 13px;
+  font-size: var(--fs-13);
   white-space: nowrap;
 }
 .selectBar button:disabled {
   opacity: 0.45;
 }
 .selectBar .selectPrimary {
-  border-color: var(--text-1);
-  background: var(--text-1);
-  color: #fff;
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 700;
 }
 .selectBar button[aria-label] {
@@ -597,25 +597,25 @@
   position: absolute;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-6);
   transform: translateY(-50%);
-  padding: 6px;
-  border: 2px dashed var(--text-1);
-  border-radius: 22px;
-  background: var(--surface-0);
+  padding: var(--sp-6);
+  border: 2px dashed var(--fg-1);
+  border-radius: 22px; /* 例外：包住里面按钮的胶囊，高度会变，不能用 999px */
+  background: var(--surface);
 }
 .drop > div {
   width: 150px;
-  padding: 8px 10px;
+  padding: var(--sp-8) var(--sp-10);
   border: 2px dashed;
-  border-radius: 16px;
+  border-radius: var(--r-16);
   text-align: center;
 }
 .drop > div[data-mode="auto"] {
   border-style: solid;
   background: var(--green);
   border-color: var(--green) !important;
-  color: #fff;
+  color: var(--fg-on-color);
 }
 .drop > div[data-over="true"] {
   transform: scale(1.04);
@@ -623,16 +623,16 @@
 }
 .drop b {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .drop small {
-  font-size: 11px;
+  font-size: var(--fs-11);
   opacity: 0.85;
 }
 
 .stop[data-name="temp"] .name {
   font-style: italic;
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .selectBar .solve {
   border-color: var(--amber-line);
@@ -645,13 +645,13 @@
 .folded {
   position: absolute;
   transform: translate(-50%, -50%);
-  padding: 2px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface-0);
-  font-size: 11px;
+  padding: var(--sp-2) var(--sp-10);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  font-size: var(--fs-11);
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--fg-3);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -662,14 +662,14 @@
   transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px 0 4px;
+  gap: var(--sp-8);
+  height: var(--h-32);
+  padding: 0 var(--sp-12) 0 var(--sp-4);
   border: 2px dashed var(--express);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--canvas);
   color: var(--express);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -677,18 +677,18 @@
   display: grid;
   place-items: center;
   height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-pill);
   background: var(--express);
-  color: #fff;
+  color: var(--fg-on-color);
 }
 .building i {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   border: 2px solid color-mix(in srgb, var(--express) 30%, transparent);
   border-top-color: var(--express);
-  animation: buildingSpin 800ms linear infinite;
+  animation: buildingSpin var(--t-spin) linear infinite;
 }
 .building[data-ready="true"] {
   border-style: solid;
@@ -702,15 +702,15 @@
 .cardFrom {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-3);
+  gap: var(--sp-4);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .cardList {
-  margin: 8px 0 4px;
-  padding-left: 16px;
-  font-size: 13px;
-  line-height: 22px;
+  margin: var(--sp-8) 0 var(--sp-4);
+  padding-left: var(--sp-16);
+  font-size: var(--fs-13);
+  line-height: var(--lh-22);
 }
 
 /* 短确认（“继续”“好的”）：小点，不显示名字 */
@@ -734,15 +734,15 @@
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-6);
   height: 24px;
-  padding: 0 10px;
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-0);
-  font-size: 12px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  font-size: var(--fs-12);
   font-style: normal;
-  color: var(--text-2);
+  color: var(--fg-2);
   white-space: nowrap;
   pointer-events: none;
 }
@@ -755,10 +755,10 @@
 .naming i {
   width: 9px;
   height: 9px;
-  border-radius: 50%;
-  border: 2px solid var(--line);
-  border-top-color: var(--text-2);
-  animation: buildingSpin 800ms linear infinite;
+  border-radius: var(--r-round);
+  border: 2px solid var(--line-2);
+  border-top-color: var(--fg-2);
+  animation: buildingSpin var(--t-spin) linear infinite;
 }
 
 /* 冲突站的卡片 */
@@ -769,39 +769,39 @@
   color: var(--amber);
 }
 .cardFile {
-  margin: 8px 0;
-  padding: 10px 12px;
+  margin: var(--sp-8) 0;
+  padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-2);
 }
 .cardFile code {
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: var(--sp-2);
   font: 13px var(--mono);
-  color: var(--text-1);
+  color: var(--fg-1);
   overflow-wrap: anywhere;
 }
 .cardResolve {
   width: 100%;
-  margin: 8px 0;
-  padding: 12px 12px;
+  margin: var(--sp-8) 0;
+  padding: var(--sp-12) var(--sp-12);
   border-radius: var(--r-10);
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   text-align: left;
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 700;
 }
 .cardResolve small {
   display: block;
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-12);
   font-weight: 400;
-  line-height: 17px;
-  color: rgba(255, 255, 255, 0.78);
+  line-height: var(--lh-18);
+  color: var(--on-dark-2);
 }
 
 /* 刚开始用时地图下面的一条说明 */
@@ -814,14 +814,14 @@
   width: min(520px, calc(100% - 48px));
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 12px;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--sp-12);
   border: 1px solid var(--border);
-  border-radius: var(--r-12, 12px);
-  background: var(--surface-0);
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-2);
+  border-radius: var(--r-12, var(--r-12));
+  background: var(--surface);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-2);
 }
 .hint i {
   flex: none;
@@ -829,7 +829,7 @@
   height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--r-round);
   background: color-mix(in srgb, var(--route-1) 14%, white);
   color: var(--route-1);
   font-style: normal;
@@ -843,7 +843,7 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-6);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .hint button:hover {
   background: var(--surface-2);

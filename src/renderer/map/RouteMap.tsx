@@ -249,10 +249,10 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                     {/* 父路被删掉了：在线头上方标一下它是从哪开出来的 */}
                     {lane.route.orphanOf && !lane.link && detail !== "lines" && (
                       <g opacity={on ? 1 : 0.7}>
-                        <path d={`M ${lane.from.x + 14} ${lane.y - 48} V ${lane.y - 12}`} stroke="var(--line-strong)" strokeWidth={2.5} strokeDasharray="4 5" strokeLinecap="round" fill="none" />
-                        <circle cx={lane.from.x + 14} cy={lane.y - 60} r={12} fill="var(--canvas)" stroke="var(--line-strong)" strokeWidth={1.5} strokeDasharray="3 3" />
-                        <path d={`M ${lane.from.x + 10} ${lane.y - 64} l 8 8 M ${lane.from.x + 18} ${lane.y - 64} l -8 8`} stroke="var(--text-3)" strokeWidth={1.5} strokeLinecap="round" />
-                        <text x={lane.from.x + 36} y={lane.y - 56} fontSize={12} fill="var(--text-2)">
+                        <path d={`M ${lane.from.x + 14} ${lane.y - 48} V ${lane.y - 12}`} stroke="var(--line-1)" strokeWidth={2.5} strokeDasharray="4 5" strokeLinecap="round" fill="none" />
+                        <circle cx={lane.from.x + 14} cy={lane.y - 60} r={12} fill="var(--canvas)" stroke="var(--line-1)" strokeWidth={1.5} strokeDasharray="3 3" />
+                        <path d={`M ${lane.from.x + 10} ${lane.y - 64} l 8 8 M ${lane.from.x + 18} ${lane.y - 64} l -8 8`} stroke="var(--fg-3)" strokeWidth={1.5} strokeLinecap="round" />
+                        <text x={lane.from.x + 36} y={lane.y - 56} fontSize={12} fill="var(--fg-2)">
                           从已删除的 {lane.route.orphanOf} 开出
                         </text>
                       </g>
@@ -288,14 +288,14 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                 );
               return (
                 <g fontSize={12} fontWeight={700}>
-                  <path d={`M ${first.x - 16} ${lane.y - 50} H ${upto.x + 16}`} stroke="var(--text-1)" strokeWidth={2} strokeLinecap="round" />
-                  <text x={(first.x + upto.x) / 2} y={lane.y - 58} textAnchor="middle" fill="var(--text-1)">
+                  <path d={`M ${first.x - 16} ${lane.y - 50} H ${upto.x + 16}`} stroke="var(--fg-1)" strokeWidth={2} strokeLinecap="round" />
+                  <text x={(first.x + upto.x) / 2} y={lane.y - 58} textAnchor="middle" fill="var(--fg-1)">
                     会带上{n > 1 ? `第 1–${n} 站` : "第 1 站"}
                   </text>
                   {at < lane.stops.length - 1 && (
                     <>
-                      <path d={`M ${upto.x + 34} ${lane.y - 50} H ${last.x + 16}`} stroke="var(--line-strong)" strokeWidth={2} strokeLinecap="round" strokeDasharray="2 5" />
-                      <text x={(upto.x + 50 + last.x) / 2} y={lane.y - 58} textAnchor="middle" fill="var(--text-3)" fontWeight={500}>
+                      <path d={`M ${upto.x + 34} ${lane.y - 50} H ${last.x + 16}`} stroke="var(--line-1)" strokeWidth={2} strokeLinecap="round" strokeDasharray="2 5" />
+                      <text x={(upto.x + 50 + last.x) / 2} y={lane.y - 58} textAnchor="middle" fill="var(--fg-3)" fontWeight={500}>
                         {stopNumber(last.stop) > n + 1 ? `第 ${n + 1}–${stopNumber(last.stop)} 站不带` : `第 ${n + 1} 站不带`}
                       </text>
                     </>
@@ -708,7 +708,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
   const busy = lane.route.status === "answering" || lane.route.status === "awaiting_permission";
   return (
     <div className={css.lane} data-on={on}>
-      <button className={css.plate} style={{ left: lane.plate.x, top: lane.plate.y, borderColor: on ? tag : "var(--line)" }} onClick={onSelect}>
+      <button className={css.plate} style={{ left: lane.plate.x, top: lane.plate.y, borderColor: on ? tag : "var(--line-2)" }} onClick={onSelect}>
         <Plate route={lane.route} size="m" />
         <span className={`${css.plateName} ell`}>{lane.route.name}</span>
       </button>
@@ -740,7 +740,7 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
               </span>
             )}
             {stop.status === "interrupted" && <em className={css.flagAmber}>没答完</em>}
-            <button className={css.node} style={{ borderColor: junction && !answering ? "var(--text-1)" : line, ...(answering ? { boxShadow: `0 0 0 5px color-mix(in srgb, ${line} 22%, transparent)` } : {}), ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, var(--text-1) 50%, var(--surface-0) 50%)` } : {}) }} onClick={() => onStop(stop)}
+            <button className={css.node} style={{ borderColor: junction && !answering ? "var(--fg-1)" : line, ...(answering ? { boxShadow: `0 0 0 5px color-mix(in srgb, ${line} 22%, transparent)` } : {}), ...(stop.status === "interrupted" ? { background: `linear-gradient(90deg, var(--fg-1) 50%, var(--surface) 50%)` } : {}) }} onClick={() => onStop(stop)}
               onContextMenu={(e) => (e.preventDefault(), onStopMenu(stop))}
               onPointerEnter={() => onHover({ kind: "stop", id: stop.id })}
               onPointerLeave={() => onHover(null)}

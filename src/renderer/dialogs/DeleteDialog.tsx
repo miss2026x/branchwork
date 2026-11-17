@@ -91,7 +91,7 @@ export function DeleteDialog({ route, stopCount, unsynced, onCancel, onConfirm, 
           <button type="button" className={css.ghost} onClick={onCancel} autoFocus>
             取消
           </button>
-          <button type="button" className={choice === "archive" && unsynced === null ? css.confirm : css.destroy} style={choice === "archive" && unsynced === null ? { background: "var(--text-1)" } : undefined} disabled={working} onClick={() => void confirm()}>
+          <button type="button" className={choice === "archive" && unsynced === null ? css.confirm : css.destroy} style={choice === "archive" && unsynced === null ? { background: "var(--fg-1)" } : undefined} disabled={working} onClick={() => void confirm()}>
             {unsynced !== null ? "不要这些改动了，删除" : choice === "archive" ? "归档" : choice === "keep" ? "删掉对话" : "全部删掉"}
           </button>
         </footer>

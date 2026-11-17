@@ -7,175 +7,175 @@
 .dialog .head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-12);
   margin: 0;
-  padding: 20px 24px 4px;
+  padding: var(--sp-20) var(--sp-24) var(--sp-4);
 }
 .head h2 {
   flex: 1;
   margin: 0;
-  font-size: 18px;
-  line-height: 26px;
+  font-size: var(--fs-18);
+  line-height: var(--lh-26);
   font-weight: 800;
 }
 .head > button {
   width: 32px;
-  height: 32px;
+  height: var(--h-32);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-8);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .head > button:hover {
   background: var(--surface-2);
 }
 .plate {
-  height: 28px;
-  padding: 0 8px;
+  height: var(--h-28);
+  padding: 0 var(--sp-8);
   border-radius: var(--r-6);
-  color: #fff;
-  font-size: 16px;
+  color: var(--fg-on-color);
+  font-size: var(--fs-16);
   font-weight: 800;
-  line-height: 28px;
+  line-height: var(--lh-28);
 }
 .plate small {
   padding-left: 1px;
-  font-size: 11px;
+  font-size: var(--fs-11);
 }
 .body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 24px 20px;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--sp-24) var(--sp-20);
 }
 .row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-6);
   min-width: 0;
 }
 .label {
   flex: none;
   width: 40px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--sp-6);
 }
 .chips button {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--h-28);
+  padding: 0 var(--sp-12);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-0);
-  font-size: 13px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  font-size: var(--fs-13);
 }
 .chips button[aria-checked="true"] {
-  border-color: var(--text-1);
-  background: var(--text-1);
-  color: #fff;
+  border-color: var(--fg-1);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 600;
 }
 .chips .dashed {
   border-style: dashed;
-  border-color: var(--line-strong);
+  border-color: var(--line-1);
   background: transparent;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .name {
   flex: 1;
   min-width: 0;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-8);
-  background: var(--surface-0);
-  font-size: 14px;
+  background: var(--surface);
+  font-size: var(--fs-14);
   transition: border-color var(--t-fast) ease-out;
 }
 .name:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line-1);
 }
 .name:focus {
   outline: none;
-  border-color: var(--text-1);
+  border-color: var(--fg-1);
 }
 .name::placeholder {
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .swatches {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-left: 8px;
+  gap: var(--sp-6);
+  padding-left: var(--sp-8);
 }
 .swatches button {
   width: 18px;
   height: 18px;
-  border-radius: 50%;
+  border-radius: var(--r-round);
 }
 .swatches button[aria-checked="true"] {
-  border: 2px solid var(--surface-0);
-  box-shadow: 0 0 0 2px var(--text-1);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 2px var(--fg-1);
 }
 
 /* 第一站：和对话栏的输入框一个样子 */
 .box {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: var(--r-12);
-  background: var(--surface-0);
+  background: var(--surface);
   transition:
     border-color var(--t-fast) ease-out,
     box-shadow var(--t-fast) ease-out;
 }
 .box:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line-1);
 }
 .box:focus-within {
-  border-color: var(--text-1);
-  box-shadow: 0 0 0 3px rgba(37, 99, 201, 0.12);
+  border-color: var(--fg-1);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 .box > label {
-  padding: 10px 12px 0;
-  font-size: 12px;
+  padding: var(--sp-10) var(--sp-12) 0;
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .box textarea {
   min-height: 108px;
-  padding: 4px 12px;
+  padding: var(--sp-4) var(--sp-12);
   border: none;
   background: transparent;
   resize: none;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--fs-14);
+  line-height: var(--lh-22);
 }
 .box textarea:focus {
   outline: none;
 }
 .box textarea::placeholder {
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 8px 8px 6px;
+  gap: var(--sp-4);
+  padding: var(--sp-6) var(--sp-8) var(--sp-8) var(--sp-6);
 }
 .controls {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-2);
 }
 .controls > * {
   flex: 0 0 auto;
@@ -189,22 +189,22 @@
   flex: none;
 }
 .pick {
-  height: 28px;
+  height: var(--h-28);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 10px;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
-  font-size: 12px;
+  background: var(--surface);
+  font-size: var(--fs-12);
 }
 .pick span {
-  padding: 0 4px;
-  border-radius: 999px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
   background: var(--surface-2);
-  font-size: 11px;
-  color: var(--text-3);
+  font-size: var(--fs-11);
+  color: var(--fg-3);
 }
 .pickList {
   animation: pop var(--t-base) var(--ease);
@@ -215,19 +215,19 @@
   width: 320px;
   max-height: 260px;
   overflow-y: auto;
-  padding: 4px;
+  padding: var(--sp-4);
   border-radius: var(--r-10);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
 }
 .pickList button {
   display: block;
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-6);
   text-align: left;
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
 }
 .pickList button:hover,
 .pickList button[aria-selected="true"] {
@@ -236,31 +236,31 @@
 .warn {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  margin: -4px 0 0;
-  padding: 8px 10px;
+  gap: var(--sp-6);
+  margin: calc(-1 * var(--sp-4)) 0 0;
+  padding: var(--sp-8) var(--sp-10);
   border-radius: var(--r-8);
   background: var(--amber-bg);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
   color: var(--amber-text);
 }
 .warn svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 .from {
   align-self: flex-start;
-  margin-top: -4px;
+  margin-top: calc(-1 * var(--sp-4));
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 4px 0 8px;
-  border-radius: 999px;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-4) 0 var(--sp-8);
+  border-radius: var(--r-pill);
   background: var(--surface-1);
-  font-size: 12px;
-  line-height: 26px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  line-height: var(--lh-26);
+  color: var(--fg-3);
 }
 .from button {
   width: 22px;
@@ -268,25 +268,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  color: var(--text-4);
+  border-radius: var(--r-round);
+  color: var(--fg-4);
 }
 .workspace {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-6);
   min-width: 0;
-  margin: -2px 0 0;
-  font-size: 12px;
-  color: var(--text-4);
+  margin: calc(-1 * var(--sp-2)) 0 0;
+  font-size: var(--fs-12);
+  color: var(--fg-4);
   white-space: nowrap;
 }
 .dialog .foot {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-12);
   margin: 0;
-  padding: 12px 24px;
+  padding: var(--sp-12) var(--sp-24);
   border-top: 1px solid var(--divider);
   border-radius: 0 0 var(--r-16) var(--r-16);
   background: var(--surface-1);
@@ -295,52 +295,52 @@
   flex: 1;
   min-width: 0;
   font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
 .cancel {
-  height: 40px;
-  padding: 0 16px;
+  height: var(--h-40);
+  padding: 0 var(--sp-16);
   border-radius: var(--r-8);
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .cancel:hover {
   background: var(--surface-2);
 }
 .go {
   flex: none;
-  height: 44px;
+  height: var(--h-44);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-16);
   border-radius: var(--r-8);
-  color: #fff;
-  font-size: 14px;
+  color: var(--fg-on-color);
+  font-size: var(--fs-14);
   font-weight: 700;
 }
 .go kbd {
   font-family: var(--mono);
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--fs-11);
+  color: var(--on-dark-2);
 }
 
 /* 提示里要强调的一句（从某站开新对话：代码不回到那一站） */
 .workspace b {
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .sub {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--sp-8);
   margin: 0;
-  padding: 2px 24px 0 64px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-3);
+  padding: var(--sp-2) var(--sp-24) 0 var(--sp-64);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .sub > span {
   flex: 1;
@@ -353,10 +353,10 @@
 .switchTo {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-6);
   flex: none;
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: var(--fs-13);
+  color: var(--fg-2);
   cursor: pointer;
 }
 

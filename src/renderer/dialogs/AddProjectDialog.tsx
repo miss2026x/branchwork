@@ -79,7 +79,7 @@ export function ImportDialog({ project, load, onImport, onCancel }: { project: P
           <button type="button" className={css.ghost} onClick={onCancel}>
             取消
           </button>
-          <button type="button" className={css.confirm} style={{ background: "var(--text-1)" }} disabled={picked.length === 0 || busy} onClick={() => (setBusy(true), onImport(picked))}>
+          <button type="button" className={css.confirm} style={{ background: "var(--fg-1)" }} disabled={picked.length === 0 || busy} onClick={() => (setBusy(true), onImport(picked))}>
             {busy ? "导入中…" : picked.length > 0 ? `导入 ${picked.length} 个` : "导入"}
           </button>
         </footer>
@@ -198,7 +198,7 @@ export function AddProjectDialog({ dir: initial, onPick, onInspect, loadSessions
           <button type="button" className={css.ghost} onClick={onCancel}>
             取消
           </button>
-          <button type="submit" className={css.confirm} style={{ background: "var(--text-1)" }} disabled={!ok}>
+          <button type="submit" className={css.confirm} style={{ background: "var(--fg-1)" }} disabled={!ok}>
             添加
           </button>
         </footer>

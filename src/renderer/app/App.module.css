@@ -9,30 +9,30 @@
   height: 60px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 0 16px;
-  background: var(--surface-0);
+  gap: var(--sp-24);
+  padding: 0 var(--sp-16);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 16px;
+  gap: var(--sp-10);
+  font-size: var(--fs-16);
 }
 .crumbs {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   min-width: 0;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .crumbs i {
   font-style: normal;
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .crumbs b {
-  color: var(--text-1);
+  color: var(--fg-1);
   font-weight: 600;
 }
 .body {
@@ -54,7 +54,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  box-shadow: -12px 0 32px rgba(22, 27, 34, 0.16);
+  box-shadow: -var(--e-drawer-left);
   animation: slide var(--t-slow) var(--ease);
 }
 @keyframes slide {
@@ -72,15 +72,15 @@
   z-index: 3;
   top: 60px;
   right: 136px;
-  height: 40px;
+  height: var(--h-40);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 16px;
-  border-radius: 999px;
-  background: var(--text-1);
-  color: #fff;
-  font-size: 14px;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-16);
+  border-radius: var(--r-pill);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-size: var(--fs-14);
   font-weight: 600;
   box-shadow: var(--e2);
 }
@@ -88,37 +88,37 @@
   margin-left: auto;
   flex: none;
   width: 300px;
-  height: 36px;
+  height: var(--h-36);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px 0 12px;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-8) 0 var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
   background: var(--surface-1);
-  color: var(--text-4);
+  color: var(--fg-4);
   text-align: left;
 }
 .search:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line-1);
 }
 .search span {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .search kbd {
-  padding: 0 6px;
+  padding: 0 var(--sp-6);
   border: 1px solid var(--border);
   border-radius: var(--r-4);
-  background: var(--surface-0);
+  background: var(--surface);
   font: 11px/18px var(--mono);
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .search[data-compact="true"] {
   width: 36px;
   padding: 0;
   justify-content: center;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .search[data-compact="true"] span,
 .search[data-compact="true"] kbd {
@@ -138,30 +138,30 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 32px;
+  gap: var(--sp-12);
+  padding: var(--sp-32);
   text-align: center;
 }
 .empty h1 {
-  margin: 12px 0 0;
-  font-size: 20px;
-  line-height: 28px;
+  margin: var(--sp-12) 0 0;
+  font-size: var(--fs-20);
+  line-height: var(--lh-28);
 }
 .empty p {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sp-12);
   max-width: 440px;
-  color: var(--text-3);
-  line-height: 22px;
+  color: var(--fg-3);
+  line-height: var(--lh-22);
 }
 .primary {
-  height: 40px;
-  padding: 0 20px;
+  height: var(--h-40);
+  padding: 0 var(--sp-20);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   border-radius: var(--r-8);
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   font-weight: 600;
 }
 .toast {
@@ -173,11 +173,11 @@
   max-width: min(720px, calc(100% - 48px));
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 12px 12px 16px;
+  gap: var(--sp-16);
+  padding: var(--sp-12) var(--sp-12) var(--sp-12) var(--sp-16);
   border-radius: var(--r-10);
-  background: var(--text-1);
-  color: #fff;
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   box-shadow: var(--e-dark);
   z-index: 10;
 }
@@ -186,11 +186,11 @@
 }
 .toast button {
   flex: none;
-  height: 28px;
-  padding: 0 10px;
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
   border-radius: var(--r-6);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--on-dark-divider);
+  color: var(--fg-on-color);
 }
 
 /* 全部项目页：占满下面整块，左栏、地图、对话栏先收起 */
@@ -198,7 +198,7 @@
   display: none;
 }
 .crumbLink {
-  padding: 4px 6px;
+  padding: var(--sp-4) var(--sp-6);
   border-radius: var(--r-6);
   font: inherit;
   color: inherit;
@@ -206,43 +206,43 @@
 .crumbLink:hover,
 .crumbLink[aria-current="page"] {
   background: var(--surface-2);
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 
 /* 空项目：地图上一条等着发车的虚线，下面直接写第一站 */
 .first {
   position: relative;
   width: min(640px, calc(100% - 48px));
-  margin: 64px auto 0;
+  margin: var(--sp-64) auto 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 .firstLine {
   position: relative;
   height: 88px;
-  margin: 0 -400px 28px;
-  padding: 0 400px;
-  border-bottom: 4px dashed var(--line-strong);
+  margin: 0 -400px var(--sp-24); /* 例外：左右各撑出 400px，让底色铺满 */
+  padding: 0 400px; /* 例外：和上面的负外边距抵消 */
+  border-bottom: 4px dashed var(--line-1);
 }
 .firstLine span {
   position: absolute;
   left: 356px;
   top: 28px;
   display: flex;
-  border: 2px dashed var(--line-strong);
+  border: 2px dashed var(--line-1);
   border-radius: var(--r-6);
-  background: var(--surface-0);
-  font-size: 13px;
-  color: var(--text-3);
+  background: var(--surface);
+  font-size: var(--fs-13);
+  color: var(--fg-3);
 }
 .firstLine b,
 .firstLine i {
-  padding: 3px 8px;
+  padding: var(--sp-2) var(--sp-8);
   font-style: normal;
 }
 .firstLine i {
-  border-left: 2px dashed var(--line-strong);
+  border-left: 2px dashed var(--line-1);
 }
 .firstLine em {
   position: absolute;
@@ -250,42 +250,42 @@
   bottom: -17px;
   width: 30px;
   height: 30px;
-  border: 3px dashed var(--line-strong);
-  border-radius: 50%;
+  border: 3px dashed var(--line-1);
+  border-radius: var(--r-round);
   background: var(--canvas);
 }
 .first h1 {
   margin: 0;
-  font-size: 30px;
-  line-height: 38px;
+  font-size: var(--fs-30);
+  line-height: var(--lh-38);
   font-weight: 800;
 }
 .first > p {
   margin: 0;
-  font-size: 16px;
-  color: var(--text-3);
+  font-size: var(--fs-16);
+  color: var(--fg-3);
 }
 .firstCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-  padding: 16px;
+  gap: var(--sp-10);
+  margin-top: var(--sp-4);
+  padding: var(--sp-16);
   border-radius: var(--r-16);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
 }
 .firstCard label {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 700;
 }
 .firstCard textarea {
   resize: vertical;
-  padding: 12px;
+  padding: var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   font: inherit;
-  line-height: 22px;
+  line-height: var(--lh-22);
 }
 .firstCard textarea:focus {
   outline: none;
@@ -295,36 +295,36 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .firstCard > div span {
   flex: 1;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .firstMore {
-  height: 40px;
-  padding: 0 10px;
-  font-size: 13px;
-  color: var(--text-3);
+  height: var(--h-40);
+  padding: 0 var(--sp-10);
+  font-size: var(--fs-13);
+  color: var(--fg-3);
 }
 .firstGo {
-  height: 40px;
-  padding: 0 16px;
+  height: var(--h-40);
+  padding: 0 var(--sp-16);
   border-radius: var(--r-10);
   background: var(--route-1);
-  color: #fff;
+  color: var(--fg-on-color);
   font-weight: 700;
 }
 .firstNote {
   display: flex;
-  gap: 8px;
-  font-size: 13px !important;
-  line-height: 20px;
+  gap: var(--sp-8);
+  font-size: var(--fs-13) !important;
+  line-height: var(--lh-20);
 }
 .firstNote svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--sp-2);
 }
 .firstNote code {
   font: 12px var(--mono);
@@ -337,48 +337,48 @@
   z-index: 20;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--sp-24);
   background: var(--scrim);
 }
 .askBox {
   width: min(440px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 20px;
+  gap: var(--sp-8);
+  padding: var(--sp-20);
   border-radius: var(--r-16);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e4);
 }
 .askBox h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fs-18);
 }
 .askBox p {
-  margin: 0 0 6px;
-  color: var(--text-2);
+  margin: 0 0 var(--sp-6);
+  color: var(--fg-2);
 }
 .askBox button {
-  padding: 10px 12px;
+  padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   text-align: left;
 }
 .askBox button:hover {
-  border-color: var(--text-1);
+  border-color: var(--fg-1);
 }
 .askBox button b,
 .askBox button small {
   display: block;
 }
 .askBox button small {
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .askBox .askCancel {
   align-self: flex-end;
   border-color: transparent;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 
 /* 底部的深色提示条：刚做完的一件事 */
@@ -389,11 +389,11 @@
   width: min(440px, calc(100% - 48px));
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--r-12, 12px);
-  background: var(--text-1);
-  color: #fff;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--sp-16);
+  border-radius: var(--r-12, var(--r-12));
+  background: var(--fg-1);
+  color: var(--fg-on-color);
   box-shadow: var(--e-dark);
   overflow: hidden;
   z-index: 10;
@@ -402,24 +402,24 @@
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--sp-2);
 }
 .done b {
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 .done span {
-  font-size: 12px;
-  line-height: 18px;
-  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--on-dark-2);
 }
 .done button {
   flex: none;
-  height: 34px;
-  padding: 0 12px;
+  height: var(--h-menu);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-8);
-  background: #fff;
-  color: var(--text-1);
-  font-size: 13px;
+  background: var(--surface);
+  color: var(--fg-1);
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 .done > i {
@@ -441,18 +441,18 @@
 .gear {
   flex: none;
   width: 40px;
-  height: 40px;
-  margin-left: 8px;
+  height: var(--h-40);
+  margin-left: var(--sp-8);
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
   border-radius: var(--r-10);
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .gear:hover,
 .gear[aria-expanded="true"] {
   background: var(--surface-2);
-  color: var(--text-1);
+  color: var(--fg-1);
 }
 
 /* 两栏之间的分隔条 */

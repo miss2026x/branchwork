@@ -4,12 +4,12 @@
   max-width: 190px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 28px;
-  padding-right: 10px;
+  gap: var(--sp-8);
+  height: var(--h-28);
+  padding-right: var(--sp-10);
   border: 1.5px dashed;
   border-radius: var(--r-6);
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   overflow: hidden;
 }
@@ -17,129 +17,129 @@
   align-self: stretch;
   display: grid;
   place-items: center;
-  padding: 0 8px;
-  color: #fff;
-  font-size: 13px;
+  padding: 0 var(--sp-8);
+  color: var(--fg-on-color);
+  font-size: var(--fs-13);
 }
 .range {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--sp-8);
+  font-size: var(--fs-13);
 }
 .range i {
   font-style: normal;
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .range select {
   flex: 1;
   min-width: 0;
-  height: 40px;
-  padding: 0 10px;
+  height: var(--h-40);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  background: var(--surface-0);
-  font-size: 13px;
+  background: var(--surface);
+  font-size: var(--fs-13);
 }
 .range small {
   flex: none;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .optional {
   font-style: normal;
   font-weight: 400;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .after {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .after label {
   display: flex;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--sp-10);
+  padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   cursor: pointer;
 }
 .after label[data-on="true"] {
-  border-color: var(--text-1);
-  box-shadow: 0 0 0 1px var(--text-1);
+  border-color: var(--fg-1);
+  box-shadow: 0 0 0 1px var(--fg-1);
 }
 .after label input {
   flex: none;
   display: inline-block;
   width: 16px;
   height: 16px;
-  margin: 2px 0 0;
+  margin: var(--sp-2) 0 0;
   padding: 0;
-  accent-color: var(--text-1);
+  accent-color: var(--fg-1);
 }
 .after b {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .after small {
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .folder {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--text-2);
+  gap: var(--sp-8);
+  margin: var(--sp-12) 0 0;
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 12px 0 6px;
-  font-size: 13px;
+  margin: var(--sp-12) 0 var(--sp-6);
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 .head small {
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 400;
-  color: var(--text-3);
+  color: var(--fg-3);
 }
 .items {
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-8);
   max-height: 300px;
   overflow-y: auto;
-  padding: 6px 12px 12px;
+  padding: var(--sp-6) var(--sp-12) var(--sp-12);
   border: 1px solid var(--border);
   border-radius: var(--r-10);
   background: var(--surface-1);
 }
 .items h3 {
-  margin: 10px 0 4px;
-  font-size: 12px;
+  margin: var(--sp-10) 0 var(--sp-4);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--fg-2);
 }
 .item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: 13px;
-  line-height: 20px;
+  gap: var(--sp-10);
+  padding: var(--sp-4) 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
 }
 .item > i {
   flex: none;
   width: 6px;
   height: 6px;
-  margin-top: 6px;
-  border-radius: 50%;
+  margin-top: var(--sp-6);
+  border-radius: var(--r-round);
 }
 .item > span {
   flex: 1;
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 var(--sp-4);
   border-radius: var(--r-6);
   outline: none;
   overflow-wrap: anywhere;
@@ -148,7 +148,7 @@
   background: var(--surface-2);
 }
 .item > span:focus {
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: 0 0 0 1.5px var(--route-1);
 }
 .item > button {
@@ -158,29 +158,29 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
-  color: var(--text-4);
+  color: var(--fg-4);
 }
 .item > button:hover {
   background: var(--surface-2);
   color: var(--red);
 }
 .add {
-  margin-top: 8px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px dashed var(--line-strong);
+  margin-top: var(--sp-8);
+  height: var(--h-32);
+  padding: 0 var(--sp-12);
+  border: 1px dashed var(--line-1);
   border-radius: var(--r-8);
-  font-size: 12px;
-  color: var(--text-2);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
 }
 .addInput {
   width: 100%;
-  height: 32px;
-  margin-top: 8px;
-  padding: 0 10px;
+  height: var(--h-32);
+  margin-top: var(--sp-8);
+  padding: 0 var(--sp-10);
   border: 1.5px solid var(--route-1);
   border-radius: var(--r-8);
-  font-size: 13px;
+  font-size: var(--fs-13);
   outline: none;
 }
 .pick {
@@ -189,12 +189,12 @@
 .pick > button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
+  gap: var(--sp-6);
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
   border: 1px solid var(--border);
   border-radius: var(--r-8);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 400;
 }
 .pick ul {
@@ -206,28 +206,28 @@
   max-height: 200px;
   overflow-y: auto;
   margin: 0;
-  padding: 6px;
+  padding: var(--sp-6);
   list-style: none;
   border-radius: var(--r-10);
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e3);
 }
 .pick li button {
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--sp-6) var(--sp-8);
   border-radius: var(--r-6);
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 400;
 }
 .pick li button:hover {
   background: var(--surface-2);
 }
 .discard {
-  height: 36px;
-  padding: 0 12px;
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-8);
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--red);
 }
 .discard:hover {
@@ -244,8 +244,8 @@
 /* 一栏的样子（和开新车同一套，见 NewRoute.module.css） */
 .rangeText {
   flex: none;
-  font-size: 12px;
-  color: var(--text-3);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
 }
 .rangePick {
   flex: 1;
@@ -254,26 +254,26 @@
 .seg {
   flex: none;
   display: inline-flex;
-  padding: 2px;
+  padding: var(--sp-2);
   border-radius: var(--r-8);
   background: var(--surface-2);
 }
 .seg button {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--h-28);
+  padding: 0 var(--sp-12);
   border-radius: var(--r-6);
-  font-size: 13px;
-  color: var(--text-3);
+  font-size: var(--fs-13);
+  color: var(--fg-3);
 }
 .seg button[aria-checked="true"] {
-  background: var(--surface-0);
+  background: var(--surface);
   box-shadow: var(--e1);
-  color: var(--text-1);
+  color: var(--fg-1);
   font-weight: 700;
 }
 .cost {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
-  color: var(--text-4);
+  font-size: var(--fs-12);
+  color: var(--fg-4);
 }
