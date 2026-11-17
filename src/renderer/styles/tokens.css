@@ -117,6 +117,19 @@
   /* 弹窗的遮罩：40% */
   --scrim: rgba(22, 27, 34, 0.4);
 
+  /* ---- 代码高亮（shiki 的 css-variables 主题读这些变量）：颜色都取自上面的线路深字和状态色 ---- */
+  --shiki-foreground: var(--fg-1);
+  --shiki-background: transparent;
+  --shiki-token-comment: var(--fg-4);
+  --shiki-token-keyword: var(--route-3-text);
+  --shiki-token-string: var(--green-text);
+  --shiki-token-string-expression: var(--green-text);
+  --shiki-token-constant: var(--orange-text);
+  --shiki-token-function: var(--route-1-text);
+  --shiki-token-parameter: var(--fg-2);
+  --shiki-token-punctuation: var(--fg-3);
+  --shiki-token-link: var(--info);
+
   /* ---- 字（设计稿“字体与长文本规范”画板）：字号只用 10 级；行高跟着字阶走 ---- */
   --fs-36: 36px;
   --fs-30: 30px;

@@ -138,12 +138,28 @@
   background: var(--surface-2);
   font-variant-ligatures: none;
 }
-.md pre {
+/* 代码块：浅底、细边，右上角小字写语言；颜色由 shiki 按 tokens.css 的 --shiki-* 变量上 */
+.md pre,
+.code {
+  position: relative;
   padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--divider);
   border-radius: var(--r-8);
   background: var(--surface-1);
   overflow-x: auto;
+  color: var(--shiki-foreground);
+}
+.codeLang {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-8);
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-4);
+  user-select: none;
+}
+.code[data-lang] code {
+  display: block;
+  padding-right: var(--sp-40);
 }
 .md pre code {
   padding: 0;
@@ -605,7 +621,13 @@
   background: var(--line-2);
 }
 .strip i[data-viewing="true"]::before {
+  left: -7px;
+  top: -6px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--surface);
   background: var(--c);
+  box-shadow: 0 0 0 2px var(--c);
 }
 .strip i[data-kind="inherited"] {
   background: var(--p);

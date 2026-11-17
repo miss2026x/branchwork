@@ -1,6 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { ChatItem, Effort, PermissionMode, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
 import { currentModel, type OptionsState } from "../ui/claude-options";
 import { TerminalStrip } from "../terminal/TerminalStrip";
@@ -14,6 +12,7 @@ import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
 import css from "./ChatPanel.module.css";
+import { Md } from "./Md";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
 interface Props {
@@ -214,6 +213,13 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <i key={q.id} data-kind="waiting" data-after={!!viewing} />
           ))}
         </div>
+        {viewing ? (
+          // 设计稿：看以前的某一站时，下面一行改成“看到第几站 / 这一路共几站”
+          <div className={css.stripLabels}>
+            <span>看到第 {num(viewing)} 站</span>
+            <span>这一路共 {total} 站</span>
+          </div>
+        ) : (
         <div className={css.stripLabels}>
           {offset > 0 && parent && <span>{offset > 1 ? `1–${offset}` : "1"} 随 {parent.express ? `快${parent.express}` : `${parent.number}路`} 带来</span>}
           {(() => {
@@ -230,6 +236,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           })()}
           {queued > 0 && <span>{queued > 1 ? `${total + 1}–${total + queued}` : total + 1} 候车</span>}
         </div>
+        )}
         <div className={css.metaRow}>
           <span className="ell">
             {parent && !route.express && offset > 0 ? `从 ${parent.number}路第 ${offset} 站分出` : parent && route.express ? `从 ${parent.number}路 提炼开出` : "自己的工作区"}
@@ -286,7 +293,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               <section key={s.id} className={css.summary} style={{ borderColor: colors.line }}>
                 <h3 style={{ color: colors.tag }}>交接摘要</h3>
                 <div className={css.md}>
-                  <Markdown remarkPlugins={[remarkGfm]}>{s.prompt}</Markdown>
+                  <Md>{s.prompt}</Md>
                 </div>
                 <p>第一个问题会连同这份摘要一起交给 Claude。</p>
               </section>
@@ -523,7 +530,7 @@ function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean })
       {blocks.map((b, i) =>
         b.kind === "text" ? (
           <div key={i} className={css.md} data-streaming={streaming && b.last}>
-            <Markdown remarkPlugins={[remarkGfm]}>{b.text}</Markdown>
+            <Md>{b.text}</Md>
           </div>
         ) : (
           <Tools key={i} tools={b.tools} running={!!streaming && i === blocks.length - 1} />

@@ -14,7 +14,7 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
   main: { modules: ["shared", "core", "db", "claude"], packages: ["electron"] },
   preload: { modules: ["shared"], packages: ["electron"] },
   // 界面只认识 shared 里的类型；数据只能经 window.bw 来
-  renderer: { modules: ["shared"], packages: ["react", "react-dom/client", "zustand", "react-markdown", "remark-gfm", "@fontsource-variable/schibsted-grotesk", "@fontsource-variable/noto-sans-sc", "@fontsource-variable/jetbrains-mono"] },
+  renderer: { modules: ["shared"], packages: ["react", "react-dom/client", "zustand", "react-markdown", "remark-gfm", "@fontsource-variable/schibsted-grotesk", "@fontsource-variable/noto-sans-sc", "@fontsource-variable/jetbrains-mono", "shiki/core", "shiki/engine/javascript"] },
 };
 
 const SRC = path.resolve(__dirname, "..", "src");
@@ -78,6 +78,17 @@ describe("界面的动效", () => {
       }
     }
     expect(problems).toEqual([]);
+  });
+});
+
+describe("代码高亮", () => {
+  it("只有 chat/highlight.ts 碰 shiki（换掉它只改一个文件）", () => {
+    const users = files(path.join(SRC, "renderer")).filter((f) => /["']shiki[/"']/.test(fs.readFileSync(f, "utf8")));
+    expect(users.map((f) => path.relative(SRC, f))).toEqual([path.join("renderer", "chat", "highlight.ts")]);
+  });
+  it("代码的颜色用 tokens.css 里的 --shiki-* 变量", () => {
+    const tokens = fs.readFileSync(path.join(SRC, "renderer/styles/tokens.css"), "utf8");
+    for (const v of ["--shiki-foreground", "--shiki-token-keyword", "--shiki-token-string", "--shiki-token-comment", "--shiki-token-function"]) expect(tokens).toContain(`${v}:`);
   });
 });
 
