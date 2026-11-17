@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { Fragment, useEffect, useMemo, useState, useRef } from "react";
 import type { QueueItem, Stop, SyncFile } from "../../shared";
 import { CompressDialog } from "../dialogs/CompressDialog";
 import type { Building } from "../panels/WaitingArea";
@@ -23,17 +23,19 @@ import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
-import { BusMark, IconChat, IconFolder, IconSearch, IconSliders } from "../ui/icons";
+import { BusMark, IconChat, IconFolder, IconPlus, IconSearch, IconSliders } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { modeInfo } from "../ui/claude-options";
 import css from "./App.module.css";
 import { useTier } from "./use-tier";
+import { PANES, dividerTarget, flexPane, loadLayout, move, sameSlot, saveLayout, setWidth, slotAt, toggle, visible, type Layout, type PaneId } from "./layout";
+import { PaneDragOverlay, PaneHeader, PaneToggles, type DragHandlers } from "./Panes";
 
 const EMPTY_QUEUE: QueueItem[] = [];
 
 /** 两栏之间的分隔条：拖动改宽度，双击恢复默认 */
-function Divider({ label, current, onDrag, onReset }: { label: string; current: number | null; onDrag(dx: number, start: number | null): void; onReset(): void }) {
-  const from = useRef<{ x: number; start: number | null } | null>(null);
+function Divider({ label, start, onDrag, onReset }: { label: string; start(): number; onDrag(dx: number, start: number): void; onReset(): void }) {
+  const from = useRef<{ x: number; start: number } | null>(null);
   return (
     <div
       className={css.divider}
@@ -42,7 +44,7 @@ function Divider({ label, current, onDrag, onReset }: { label: string; current: 
       aria-label={label}
       title={`${label}；双击恢复默认`}
       onPointerDown={(e) => {
-        from.current = { x: e.clientX, start: current };
+        from.current = { x: e.clientX, start: start() };
         e.currentTarget.setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => from.current && onDrag(e.clientX - from.current.x, from.current.start)}
@@ -164,24 +166,25 @@ export function App() {
       return false;
     }
   });
-  /** 拖出来的左栏、对话栏宽度；没拖过就用默认的。只记在这台机器上 */
-  const [widths, setWidths] = useState<{ rail: number | null; panel: number | null }>(() => {
-    try {
-      return { rail: null, panel: null, ...(JSON.parse(localStorage.getItem("bw.widths") ?? "{}") as object) };
-    } catch {
-      return { rail: null, panel: null };
-    }
-  });
-  const setWidth = (which: "rail" | "panel", value: number | null) =>
-    setWidths((w) => {
-      const next = { ...w, [which]: value };
-      try {
-        localStorage.setItem("bw.widths", JSON.stringify(next));
-      } catch {
-        // 记不住也没关系
-      }
+  /** 三个面板怎么摆：显示哪几个、顺序、拖出来的宽度（设计稿 9-7）。只记在这台机器上 */
+  const [layout, setLayout] = useState<Layout>(loadLayout);
+  const updateLayout = (f: (l: Layout) => Layout) =>
+    setLayout((l) => {
+      const next = f(l);
+      saveLayout(next);
       return next;
     });
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const paneEls = useRef<Partial<Record<PaneId, HTMLElement | null>>>({});
+  /** 面板现在的宽度（拖分隔条时从这里开始算） */
+  const paneWidth = (id: PaneId) => paneEls.current[id]?.getBoundingClientRect().width ?? PANES[id].base;
+  const paneWidthStyle = (id: PaneId) => layout.width[id] ?? (id === "chat" ? (tier === "wide" ? 420 : 380) : PANES[id].base);
+  const resizePane = (left: PaneId, right: PaneId, dx: number, start: number) => {
+    const { pane, sign } = dividerTarget(left, right, flex);
+    updateLayout((l) => setWidth(l, pane, start + sign * dx));
+  };
+  /** 正在拖哪个面板换位置 */
+  const [paneDrag, setPaneDrag] = useState<{ id: PaneId; x: number; y: number; slot: number | null; lineX: number | null; hint: string | null } | null>(null);
   const [deleting, setDeleting] = useState<{ routeId: string; unsynced: SyncFile[] | null } | null>(null);
   const stopNumber = (stop: Stop) => stopOffset(allRoutes[stop.routeId], allRoutes, allStops) + ordinal(stop, allStops);
 
@@ -191,6 +194,13 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ctrl+Alt+1/2/3（Mac 上 ⌘⌥）：显示 / 收起项目列表、地图、对话
+      if ((e.ctrlKey || e.metaKey) && e.altKey && !e.shiftKey && /^Digit[123]$/.test(e.code)) {
+        e.preventDefault();
+        const id = (["rail", "map", "chat"] as const)[Number(e.code.slice(5)) - 1]!;
+        updateLayout((l) => toggle(l, id));
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = e.key.toLowerCase();
       if (key === "k") {
@@ -235,6 +245,85 @@ export function App() {
       return { stopId, express: expressBase + 1 + i, name: d.name.trim() || `${source.name} · 续`, ready: d.status !== "running", source, upto: stopNumber(allStops[stopId]!), startedAt: d.startedAt, direct: d.direct };
     });
 
+  // 实际摆出来的面板：还没有项目时地图（欢迎页）一定在；没选路时对话只在没有地图时占个位；窄窗口里对话改成从右边滑出
+  const shown = projects.length === 0 && !visible(layout).includes("map") ? layout.order.filter((p) => p === "map" || visible(layout).includes(p)) : visible(layout);
+  const chatAsDrawer = tier === "narrow" && shown.includes("map");
+  const flowPanes = shown.filter((p) => !(p === "chat" && (chatAsDrawer || (!route && shown.includes("map")))));
+  const flex = flexPane(flowPanes);
+  const dragHandlers: DragHandlers = {
+    onDragStart: (id, x, y) => setPaneDrag({ id, x, y, slot: null, lineX: null, hint: null }),
+    onDragMove: (x, y) =>
+      setPaneDrag((d) => {
+        if (!d) return d;
+        const ids = visible(layout);
+        const rects = ids.map((p) => paneEls.current[p]?.getBoundingClientRect() ?? { left: 0, right: 0 });
+        const slot = slotAt(x, rects);
+        if (sameSlot(layout, d.id, slot)) return { ...d, x, y, slot: null, lineX: null, hint: null };
+        const lineX = slot === 0 ? rects[0]!.left + 2 : slot >= rects.length ? rects[rects.length - 1]!.right - 2 : rects[slot]!.left;
+        const before = ids[slot - 1];
+        const after = ids[slot];
+        const hint = before && after ? `放到${PANES[before].label}和${PANES[after].label}之间` : before ? "放到最右边" : "放到最左边";
+        return { ...d, x, y, slot, lineX, hint };
+      }),
+    onDragEnd: (commit) => {
+      setPaneDrag((d) => {
+        if (d && commit && d.slot !== null) updateLayout((l) => move(l, d.id, d.slot!));
+        return null;
+      });
+    },
+  };
+
+  const waitingArea = (floating: boolean) => (
+    <WaitingArea
+                buttonOnlyWhenOpen={floating}
+                items={Object.values(allQueues).flat()}
+                routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
+                project={{ id: projectId!, name: projects.find((p) => p.id === projectId)?.name ?? "" }}
+                projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
+                selectedRoute={route ?? undefined}
+                onAdd={(text) => projectId && void queueAdd(projectId, text)}
+                onAssign={(itemId, toRoute, mode) => void queueAssign(itemId, toRoute, mode)}
+                onRemove={(itemId) => void queueRemove(itemId)}
+                onBoard={(itemId) => void queueBoard(itemId)}
+                onStartNew={(itemId) => void queueStartNew(itemId)}
+                openSignal={waitingSignal}
+                onDrag={setDragging}
+                building={building}
+                onOpenBuilding={(stopId) => openCompress(stopId)}
+                onCancelBuilding={(stopId) => dropDistill(stopId)}
+              />
+  );
+  const noticesEl = (
+    <Notices
+            notices={notices}
+            routes={allRoutes}
+            stops={allStops}
+            projects={projects}
+            currentProjectId={projectId}
+            stopNumber={stopNumber}
+            onDismiss={dismissNotice}
+            onViewSummary={openCompress}
+            onGoToRoute={goToRoute}
+            onContinue={(id) => {
+              goToRoute(id);
+              void ask(id, "接着上一站没做完的地方继续，把它做完。");
+            }}
+            onResync={(id) => void resync(id)}
+            onViewChanges={viewChanges}
+            onJump={goToStop}
+            onStop={stopRoute}
+            onBoard={(itemId) => void queueBoard(itemId)}
+            onEditFirst={(itemId, id, text) => {
+              setDraft(id, text);
+              void queueRemove(itemId);
+              goToRoute(id);
+            }}
+          />
+  );
+  const chatEl = route ? (
+    <ChatPanel key={route!.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />
+  ) : null;
+
   return (
     <div className={css.app}>
       <header className={css.top}>
@@ -265,13 +354,14 @@ export function App() {
           <span>搜索提问、候车区、命令</span>
           <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
         </button>
+        {tier !== "narrow" && <PaneToggles layout={layout} onToggle={(id) => updateLayout((l) => toggle(l, id))} />}
         <button className={css.gear} aria-label="设置" aria-expanded={settings} onClick={() => setSettings(!settings)}>
           <IconSliders size={18} />
         </button>
       </header>
       {settings && <Settings load={environment} onClose={() => setSettings(false)} />}
 
-      <div className={css.body} data-tier={tier} data-overview={overview} style={{ ...(widths.rail ? { "--rail-w": `${widths.rail}px` } : {}), ...(widths.panel ? { "--panel-w": `${widths.panel}px` } : {}) } as React.CSSProperties}>
+      <div ref={bodyRef} className={css.body} data-tier={tier} data-overview={overview} style={layout.width.rail ? ({ "--rail-w": `${layout.width.rail}px` } as React.CSSProperties) : undefined}>
         {overview && (
           <Overview
             projects={projects}
@@ -298,10 +388,40 @@ export function App() {
             onRemove={(id) => void queueRemove(id)}
           />
         )}
-        <ProjectRail compact={tier !== "wide"} onDelete={(id) => setDeleting({ routeId: id, unsynced: null })} />
-        {tier === "wide" && !overview && <Divider label="拖动调整左栏宽度" onDrag={(dx, start) => setWidth("rail", Math.min(400, Math.max(200, (start ?? 264) + dx)))} current={widths.rail} onReset={() => setWidth("rail", null)} />}
-
-        <main className={css.center}>
+        {flowPanes.map((id, i) => {
+          const left = flowPanes[i - 1];
+          const compactRail = (p: PaneId | undefined) => p === "rail" && tier !== "wide";
+          return (
+            <Fragment key={id}>
+              {left && !overview && (compactRail(left) || compactRail(id) ? null : <Divider label={`拖动调整${PANES[dividerTarget(left, id, flex).pane].label}的宽度`} onDrag={(dx, start) => resizePane(left, id, dx, start)} start={() => paneWidth(dividerTarget(left, id, flex).pane)} onReset={() => updateLayout((l) => setWidth(l, dividerTarget(left, id, flex).pane, null))} />)}
+              <section
+                ref={(el) => void (paneEls.current[id] = el)}
+                className={css.pane}
+                data-pane={id}
+                data-first={i === 0 || undefined}
+                data-edge={i === flowPanes.length - 1 && i > 0 ? "right" : undefined}
+                data-flex={id === flex || undefined}
+                data-dragging={paneDrag?.id === id || undefined}
+                style={id === flex || compactRail(id) ? undefined : { width: paneWidthStyle(id) }}
+                aria-label={PANES[id].label}
+              >
+                <PaneHeader
+                  id={id}
+                  layout={layout}
+                  compact={compactRail(id)}
+                  drag={dragHandlers}
+                  onHide={() => updateLayout((l) => toggle(l, id))}
+                  extra={
+                    id === "rail" ? (
+                      <button className={css.paneAction} aria-label="添加项目" title="添加项目" onClick={() => void openAddProject()}>
+                        <IconPlus size={14} />
+                      </button>
+                    ) : undefined
+                  }
+                />
+                {id === "rail" && <ProjectRail compact={tier !== "wide"} hideHead={tier === "wide"} onDelete={(rid) => setDeleting({ routeId: rid, unsynced: null })} />}
+                {id === "map" && (
+                  <main className={css.center}>
           {!ready ? null : projects.length === 0 ? (
             <Welcome
               onPick={() => void openAddProject()}
@@ -400,24 +520,8 @@ export function App() {
                     // 记不住就下次再提示一次
                   }
                 }} />
-              <WaitingArea
-                items={Object.values(allQueues).flat()}
-                routes={Object.values(allRoutes).filter((r) => r.status !== "archived")}
-                project={{ id: projectId!, name: projects.find((p) => p.id === projectId)?.name ?? "" }}
-                projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
-                selectedRoute={route ?? undefined}
-                onAdd={(text) => projectId && void queueAdd(projectId, text)}
-                onAssign={(itemId, toRoute, mode) => void queueAssign(itemId, toRoute, mode)}
-                onRemove={(itemId) => void queueRemove(itemId)}
-                onBoard={(itemId) => void queueBoard(itemId)}
-                onStartNew={(itemId) => void queueStartNew(itemId)}
-                openSignal={waitingSignal}
-                onDrag={setDragging}
-                building={building}
-                onOpenBuilding={(stopId) => openCompress(stopId)}
-                onCancelBuilding={(stopId) => dropDistill(stopId)}
-              />
-              {tier === "narrow" && route && !drawer && (
+              {waitingArea(false)}
+              {chatAsDrawer && route && !drawer && (
                 <button className={css.drawerButton} onClick={() => setDrawer(true)}>
                   <IconChat size={14} /> 对话
                 </button>
@@ -425,37 +529,30 @@ export function App() {
             </>
           )}
           {/* 窄窗口里对话栏盖在地图上：点地图收回 */}
-          {tier === "narrow" && drawer && route && <div className={css.drawerBackdrop} onPointerDown={() => setDrawer(false)} />}
-          <Notices
-            notices={notices}
-            routes={allRoutes}
-            stops={allStops}
-            projects={projects}
-            currentProjectId={projectId}
-            stopNumber={stopNumber}
-            onDismiss={dismissNotice}
-            onViewSummary={openCompress}
-            onGoToRoute={goToRoute}
-            onContinue={(id) => {
-              goToRoute(id);
-              void ask(id, "接着上一站没做完的地方继续，把它做完。");
-            }}
-            onResync={(id) => void resync(id)}
-            onViewChanges={viewChanges}
-            onJump={goToStop}
-            onStop={stopRoute}
-            onBoard={(itemId) => void queueBoard(itemId)}
-            onEditFirst={(itemId, id, text) => {
-              setDraft(id, text);
-              void queueRemove(itemId);
-              goToRoute(id);
-            }}
-          />
+          {chatAsDrawer && drawer && route && <div className={css.drawerBackdrop} onPointerDown={() => setDrawer(false)} />}
+          {flowPanes.includes("map") && noticesEl}
         </main>
-
-        {route && tier !== "narrow" && !overview && <Divider label="拖动调整对话栏宽度" onDrag={(dx, start) => setWidth("panel", Math.min(680, Math.max(340, (start ?? (tier === "wide" ? 420 : 380)) - dx)))} current={widths.panel} onReset={() => setWidth("panel", null)} />}
-        {route && (tier !== "narrow" || drawer) && <ChatPanel key={route.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode)} />}
+                )}
+                {id === "chat" && (route ? chatEl : <div className={css.noChat}>在{flowPanes.includes("rail") ? "项目列表" : "左上角"}里选一路车，这里显示它的对话</div>)}
+              </section>
+            </Fragment>
+          );
+        })}
+        {/* 没有地图时：候车区（从对话栏的“本路候车”打开）和通知浮在整个窗口上 */}
+        {!flowPanes.includes("map") && !overview && (
+          <div className={css.floatLayer}>
+            {waitingArea(true)}
+            {noticesEl}
+          </div>
+        )}
+        {/* 窄窗口：对话从右边滑出盖在地图上 */}
+        {chatAsDrawer && route && drawer && (
+          <section className={`${css.pane} ${css.drawer}`} data-pane="chat" aria-label="对话">
+            {chatEl}
+          </section>
+        )}
       </div>
+      {paneDrag && <PaneDragOverlay id={paneDrag.id} x={paneDrag.x} y={paneDrag.y} lineX={paneDrag.lineX} hint={paneDrag.hint} />}
 
       {deleting && allRoutes[deleting.routeId] && (
         <DeleteDialog

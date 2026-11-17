@@ -1,10 +1,10 @@
+/* 宽度、边线由外面的面板管（设计稿 9-7）；窄窗口里展开的浮层自己定宽 */
 .rail {
-  flex: none;
-  width: var(--rail-w, 264px);
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-right: 1px solid var(--border);
 }
 .head {
   display: flex;
@@ -277,13 +277,13 @@
 
 /* 窄窗口：收成一列图标 */
 .strip {
-  flex: none;
+  flex: 1;
+  min-height: 0;
   width: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
   background: var(--surface);
-  border-right: 1px solid var(--border);
 }
 .stripList {
   flex: 1;
@@ -361,6 +361,8 @@
   left: 0;
   top: 0;
   bottom: 0;
+  width: var(--rail-w, 264px);
+  border-right: 1px solid var(--border);
   box-shadow: var(--e-drawer-left);
 }
 .floatBackdrop {

@@ -38,6 +38,8 @@ interface Props {
   onStartNew(itemId: string): void;
   /** 每次变化就把浮窗打开（从搜索跳过来时用） */
   openSignal?: number;
+  /** 没有地图时：平时不放浮动按钮，从对话栏的“本路候车”打开，打开后按钮当关闭用 */
+  buttonOnlyWhenOpen?: boolean;
   /** 开始或结束拖一个问题（拖到线路图上某一路的末尾去派车） */
   onDrag?(item: QueueItem | null): void;
 }
@@ -46,7 +48,7 @@ const busy = (r: Route) => r.status === "answering" || r.status === "awaiting_pe
 const canBoard = (r: Route) => r.status === "idle" || r.status === "interrupted";
 
 /** 候车区：准备好的问题先放着。右上角一个按钮，点开是浮窗。只收数据、发出操作 */
-export function WaitingArea({ items: everything, routes: allRoutes, project, projectNames, selectedRoute, building = [], onOpenBuilding, onCancelBuilding, onAdd, onAssign, onRemove, onBoard, onStartNew, openSignal = 0, onDrag }: Props) {
+export function WaitingArea({ items: everything, routes: allRoutes, project, projectNames, selectedRoute, building = [], onOpenBuilding, onCancelBuilding, onAdd, onAssign, onRemove, onBoard, onStartNew, openSignal = 0, onDrag, buttonOnlyWhenOpen }: Props) {
   const [open, setOpen] = useState(false);
   /** 看哪些：所有项目 / 这个项目 / 只看正在看的那一路 */
   const [scope, setScope] = useState<"all" | "project" | "route">("project");
@@ -188,6 +190,7 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
 
   return (
     <div className={css.wrap}>
+      {(!buttonOnlyWhenOpen || open) && (
       <button className={css.fab} aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? (
           <IconClose size={14} />
@@ -201,6 +204,7 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
           {!open && (mine.length > 0 || building.length > 0) && <small>{ready > 0 ? `${ready} 条可以登车了` : building.some((b) => b.ready) ? "有摘要等你看" : anyRunning ? "快线提炼中" : unassigned > 0 && unassigned === mine.length ? `${unassigned} 条还没派车` : "到站后发出"}</small>}
         </span>
       </button>
+      )}
 
       {open && (
         <section className={css.panel} aria-label="候车区">

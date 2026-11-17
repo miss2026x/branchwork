@@ -1,0 +1,125 @@
+/* 面板布局（设计稿 9-7） */
+.toggles {
+  flex: none;
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+}
+.toggles button {
+  width: 32px;
+  height: var(--h-32);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  color: var(--line-1);
+}
+.toggles button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.toggles button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* 面板顶上那一条：高 36，⠿ + 名字，右边 × */
+.head {
+  flex: none;
+  height: var(--h-36);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-6) 0 var(--sp-6);
+  border-bottom: 1px solid var(--divider);
+  background: var(--surface);
+}
+.head[data-compact] {
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+.grip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-width: 0;
+  height: var(--h-28);
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-6);
+  color: var(--fg-4);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.grip:hover {
+  background: var(--surface-2);
+  color: var(--fg-3);
+}
+.grip:active {
+  cursor: grabbing;
+}
+.grip b {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+.spacer {
+  flex: 1;
+}
+.hide {
+  flex: none;
+  width: 28px;
+  height: var(--h-28);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+  color: var(--fg-4);
+}
+.hide:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.hide:disabled {
+  visibility: hidden;
+}
+
+/* 拖动中 */
+.dropLine {
+  position: fixed;
+  z-index: 40;
+  top: 60px;
+  bottom: 0;
+  width: 4px;
+  border-radius: var(--r-4);
+  background: var(--info);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+  pointer-events: none;
+}
+.ghost {
+  position: fixed;
+  z-index: 41;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  height: var(--h-36);
+  padding: 0 var(--sp-12) 0 var(--sp-10);
+  border-radius: var(--r-10);
+  background: var(--surface);
+  box-shadow: var(--e3);
+  color: var(--fg-4);
+  rotate: -2deg;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.ghost b {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--fg-3);
+}
+.ghost span {
+  font-size: var(--fs-12);
+  color: var(--fg-4);
+}

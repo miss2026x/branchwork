@@ -1,10 +1,11 @@
+/* 宽度、左边线由外面的面板管（设计稿 9-7） */
 .panel {
-  flex: none;
-  width: var(--panel-w, 420px);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-left: 1px solid var(--border);
 }
 /* 头部（设计稿 V3 主界面）：2px 角标色外框、圆角 12；左边大号路牌，右边线路名 18 / 700 和一行状态 */
 .head {

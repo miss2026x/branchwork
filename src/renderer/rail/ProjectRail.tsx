@@ -13,9 +13,12 @@ import { ago } from "../ui/ago";
 export function ProjectRail({
   onDelete,
   compact = false,
+  hideHead = false,
 }: {
   onDelete(routeId: string): void;
   /** 窗口窄：收成一列图标，点项目图标展开成浮层 */ compact?: boolean;
+  /** 放在面板里时，“项目 +”那一行由面板顶上那一条代替 */
+  hideHead?: boolean;
 }) {
   const [floating, setFloating] = useState(false);
   const archiveRoute = useStore((s) => s.archiveRoute);
@@ -128,6 +131,7 @@ export function ProjectRail({
         <div className={css.floatBackdrop} onClick={() => setFloating(false)} />
       )}
       <aside className={compact ? `${css.rail} ${css.floating}` : css.rail}>
+        {!hideHead && (
         <div className={css.head}>
           <span>项目</span>
           <button
@@ -138,6 +142,7 @@ export function ProjectRail({
             <IconPlus />
           </button>
         </div>
+        )}
 
         <div className={css.list}>
           {projects.map((p) => {

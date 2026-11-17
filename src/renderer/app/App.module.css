@@ -47,14 +47,80 @@
 .body[data-tier="narrow"] {
   --panel-w: 380px;
 }
+/* 三个面板（设计稿 9-7）：顺序、显示哪几个由布局决定；占剩下宽度的那个 flex: 1，其余用拖出来的宽度 */
+.pane {
+  flex: none;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+.pane[data-first] {
+  border-left: none;
+}
+.pane[data-flex] {
+  flex: 1;
+}
+.pane[data-pane="map"] {
+  background: var(--canvas);
+}
+.pane[data-dragging] > :not(:first-child) {
+  opacity: 0.4;
+}
+/* 项目列表在最右边时，窄窗口里展开的浮层往左展开 */
+.pane[data-edge="right"] > aside:last-child {
+  left: auto;
+  right: 0;
+}
+/* 对话占满剩下的宽度时（没有地图），内容收在中间约 900px，行不会太长 */
+.pane[data-pane="chat"][data-flex] > aside {
+  padding-inline: max(0px, calc((100% - 900px) / 2)); /* 例外：按面板宽度算出来的左右留白 */
+}
+.paneAction {
+  flex: none;
+  width: 28px;
+  height: var(--h-28);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+  color: var(--fg-3);
+}
+.paneAction:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.noChat {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-24);
+  text-align: center;
+  font-size: var(--fs-13);
+  color: var(--fg-4);
+}
+/* 没有地图时，候车区和通知浮在整个窗口上 */
+.floatLayer {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  pointer-events: none;
+}
+/* 通知在输入框上面，不挡“发车” */
+.floatLayer > :last-child {
+  bottom: 156px; /* 例外：输入框的高度加上下留白 */
+}
 /* 窄窗口：对话栏滑出来盖在地图上 */
-.body[data-tier="narrow"] > aside:last-child {
+.drawer {
   position: absolute;
   z-index: 6;
   top: 0;
   right: 0;
   bottom: 0;
-  box-shadow: -var(--e-drawer-left);
+  width: var(--panel-w);
+  box-shadow: var(--e-drawer-right);
   animation: slide var(--t-slow) var(--ease);
 }
 @keyframes slide {
@@ -127,6 +193,7 @@
 .center {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   position: relative;
   /* 空项目那条虚线两头伸得很长，别画到左栏和对话栏上 */
   overflow-x: clip;

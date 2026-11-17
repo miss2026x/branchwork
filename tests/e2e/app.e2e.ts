@@ -643,6 +643,38 @@ describe("应用", () => {
     await shot("34-imported");
   });
 
+  it("面板布局：右上角开关收起和打开面板，按住面板顶部拖动换位置，重开应用还是这样", async () => {
+    const order = () => page.locator("section[data-pane]").evaluateAll((els) => els.map((e) => e.getAttribute("data-pane")));
+    expect(await order()).toEqual(["rail", "map", "chat"]);
+    const toggles = page.getByRole("group", { name: "显示哪些面板" });
+    // 收起项目列表，再用快捷键打开
+    await toggles.getByRole("button", { name: "项目列表" }).click();
+    expect(await order()).toEqual(["map", "chat"]);
+    await page.keyboard.press("Control+Alt+Digit1");
+    expect(await order()).toEqual(["rail", "map", "chat"]);
+    // 把对话拖到最左边
+    const grip = (await page.getByRole("button", { name: "拖动对话换位置" }).boundingBox())!;
+    await page.mouse.move(grip.x + 8, grip.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(400, 300, { steps: 6 });
+    await page.mouse.move(40, 300, { steps: 6 });
+    await page.mouse.up();
+    expect(await order()).toEqual(["chat", "rail", "map"]);
+    // 只剩一个面板时收不起
+    await toggles.getByRole("button", { name: "项目列表" }).click();
+    await toggles.getByRole("button", { name: "地图" }).click();
+    expect(await order()).toEqual(["chat"]);
+    expect(await toggles.getByRole("button", { name: "对话" }).isDisabled()).toBe(true);
+    await shot("40-layout-chat-only");
+    // 重开应用：布局还在
+    await page.reload();
+    await expect.poll(() => order()).toEqual(["chat"]);
+    // 恢复默认，免得影响后面的测试
+    await page.evaluate(() => localStorage.removeItem("bw.layout"));
+    await page.reload();
+    await expect.poll(() => order()).toEqual(["rail", "map", "chat"]);
+  });
+
   it("从 Branchwork 移除项目：先列出没进 Local 的改动，确认后回到欢迎页，Local 文件夹不动", async () => {
     const before = fs.readdirSync(local).sort();
     await page.getByRole("button", { name: "my-project 的菜单" }).click();
