@@ -1,4 +1,4 @@
-/* 地图顶部的路线标签（设计稿 9-11）：放不下时一级一级收 */
+/* 地图顶部的路线标签（设计稿 9-11）：全名，放不下就左右滚 */
 .bar {
   position: absolute;
   z-index: 3;
@@ -9,33 +9,43 @@
   align-items: center;
   gap: var(--sp-8);
 }
-.ruler {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  gap: var(--sp-8);
-  visibility: hidden;
-  pointer-events: none;
-  white-space: nowrap;
-}
-.ruler > span {
-  display: inline-flex;
-}
 .divider {
   flex: none;
   width: 1px;
   height: var(--sp-24);
   background: var(--border);
 }
+.scroller {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
 .tabs {
   flex: 1;
   min-width: 0;
   display: flex;
   gap: var(--sp-8);
-  padding: var(--sp-2);
-  margin: calc(-1 * var(--sp-2));
-  overflow: hidden;
+  /* 状态点压在标签右上角，留出地方不被裁掉 */
+  padding: var(--sp-4) var(--sp-2);
+  margin: calc(-1 * var(--sp-4)) 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+/* 放不下的那一边渐隐 */
+.tabs[data-fade-right] {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); /* 例外：遮罩只看透明度 */
+}
+.tabs[data-fade-left] {
+  mask-image: linear-gradient(90deg, transparent, #000 28px); /* 例外：同上 */
+}
+.tabs[data-fade-left][data-fade-right] {
+  mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); /* 例外：同上 */
 }
 .tab {
   position: relative;
@@ -55,18 +65,31 @@
 .tab[aria-current="true"] {
   font-weight: 600;
 }
-.tab[data-size="short"] {
-  max-width: 124px;
-}
-.tab[data-size="plate"] {
-  padding: 0 var(--sp-6);
-}
 .name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* 路的状态：蓝点回答中、黄点等你批准、红点冲突 */
+.arrow {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: var(--h-36);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  box-shadow: var(--e1);
+  color: var(--fg-2);
+  font-size: var(--fs-16);
+  font-weight: 700;
+}
+.arrow:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+/* 状态点：蓝回答中、黄等你批准、红冲突 */
 .dot {
   position: absolute;
   right: -3px; /* 例外：压在标签右上角 */
@@ -86,94 +109,6 @@
 .dot[data-tone="red"] {
   background: var(--red);
 }
-.moreWrap {
-  position: relative;
-  flex: none;
-}
-.more {
-  position: relative;
-  height: var(--h-36);
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--sp-10);
-  border: 1px solid var(--border);
-  border-radius: var(--r-8);
-  background: var(--surface);
-  box-shadow: var(--e1);
-  color: var(--fg-1);
-  font-weight: 700;
-}
-.more[aria-expanded="true"] {
-  border-color: var(--fg-1);
-  background: var(--fg-1);
-  color: var(--fg-on-color);
-}
-.menu {
-  animation: pop var(--t-base) var(--ease);
-  position: absolute;
-  z-index: 8;
-  right: 0;
-  top: 42px; /* 例外：按钮下面留 6px */
-  width: 280px;
-  max-height: 60vh; /* 例外：路很多时在框里滚 */
-  overflow-y: auto;
-  padding: var(--sp-6);
-  border-radius: var(--r-12);
-  background: var(--surface);
-  box-shadow: var(--e3);
-}
-.menu header {
-  padding: var(--sp-8) var(--sp-10) var(--sp-6);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--fg-3);
-}
-.menu button {
-  width: 100%;
-  height: var(--h-36);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-10);
-  padding: 0 var(--sp-10);
-  border-radius: var(--r-8);
-  font-size: var(--fs-13);
-  text-align: left;
-}
-.menu button:hover {
-  background: var(--surface-2);
-}
-.menuName {
-  flex: 1;
-  min-width: 0;
-}
-.menu em {
-  flex: none;
-  padding: 0 var(--sp-8);
-  border-radius: var(--r-pill);
-  font-size: var(--fs-11);
-  font-style: normal;
-  font-weight: 600;
-  line-height: var(--lh-20);
-}
-.menu em[data-tone="amber"] {
-  background: var(--amber-bg);
-  color: var(--amber-text);
-}
-.menu em[data-tone="red"] {
-  background: var(--red-bg);
-  color: var(--red-text);
-}
-.menu em[data-tone="blue"] {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-.menu footer {
-  margin: var(--sp-4) var(--sp-10) var(--sp-6);
-  padding-top: var(--sp-8);
-  border-top: 1px solid var(--divider);
-  font-size: var(--fs-12);
-  color: var(--fg-3);
-}
 
 @keyframes pulse {
   0%,
@@ -182,12 +117,6 @@
   }
   50% {
     opacity: 1;
-  }
-}
-@keyframes pop {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -13,8 +13,8 @@ import { RouteTabs } from "./RouteTabs";
 import { plainText } from "../ui/plain-text";
 
 interface Props {
-  /** 路线标签最左、固定不滚的那一格：Local 专车（设计稿 9-10）；compact：标签挤的时候只剩“L” */
-  leading?: (compact: boolean) => ReactNode;
+  /** 路线标签最左、固定不滚的那一格：Local 专车（设计稿 9-10） */
+  leading?: ReactNode;
   routes: Route[];
   stops: Stop[];
   /** 候车区里的问题：派给某一路的，在那一路的末尾画成虚线的站 */

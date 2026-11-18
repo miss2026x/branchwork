@@ -9,7 +9,7 @@ import css from "./LocalTab.module.css";
  * 路线标签最左的 Local 专车（设计稿 9-10）：固定不随各路标签滚动。
  * 标签上只带最要紧的一项：冲突 → 回答中（有路在等时带上）→ 开发服务器 → 几处没提交 → 分支名；悬停看完整的现状
  */
-export function LocalTab({ projectId, selected, compact = false }: { projectId: string; selected: boolean; compact?: boolean }) {
+export function LocalTab({ projectId, selected }: { projectId: string; selected: boolean }) {
   const route = useStore((s) => Object.values(s.routes).find((r) => r.projectId === projectId && r.local));
   const status = useStore((s) => s.localStatus[projectId]);
   const activity = useStore((s) => s.activity);
@@ -71,23 +71,6 @@ export function LocalTab({ projectId, selected, compact = false }: { projectId: 
     );
   }
 
-  // 挤的时候（设计稿 9-11）：只剩“L”，右上角一个点：红冲突、蓝回答中、绿开发服务器、黄有没提交的改动
-  const dotTone = status?.missing || conflicts ? "red" : busy ? (route?.status === "awaiting_permission" ? "amber" : "blue") : dev ? "green" : changed > 0 ? "amber" : undefined;
-  if (compact) {
-    return (
-      <span className={css.wrap} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}>
-        <button className={css.tab} data-compact aria-current={selected} onClick={() => (setHover(false), void open(projectId))} aria-label="Local 专车：直接在 Local 里干活">
-          <b className={css.l}>L</b>
-          {dotTone && <i className={css.dot} data-tone={dotTone} aria-hidden />}
-        </button>
-        {hover && !selected && status && (
-          <div className={css.card} role="tooltip">
-            <LocalNow status={status} dev={dev} dir={dir} compact />
-          </div>
-        )}
-      </span>
-    );
-  }
   return (
     <span className={css.wrap} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}>
       <button className={css.tab} aria-current={selected} data-tone={tone} onClick={() => (setHover(false), void open(projectId))} aria-label="Local 专车：直接在 Local 里干活">

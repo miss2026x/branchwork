@@ -506,7 +506,7 @@ export function App() {
                     ) : (
                       <>
                         <RouteMap
-                          leading={projectId ? (compact) => <LocalTab projectId={projectId} selected={!!route?.local} compact={compact} /> : undefined}
+                          leading={projectId ? <LocalTab projectId={projectId} selected={!!route?.local} /> : undefined}
                           resizing={!!anim}
                           activityLabel={(routeId) => (activities[routeId] ? activityText(activities[routeId]!) : null)}
                           stopImages={(stop) => <StopImages ownerId={stop.id} count={stop.images ?? 0} title={`第 ${stopNumber(stop)} 站`} />}
