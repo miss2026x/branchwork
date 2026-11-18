@@ -58,6 +58,8 @@ export function createDemoClaudeClient(): ClaudeClient {
           // 带“拖”字：写完文件后再磨蹭几秒，方便试“改了一半就停车”
           if (opts.prompt.includes("拖")) await sleep(6000, opts.signal);
           await say("写好了。到站后这个改动会同步到 Local。");
+          // 带“代码”二字：再回一段代码，方便看代码高亮（边流出来边上色）
+          if (opts.prompt.includes("代码")) await say("\n\n```ts\nexport function greet(name: string): string {\n  return `你好，${name}`;\n}\n```\n");
         }
       }
       const start = tools.find((t) => t.name === "terminal_start");

@@ -16,7 +16,7 @@ import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
 import css from "./ChatPanel.module.css";
-import { Md } from "./Md";
+import { Md, StreamingMd } from "./Md";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
 interface Props {
@@ -531,7 +531,7 @@ function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean })
       {blocks.map((b, i) =>
         b.kind === "text" ? (
           <div key={i} className={css.md} data-streaming={streaming && b.last}>
-            <Md>{b.text}</Md>
+            {streaming ? <StreamingMd>{b.text}</StreamingMd> : <Md>{b.text}</Md>}
           </div>
         ) : (
           <Tools key={i} tools={b.tools} running={!!streaming && i === blocks.length - 1} />

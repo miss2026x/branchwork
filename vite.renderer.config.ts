@@ -7,6 +7,7 @@ export default defineConfig({
   root: path.resolve(__dirname, "src/renderer"),
   base: "./",
   plugins: [react()],
+  worker: { format: "es" },
   build: { outDir: path.resolve(__dirname, "out/web"), emptyOutDir: true },
   server: { port: 5199 },
 });

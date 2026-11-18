@@ -82,9 +82,12 @@ describe("界面的动效", () => {
 });
 
 describe("代码高亮", () => {
-  it("只有 chat/highlight.ts 碰 shiki（换掉它只改一个文件）", () => {
+  it("只有 chat/highlight-engine.ts 碰 shiki（换掉它只改一个文件）；它跑在后台线程里", () => {
     const users = files(path.join(SRC, "renderer")).filter((f) => /["']shiki[/"']/.test(fs.readFileSync(f, "utf8")));
-    expect(users.map((f) => path.relative(SRC, f))).toEqual([path.join("renderer", "chat", "highlight.ts")]);
+    expect(users.map((f) => path.relative(SRC, f))).toEqual([path.join("renderer", "chat", "highlight-engine.ts")]);
+    // 界面主线程只经 highlight.ts 把代码送到后台线程，不直接引用引擎（动态 import 只是没有后台线程时的退路）
+    const direct = files(path.join(SRC, "renderer")).filter((f) => !/highlight(\.worker)?\.ts$/.test(f) && /from ["']\.\/highlight-engine["']/.test(fs.readFileSync(f, "utf8")));
+    expect(direct.map((f) => path.relative(SRC, f))).toEqual([]);
   });
   it("代码的颜色用 tokens.css 里的 --shiki-* 变量", () => {
     const tokens = fs.readFileSync(path.join(SRC, "renderer/styles/tokens.css"), "utf8");

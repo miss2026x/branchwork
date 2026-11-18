@@ -11,5 +11,7 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react()],
+    // 代码高亮跑在后台线程里（chat/highlight.worker.ts），按模块打包
+    worker: { format: "es" },
   },
 });

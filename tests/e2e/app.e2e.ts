@@ -418,6 +418,28 @@ describe("应用", () => {
     expect(await viewer.count()).toBe(0);
   });
 
+  it("回答里的代码块：在后台线程里上色（不卡界面），上好的颜色用 --shiki-* 变量", async () => {
+    await composer().click();
+    await page.keyboard.type("给我一段代码");
+    await page.keyboard.press("Enter");
+    const colored = page.getByRole("log").locator('pre code span[style*="--shiki-token-keyword"]');
+    await expect.poll(() => colored.count(), { timeout: 30000 }).toBeGreaterThan(0);
+    expect(await page.getByRole("log").locator("pre code").last().innerText()).toContain("export function greet(name: string): string {");
+    // 打包出来的后台线程在 file:// 页面里起得来、能上色（起不来时会悄悄退回主线程，这里守住）
+    const wfile = fs.readdirSync(path.join(root, "out/renderer/assets")).find((f) => f.startsWith("highlight.worker"))!;
+    const reply = await page.evaluate(
+      (f) =>
+        new Promise<string>((resolve) => {
+          const w = new Worker(new URL(`./assets/${f}`, location.href), { type: "module" });
+          w.onmessage = (e: MessageEvent<{ lines: { color?: string }[][] | null }>) => resolve(e.data.lines?.[0]?.[0]?.color ?? "null");
+          w.onerror = (e) => resolve(`error ${e.message}`);
+          w.postMessage({ id: 1, code: "const a = 1", lang: "ts" });
+        }),
+      wfile,
+    );
+    expect(reply).toBe("var(--shiki-token-keyword)");
+  });
+
   it("模型、起名、后台终端：选模型；站名稍后换成小模型起的；Claude 开的终端在一站结束后还在，能看输出、能停", async () => {
     // 列表是从 Claude Code 读的（演示模式下是假的三个）
     await page.getByRole("button", { name: /^模型：Default/ }).click();

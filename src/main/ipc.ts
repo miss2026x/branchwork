@@ -1,3 +1,4 @@
+import { batchEvents } from "./event-batch";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
@@ -118,7 +119,8 @@ export function registerIpc(core: Core): void {
     return (calls[method] as (...a: unknown[]) => unknown)(...args);
   });
 
-  core.on((event) => {
+  const send = batchEvents((event) => {
     for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send(EVENT, event);
   });
+  core.on(send);
 }
