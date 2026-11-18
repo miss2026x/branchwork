@@ -22,6 +22,8 @@ import { Settings } from "./Settings";
 import { Welcome } from "./Welcome";
 import { OverviewQueue } from "../overview/OverviewQueue";
 import { CommandPalette } from "../palette/CommandPalette";
+import { LocalTab } from "../map/LocalTab";
+import { LocalPresetsDialog } from "../dialogs/LocalPresetsDialog";
 import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
@@ -33,6 +35,7 @@ import css from "./App.module.css";
 import { useTier } from "./use-tier";
 import { PANES, dividerTarget, edgeHidden, flexPane, hiddenBetween, loadLayout, saveLayout, setWidth, targetWidths, toggle, visible, type Layout, type PaneId } from "./layout";
 import { EdgeOpener, LayoutButton, PaneDivider } from "./Panes";
+import { routeLabel } from "../ui/route-color";
 
 const EMPTY_QUEUE: QueueItem[] = [];
 
@@ -106,6 +109,8 @@ export function App() {
   const routeTerminals = useMemo(() => Object.values(terminals).filter((t) => t.routeId === routeId).sort((a, b) => a.startedAt - b.startedAt), [terminals, routeId]);
   const viewed = terminalView ? terminals[terminalView.id] : undefined;
   const dialog = useStore((s) => s.dialog);
+  const localPresets = useStore((s) => s.localPresets);
+  const saveLocalPresets = useStore((s) => s.saveLocalPresets);
   const pickDirectory = useStore((s) => s.pickDirectory);
   const inspectDirectory = useStore((s) => s.inspectDirectory);
   const closeDialog = useStore((s) => s.closeDialog);
@@ -239,7 +244,7 @@ export function App() {
     const s = by.stopId ? allStops[by.stopId] : undefined;
     if (!by.routeId) return "Local 里这一处是你自己直接改的";
     if (!r) return "Local 里这一处是一条已经删掉的线路改的";
-    return `Local 里这一处刚被 ${r.express ? `快${r.express}` : `${r.number}路`}${s ? ` 第 ${stopNumber(s)} 站` : ""}改过`;
+    return `Local 里这一处刚被 ${routeLabel(r)}${s ? ` 第 ${stopNumber(s)} 站` : ""}改过`;
   };
   const projectStops = Object.values(allStops).filter((s) => routes.some((r) => r.id === s.routeId));
   /** 这个项目里在建的快线：正在提炼的，和摘要好了还没开出的。编号接着已有的快线往下排 */
@@ -556,6 +561,7 @@ export function App() {
                     ) : (
                       <>
                         <RouteMap
+                          leading={projectId ? <LocalTab projectId={projectId} selected={!!route?.local} /> : undefined}
                           resizing={!!anim}
                           activityLabel={(routeId) => (activities[routeId] ? activityText(activities[routeId]!) : null)}
                           stopImages={(stop) => <StopImages ownerId={stop.id} count={stop.images ?? 0} title={`第 ${stopNumber(stop)} 站`} />}
@@ -739,7 +745,7 @@ export function App() {
             routeCount={mine.length}
             archivedCount={mine.filter((r) => r.status === "archived").length}
             queueCount={(allQueues[dialog.projectId] ?? []).length}
-            busy={mine.filter((r) => r.status === "answering" || r.status === "awaiting_permission").map((r) => `${r.express ? `快${r.express}` : `${r.number}路`} ${r.name}`)}
+            busy={mine.filter((r) => r.status === "answering" || r.status === "awaiting_permission").map((r) => `${routeLabel(r)} ${r.name}`)}
             blocked={dialog.blocked}
             error={dialog.error}
             onCancel={closeDialog}
@@ -761,6 +767,9 @@ export function App() {
           preparing={preparing}
           onCancel={closeDialog}
         />
+      )}
+      {dialog?.kind === "local-presets" && (
+        <LocalPresetsDialog projectName={projects.find((p) => p.id === dialog.projectId)?.name ?? ""} saved={localPresets[dialog.projectId]} onSave={(list) => saveLocalPresets(dialog.projectId, list)} onClose={closeDialog} />
       )}
       {dialog?.kind === "log" && projects.find((p) => p.id === dialog.projectId) && (
         <SyncLogDialog project={projects.find((p) => p.id === dialog.projectId)!} entries={dialog.entries} kept={dialog.kept} onOpenKept={openKept} onRemoveKept={(id) => void removeKept(id)} routes={allRoutes} stops={allStops} stopNumber={stopNumber} onViewRoute={goToRoute} onClose={closeDialog} />

@@ -3,6 +3,7 @@ import type { Route, Terminal } from "../../shared";
 import { Plate } from "../ui/Plate";
 import { IconChevron, IconClose, IconStop, IconTerminal } from "../ui/icons";
 import css from "./Terminal.module.css";
+import { routeLabel } from "../ui/route-color";
 
 interface Props {
   route: Route;
@@ -48,7 +49,7 @@ export function TerminalStrip({ route, terminals, stopLabel, onOpen, onStop }: P
                   <span className={css.rowText}>
                     <b className="ell">{t.name}</b>
                     <small className="ell">
-                      <code>{t.command}</code> · {route.express ? `快${route.express}` : `${route.number}路`} 的工作区{from && <>，{from}开的</>}
+                      <code>{t.command}</code> · {route.local ? "在 Local 里" : `${routeLabel(route)} 的工作区`}{from && <>，{from}开的</>}
                     </small>
                   </span>
                   {t.port !== null && t.status === "running" && <em>{`:${t.port}`}</em>}

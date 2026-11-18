@@ -3,7 +3,7 @@ import type { Project, Route, Stop } from "../../shared";
 import type { Notice } from "../stores/notices";
 import { BusMark, IconAlert, IconClose, IconCompress, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
-import { routeColors } from "../ui/route-color";
+import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Notices.module.css";
 
 interface Props {
@@ -105,7 +105,7 @@ function Card({ n, ...p }: Props & { n: Notice }) {
           {who} {stop ? `第 ${p.stopNumber(stop)} 站` : ""}有 {n.files.length || "几"} 个文件没法自动合进 Local
         </>,
         <>
-          {names.length > 0 && `${names.join("、")}${n.files.length > 2 ? " 等" : ""} 和 Local 里的改动撞上了。`}Local 和其他线路都没受影响，改动留在 {route.express ? `快${route.express}` : `${route.number}路`} 的工作区。
+          {names.length > 0 && `${names.join("、")}${n.files.length > 2 ? " 等" : ""} 和 Local 里的改动撞上了。`}Local 和其他线路都没受影响，改动留在 {routeLabel(route)} 的工作区。
         </>,
         <button className={css.primary} onClick={act(() => p.onGoToRoute(route.id))}>
           查看
@@ -176,7 +176,7 @@ function Card({ n, ...p }: Props & { n: Notice }) {
         <Plate route={route} size="i" />,
         <>
           {project && `${project} `}
-          {route.express ? `快${route.express}` : `${route.number}路`} 到站了，有一条等你登车
+          {routeLabel(route)} 到站了，有一条等你登车
         </>,
         <>“{short(n.text)}”，你设的是手动登车</>,
         <>

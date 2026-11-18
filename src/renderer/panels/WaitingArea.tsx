@@ -5,6 +5,7 @@ import { IconClose, IconMore, IconWait, IconImage } from "../ui/icons";
 import imgCss from "../chat/Images.module.css";
 import { Plate } from "../ui/Plate";
 import css from "./WaitingArea.module.css";
+import { routeLabel } from "../ui/route-color";
 
 /** 在建的快线：正在提炼，或摘要好了还没开出 */
 export interface Building {
@@ -141,7 +142,7 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
                 <span className={`${css.targetName} ell`} title={r.name}>
                   {r.name}
                 </span>
-                <span className={css.seg} role="radiogroup" aria-label={`派给 ${r.express ? `快${r.express}` : `${r.number}路`} 的登车方式`}>
+                <span className={css.seg} role="radiogroup" aria-label={`派给 ${routeLabel(r)} 的登车方式`}>
                   {(["auto", "manual"] as const).map((mode) => (
                     <button
                       key={mode}
@@ -232,7 +233,7 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
             </button>
             {selectedRoute && (
               <button role="radio" aria-checked={effective === "route"} onClick={() => setScope("route")}>
-                只看 {selectedRoute.express ? `快${selectedRoute.express}` : `${selectedRoute.number}路`}
+                只看 {routeLabel(selectedRoute)}
               </button>
             )}
           </div>
@@ -243,7 +244,7 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
                 <h3 data-tone="auto">在建快线</h3>
                 {building.map((b) => {
                   const seconds = Math.max(0, Math.round((Date.now() - b.startedAt) / 1000));
-                  const from = `${b.source.express ? `快${b.source.express}` : `${b.source.number}路`} 第 1–${b.upto} 站`;
+                  const from = `${routeLabel(b.source)} 第 1–${b.upto} 站`;
                   return (
                     <div key={b.stopId} className={css.building} data-ready={b.ready}>
                       <div>

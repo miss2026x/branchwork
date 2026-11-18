@@ -4,12 +4,26 @@
   /* clip 而不是 hidden：键盘焦点落到视野外的站上时，浏览器不会偷偷滚动这一层 */
   overflow: clip;
 }
-.tabs {
+/* 路线标签这一行：最左是固定的 Local 专车，竖线右边是各路，放不下时只有各路横着滚 */
+.tabbar {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   top: 12px;
   left: 16px;
   right: 190px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.tabDivider {
+  flex: none;
+  width: 1px;
+  height: var(--sp-24);
+  background: var(--border);
+}
+.tabs {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: var(--sp-8);
   /* 放不下时横向滚动，不把名字挤短 */

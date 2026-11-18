@@ -54,7 +54,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "localPresets", "localRoute", "localStatus", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setLocalPresets", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -820,6 +820,35 @@ describe("应用", () => {
     await page.evaluate(() => localStorage.removeItem("bw.layout"));
     await page.reload();
     await settled(["rail", "map", "chat"]);
+  });
+
+  it("Local 专车（设计稿 9-10）：路线标签最左；点常用提示填进输入框，再点撤回；在 Local 里直接回答，不建工作区", async () => {
+    const tab = page.getByRole("button", { name: /Local 专车/ });
+    await tab.click();
+    await expect.poll(() => page.getByText("这辆车直接在 Local 里干活").isVisible(), { timeout: 10000 }).toBe(true);
+    const now = page.getByRole("region", { name: "Local 现在" }).first();
+    await expect.poll(() => now.getByText("main", { exact: true }).isVisible(), { timeout: 10000 }).toBe(true);
+    // 左栏、地图上都没有专车
+    expect(await page.locator("aside").getByText("Local 专车").count()).toBeLessThanOrEqual(1);
+
+    const chip = page.getByRole("button", { name: /看看现状/ });
+    await chip.click();
+    await expect.poll(() => composer().innerText()).toContain("说说 Local 现在的情况");
+    expect(await chip.getAttribute("aria-pressed")).toBe("true");
+    await chip.click();
+    await expect.poll(() => composer().innerText()).toBe("");
+    await shot("36-local-car");
+
+    await chip.click();
+    await page.keyboard.press("Enter");
+    // 批准方式和普通路一样：开专车时沿用项目的（前面开过“全部不问”的话就不会问）
+    await expect.poll(async () => (await page.getByRole("alertdialog", { name: "等你批准" }).isVisible()) || (await page.getByText("已到第 1 站").isVisible()), { timeout: 30000 }).toBe(true);
+    if (await page.getByRole("alertdialog", { name: "等你批准" }).isVisible()) await page.getByRole("button", { name: /允许这一次/ }).click();
+    await expect.poll(() => page.getByText("已到第 1 站").isVisible(), { timeout: 30000 }).toBe(true);
+    // 直接写在 Local 里（不经过工作区和同步）；交给 Claude 的提问后面附着 Local 现状，记下来的还是原话
+    expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toContain("站：说说 Local 现在的情况");
+    expect(await page.getByText("Branchwork 附上了 Local 现在的样子").isVisible()).toBe(true);
+    expect(await page.getByText("改动已进 Local").count()).toBe(0);
   });
 
   it("从 Branchwork 移除项目：先列出没进 Local 的改动，确认后回到欢迎页，Local 文件夹不动", async () => {

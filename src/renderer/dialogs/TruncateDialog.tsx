@@ -4,6 +4,7 @@ import { IconClose } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
+import { routeLabel } from "../ui/route-color";
 
 interface Props {
   route: Route;
@@ -28,7 +29,7 @@ export function TruncateDialog({ route, stop, stopNumber, lastNumber, forks, req
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
   const range = lastNumber > stopNumber ? `第 ${stopNumber}–${lastNumber} 站` : `第 ${stopNumber} 站`;
-  const label = (r: Route) => (r.express ? `快${r.express}` : `${r.number}路`);
+  const label = (r: Route) => routeLabel(r);
   return (
     <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
       <div className={css.dialog} role="alertdialog" aria-modal aria-label={`从第 ${stopNumber} 站截线`}>

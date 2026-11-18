@@ -6,6 +6,7 @@
 export { inspectRepo, type RepoInfo } from "./inspect";
 export { gitVersionText } from "./git";
 export { createSyncEngine } from "./engine";
+export { readLocalGit, fetchUpstream, type LocalGit, type LocalGitFile } from "./local-git";
 export { SyncError } from "./types";
 export type {
   ConflictFile,

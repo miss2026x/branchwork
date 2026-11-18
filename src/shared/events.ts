@@ -1,4 +1,4 @@
-import type { ClaudeOptions, ImportProgress, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal } from "./model";
+import type { ClaudeOptions, ImportProgress, LocalStatus, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -23,6 +23,8 @@ export type BwEvent =
   | { type: "stop.thinking"; routeId: string; stopId: string; text: string }
   /** 这一路此刻在做什么（设计稿 4-8：在想、正在写文件、工具在跑、停车中）；null：在出字或者闲着 */
   | { type: "route.activity"; routeId: string; activity: RouteActivity | null }
+  /** Local 的现状变了（专车到站、有路进了 Local、拉到了远端的新提交） */
+  | { type: "local.status"; status: LocalStatus }
   /** 正在开新的一路（开新车、开新对话、压缩成快线）：做到哪一步；step 为 null 表示做完了 */
   | { type: "route.preparing"; projectId: string; step: string | null }
   /** 导入终端会话的进度（设计稿 4-8） */

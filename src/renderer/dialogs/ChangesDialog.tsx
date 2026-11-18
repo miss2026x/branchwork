@@ -4,6 +4,7 @@ import { IconClose } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./Dialog.module.css";
 import own from "./ChangesDialog.module.css";
+import { routeLabel } from "../ui/route-color";
 
 interface Props {
   route: Route;
@@ -21,7 +22,7 @@ export function ChangesDialog({ route, files, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  const label = route.express ? `快${route.express}` : `${route.number}路`;
+  const label = routeLabel(route);
   const added = files?.reduce((n, f) => n + (f.added ?? 0), 0) ?? 0;
   const removed = files?.reduce((n, f) => n + (f.removed ?? 0), 0) ?? 0;
 

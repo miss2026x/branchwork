@@ -64,6 +64,11 @@ export interface Route {
   folded: boolean;
   /** 父路被删掉了：这里记下它当时的叫法（“2路”），线路图上标“从已删除的 2路 开出” */
   orphanOf: string | null;
+  /**
+   * Local 专车（设计稿 9-10）：直接在 Local 文件夹里干活的那一路，每个项目最多一辆。
+   * 没有自己的工作区（worktreePath 就是 Local），不做站前、站后同步；路号是 0，不画在线路图上
+   */
+  local?: boolean;
   createdAt: number;
   archivedAt: number | null;
 }
@@ -263,7 +268,40 @@ export type RouteActivity =
   /** 工具在跑 */
   | { kind: "running"; tool: string; detail: string; since: number }
   /** 点了停车，正在停：step 是在等哪一步 */
-  | { kind: "stopping"; step: string; since: number };
+  | { kind: "stopping"; step: string; since: number }
+  /** 到站了，改动等 Local 专车这一站做完再进 Local */
+  | { kind: "waiting-local"; since: number };
+
+/** Local 里一个没提交的文件 */
+export type LocalFileState = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflict";
+
+/** Local 现在的样子（设计稿 9-10 “Local 现在”）：Local 标签、专车面板用；每一站开始时也交给专车的 Claude */
+export interface LocalStatus {
+  projectId: string;
+  /** Local 文件夹找不到了（被移走、改名） */
+  missing: boolean;
+  /** 当前分支；没在分支上（detached）时为空 */
+  branch: string | null;
+  /** 跟踪的远端分支（origin/main）；没设时为空 */
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  /** 没提交的改动。by：这个文件最近一次是哪一路哪一站带进 Local 的；找不到是你自己直接改的 */
+  files: { path: string; state: LocalFileState; by: { routeId: string; stopId: string | null } | null }[];
+  /** 从 package.json 读到的命令（pnpm dev、pnpm test）；读不到就没有 */
+  commands: { dev?: string; test?: string };
+  /** 什么时候看的 */
+  at: number;
+}
+
+/** Local 专车的一条常用提示（设计稿 9-10）。builtin 是自带的那几条的编号；自己加的没有 */
+export interface LocalPreset {
+  id: string;
+  label: string;
+  text: string;
+  hidden?: boolean;
+  builtin?: string;
+}
 
 /** 导入终端会话的进度 */
 export interface ImportProgress {

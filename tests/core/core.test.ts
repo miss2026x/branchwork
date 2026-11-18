@@ -1619,3 +1619,106 @@ describe("特殊的站：短确认、斜杠命令", () => {
     expect(named).toBe(1); // 只有第一站去起了名
   });
 });
+
+describe("Local 专车（设计稿 9-10）", () => {
+  it("每个项目一辆：直接在 Local 里回答，不建工作区、不同步；提问后面附上 Local 的现状", async () => {
+    const one = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, "a.txt", replaceLine(LINES, 2, "by one"));
+    await core.ask(one.id, "改 a");
+
+    const local = core.localRoute(project.id);
+    expect(local).toMatchObject({ local: true, number: 0, name: "Local 专车", worktreePath: lab.local, status: "idle" });
+    expect(core.localRoute(project.id).id).toBe(local.id); // 只有一辆
+    expect(db.routes.nextNumber(project.id)).toBe(2); // 不占路号
+
+    claude.script = (t) => {
+      expect(t.cwd).toBe(lab.local);
+      write(t.cwd, "notes.md", "专车写的\n");
+      t.say("写好了");
+    };
+    const r = await core.ask(local.id, "写个 notes");
+    expect(r).toMatchObject({ kind: "answered", sync: null, stop: { status: "done", syncState: "none" } });
+    expect(read(lab.local, "notes.md")).toBe("专车写的\n");
+    expect(core.syncLog(local.id)).toEqual([]);
+    expect(routeOf(local.id).status).toBe("idle");
+
+    // 交给 Claude 的提问：原话 + Local 现状（a.txt 是 1路 第 1 站带进来的）；存下来的提问还是原话
+    const sent = claude.asks.at(-1)!.prompt;
+    expect(sent.startsWith("写个 notes\n\n<branchwork-local>")).toBe(true);
+    expect(sent).toMatch(/- a\.txt（改了；1路「改 a」第 1 站「改 a」）/);
+    expect(stopsOf(local.id)[0]!.prompt).toBe("写个 notes");
+
+    // 斜杠命令不附
+    await core.ask(local.id, "/compact");
+    expect(claude.asks.at(-1)!.prompt).toBe("/compact");
+  });
+
+  it("专车回答时，别的路到站后先等着，专车这一站做完再进 Local", async () => {
+    const one = await core.createRoute(project.id);
+    const local = core.localRoute(project.id);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    claude.script = async (t) => {
+      if (t.cwd === lab.local) {
+        write(t.cwd, "b.txt", "专车\n");
+        await gate;
+      } else write(t.cwd, "c.txt", "1路\n");
+    };
+    const pl = core.ask(local.id, "在 Local 里改 b");
+    await new Promise((r) => setTimeout(r, 30));
+    const p1 = core.ask(one.id, "改 c");
+    // 1路 到站了，但改动还没进 Local：在等专车
+    await until("route.activity");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(events.some((e) => e.type === "route.activity" && e.routeId === one.id && e.activity?.kind === "waiting-local")).toBe(true);
+    expect(fs.existsSync(path.join(lab.local, "c.txt"))).toBe(false);
+    expect(stopsOf(one.id)[0]).toMatchObject({ status: "done" });
+
+    release();
+    await Promise.all([pl, p1]);
+    expect(read(lab.local, "c.txt")).toBe("1路\n");
+    expect(read(lab.local, "b.txt")).toBe("专车\n");
+    expect(core.syncLog(one.id).map((e) => [e.direction, e.status])).toContainEqual(["push", "ok"]);
+  });
+
+  it("Local 现状：分支、没提交的文件各是哪一路带进来的；变了推 local.status", async () => {
+    const one = await core.createRoute(project.id);
+    claude.script = (t) => write(t.cwd, "b.txt", "x\n");
+    await core.ask(one.id, "改 b");
+    write(lab.local, "mine.txt", "我自己写的\n");
+    const s = await core.localStatus(project.id);
+    expect(s).toMatchObject({ projectId: project.id, missing: false, branch: expect.any(String) as string, upstream: null });
+    const stop = stopsOf(one.id)[0]!;
+    expect(s.files).toContainEqual({ path: "b.txt", state: "modified", by: { routeId: one.id, stopId: stop.id } });
+    expect(s.files).toContainEqual({ path: "mine.txt", state: "untracked", by: null });
+    // 1路 到站进了 Local：过一小会儿推一次新的现状
+    await until("local.status");
+  });
+
+  it("专车不能改站、归档、删除、丢弃改动；移除项目时绝不删 Local", async () => {
+    const local = core.localRoute(project.id);
+    claude.script = (t) => t.say("好");
+    await core.ask(local.id, "看看");
+    const stop = stopsOf(local.id)[0]!;
+    await expect(core.truncate(local.id, stop.id)).rejects.toMatchObject({ code: "LOCAL_ROUTE" });
+    expect(() => core.archiveRoute(local.id)).toThrow(/不能归档/);
+    await expect(core.deleteRoute(local.id)).rejects.toMatchObject({ code: "LOCAL_ROUTE" });
+    await expect(core.discardChanges(local.id)).rejects.toMatchObject({ code: "LOCAL_ROUTE" });
+    expect(await core.changes(local.id)).toEqual([]);
+
+    // 改批准方式只改专车，不改项目的默认
+    core.setRoutePermissionMode(local.id, "all");
+    expect(core.listProjects()[0]!.permissionMode).not.toBe("all");
+
+    await core.removeProject(project.id, true);
+    expect(fs.existsSync(path.join(lab.local, "a.txt"))).toBe(true);
+  });
+
+  it("常用提示：没改过是 null；存了能读回来；null 恢复自带的", () => {
+    expect(core.localPresets(project.id)).toBeNull();
+    core.setLocalPresets(project.id, [{ id: "x", label: " 构建镜像 ", text: "docker build ." }, { id: "pull", label: "拉主分支", text: "拉", builtin: "pull", hidden: true }, { id: "e", label: "", text: "空的不存" }]);
+    expect(core.localPresets(project.id)).toEqual([{ id: "x", label: "构建镜像", text: "docker build ." }, { id: "pull", label: "拉主分支", text: "拉", hidden: true, builtin: "pull" }]);
+    core.setLocalPresets(project.id, null);
+    expect(core.localPresets(project.id)).toBeNull();
+  });
+});

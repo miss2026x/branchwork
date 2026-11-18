@@ -4,7 +4,7 @@ import type { RunSettings } from "../stores/store";
 import type { OptionsState } from "../ui/claude-options";
 import { IconClose, IconCompress, IconFolder } from "../ui/icons";
 import { Plate } from "../ui/Plate";
-import { routeColors } from "../ui/route-color";
+import { routeColors, routeLabel } from "../ui/route-color";
 import { Select } from "../ui/Select";
 import css from "./Dialog.module.css";
 import own from "./Compress.module.css";
@@ -69,7 +69,7 @@ export function CompressDialog({ source, stop, stopNumber, choices, contextToken
   const express = { number: 0, express: nextExpress };
   const green = routeColors(express).tag;
   const shownName = name.trim() || `${source.name} · 续`;
-  const sourceLabel = source.express ? `快${source.express}` : `${source.number}路`;
+  const sourceLabel = routeLabel(source);
   const isLast = choices.at(-1)?.stop.id === stop.id;
   const before = contextTokens && isLast ? contextTokens : null;
 

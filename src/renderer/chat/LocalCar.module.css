@@ -1,0 +1,273 @@
+/* Local 专车面板里多出来的几块（设计稿 9-10） */
+
+.now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin-top: var(--sp-10);
+  padding: var(--sp-10) var(--sp-12);
+  border-radius: var(--r-12);
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-12);
+  line-height: var(--lh-20);
+  color: var(--fg-1);
+}
+.now[data-tone="red"] {
+  box-shadow: inset 0 0 0 1px var(--red-line);
+}
+.now header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.now header b {
+  font-weight: 600;
+}
+.now header span {
+  font-size: var(--fs-11);
+  color: var(--fg-4);
+}
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  min-width: 0;
+  margin: 0;
+}
+.row svg {
+  flex: none;
+  color: var(--fg-3);
+}
+.row[data-tone="red"],
+.row[data-tone="red"] svg {
+  color: var(--red-text);
+}
+.row code,
+.foot code {
+  font-family: var(--mono);
+  font-size: var(--fs-11);
+}
+.branch {
+  font-weight: 700;
+}
+.dim {
+  color: var(--fg-3);
+}
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-round);
+  background: var(--amber);
+}
+.dot[data-tone="none"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--fg-4);
+}
+.dot[data-tone="green"] {
+  background: var(--green);
+  animation: pulse var(--t-loop) ease-in-out infinite;
+}
+.by {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-weight: 600;
+}
+.port {
+  color: var(--info-text);
+  font-weight: 600;
+}
+.foot {
+  color: var(--fg-4);
+  font-size: var(--fs-11);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin: var(--sp-8) 0 var(--sp-24);
+  font-size: var(--fs-13);
+  line-height: var(--lh-22);
+  color: var(--fg-2);
+}
+.intro b {
+  color: var(--fg-1);
+}
+.intro p {
+  margin: 0;
+}
+.intro code {
+  font-family: var(--mono);
+  font-size: var(--fs-12);
+}
+
+.presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-8);
+}
+.presetHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+.presetHead span {
+  font-weight: 600;
+}
+.presetHead small {
+  font-size: var(--fs-11);
+  color: var(--fg-4);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+.chip,
+.more {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: var(--h-28);
+  max-width: 100%;
+  padding: 0 var(--sp-10);
+  border: 0;
+  border-radius: var(--r-8);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-1);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+.chip:hover,
+.more:hover {
+  background: var(--surface-2);
+}
+.chip small {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-11);
+  font-weight: 500;
+  color: var(--fg-3);
+}
+.icon {
+  color: var(--fg-3);
+  font-weight: 700;
+}
+.chip[aria-pressed="true"] {
+  background: var(--local);
+  box-shadow: none;
+  color: var(--fg-on-color);
+}
+.chip[aria-pressed="true"] small,
+.chip[aria-pressed="true"] .icon {
+  color: var(--on-dark-2);
+}
+.chip[data-urgent] {
+  background: var(--red-bg);
+  box-shadow: inset 0 0 0 1px var(--red-line);
+  color: var(--red-text);
+}
+.chip[data-urgent] .icon {
+  color: var(--red-text);
+}
+.more {
+  width: var(--h-28);
+  justify-content: center;
+  padding: 0;
+  color: var(--fg-3);
+}
+.moreWrap {
+  position: relative;
+}
+.menu {
+  animation: pop var(--t-base) var(--ease);
+  position: absolute;
+  z-index: 7;
+  right: 0;
+  bottom: 34px; /* 例外：贴着“⋯”按钮上方 */
+  width: 260px;
+  padding: var(--sp-6);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  width: 100%;
+  height: var(--h-menu);
+  padding: 0 var(--sp-10);
+  border: 0;
+  border-radius: var(--r-8);
+  background: none;
+  color: var(--fg-1);
+  font: inherit;
+  font-size: var(--fs-13);
+  text-align: left;
+  cursor: pointer;
+}
+.menuItem:hover {
+  background: var(--surface-2);
+}
+.menuItem small {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-11);
+  color: var(--fg-4);
+}
+.menuDivider {
+  display: block;
+  height: 1px;
+  margin: var(--sp-4) var(--sp-6);
+  background: var(--divider);
+}
+
+.waiting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.waiting p {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: var(--sp-6) var(--sp-10);
+  border-radius: var(--r-10);
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

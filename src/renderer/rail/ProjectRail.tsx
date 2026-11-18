@@ -60,7 +60,7 @@ export function ProjectRail({
       <div className={css.stripList}>
         {projects.map((p) => {
           const list = Object.values(routes)
-            .filter((r) => r.projectId === p.id && r.status !== "archived")
+            .filter((r) => r.projectId === p.id && r.status !== "archived" && !r.local)
             .sort((a, b) => a.number - b.number);
           return (
             <section key={p.id} className={css.projectSection}>
@@ -142,7 +142,7 @@ export function ProjectRail({
         <div className={css.list}>
           {projects.map((p) => {
             const mine = Object.values(routes)
-              .filter((r) => r.projectId === p.id)
+              .filter((r) => r.projectId === p.id && !r.local)
               .sort((a, b) => a.number - b.number);
             const list = mine.filter((r) => r.status !== "archived");
             const archived = mine.filter((r) => r.status === "archived");

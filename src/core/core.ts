@@ -12,6 +12,8 @@ import type {
   Environment,
   FileStat,
   KeptWorktree,
+  LocalPreset,
+  LocalStatus,
   StopContent,
   PermissionDecision,
   PermissionMode,
@@ -34,10 +36,11 @@ import type {
   TerminalSession,
 } from "../shared";
 import { IMAGE_MAX_COUNT, withoutImageMarks } from "../shared";
-import { createSyncEngine, gitVersionText, inspectRepo, type SyncEngine, type SyncHooks } from "../sync";
+import { createSyncEngine, fetchUpstream, gitVersionText, inspectRepo, readLocalGit, type LocalGit, type SyncEngine, type SyncHooks } from "../sync";
+import { LOCAL_ROUTE_NAME, localBrief, localStatus as buildLocalStatus, routeLabel } from "./local";
 import { createTerminals, type TerminalInfo, type Terminals } from "../terminal";
 
-export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED" | "BAD_IMAGE";
+export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED" | "BAD_IMAGE" | "LOCAL_ROUTE";
 
 export class CoreError extends Error {
   constructor(
@@ -63,6 +66,9 @@ export interface CoreOptions {
   naming?: boolean;
   /** 测试里换成假的同步引擎工厂；默认用真的 */
   createEngine?: (localDir: string, worktreesDir: string, hooks?: SyncHooks) => Promise<SyncEngine>;
+  /** 测试里换成假的：读 Local 的 git 状态、去远端看新提交。默认用真的 git */
+  localGit?: (localDir: string) => Promise<LocalGit>;
+  fetchUpstream?: (localDir: string) => Promise<boolean>;
 }
 
 export type AskReport =
@@ -129,6 +135,13 @@ export interface Core {
   terminalStop(terminalId: string): Promise<void>;
   /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步。images：带的图片，text 里的“[图 N]”标出位置 */
   ask(routeId: string, text: string, images?: PromptImage[]): Promise<AskReport>;
+  /** 这个项目的 Local 专车（设计稿 9-10）；还没有就开一辆 */
+  localRoute(projectId: string): Route;
+  /** Local 现在的样子：分支、和远端差多少、没提交的文件各是哪一路带进来的。顺便在后台 fetch 一下，有变化再推 local.status */
+  localStatus(projectId: string): Promise<LocalStatus>;
+  /** 专车的常用提示；没改过是 null（用自带的） */
+  localPresets(projectId: string): LocalPreset[] | null;
+  setLocalPresets(projectId: string, presets: LocalPreset[] | null): void;
   /** 一站的提问、或候车区一个问题带的图片 */
   images(ownerId: string): PromptImage[];
   /**
@@ -269,7 +282,7 @@ export function createCore(opts: CoreOptions): Core {
     for (const route of db.routes.listByProject(project.id)) {
       if (route.status !== "answering" && route.status !== "awaiting_permission") continue;
       for (const s of db.stops.listByRoute(route.id)) {
-        if (s.status === "answering") db.stops.update(s.id, { status: "interrupted", syncState: "unsynced", endedAt: Date.now(), error: "应用在回答途中退出" });
+        if (s.status === "answering") db.stops.update(s.id, { status: "interrupted", syncState: route.local ? "none" : "unsynced", endedAt: Date.now(), error: "应用在回答途中退出" });
       }
       db.routes.update(route.id, { status: "interrupted" });
     }
@@ -335,8 +348,50 @@ export function createCore(opts: CoreOptions): Core {
     return entry;
   };
 
+  // ── Local 专车 ──
+  /** 各项目的专车正在回答的那一站：结束时 resolve。这期间各路到站后先不进 Local（设计稿 9-10） */
+  const localBusy = new Map<string, Promise<void>>();
+  /** 到站了：专车在回答就等它这一站做完再进 Local */
+  const waitLocal = async (routeId: string) => {
+    const projectId = db.routes.get(routeId)?.projectId;
+    if (!projectId || !localBusy.has(projectId)) return;
+    const since = Date.now();
+    while (localBusy.has(projectId)) {
+      setActivity(routeId, { kind: "waiting-local", since });
+      await localBusy.get(projectId);
+    }
+    if (activities.get(routeId)?.kind === "waiting-local") setActivity(routeId, null);
+  };
+  const readGit = opts.localGit ?? readLocalGit;
+  const fetchRemote = opts.fetchUpstream ?? fetchUpstream;
+  /** 各项目上次去远端看新提交的时间：五分钟最多一次 */
+  const lastFetch = new Map<string, number>();
+  const readLocal = async (project: Project): Promise<LocalStatus> => {
+    const g = await readGit(project.localDir).catch((): LocalGit => ({ missing: false, branch: null, upstream: null, ahead: 0, behind: 0, files: [], commands: {} }));
+    return buildLocalStatus(project.id, g, db.syncLog.listByRoutes(db.routes.listByProject(project.id).map((r) => r.id)));
+  };
+  /** Local 可能变了：过一小会儿重新看一遍，推给界面（连着好几次只看一遍） */
+  const localTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const refreshLocal = (projectId: string) => {
+    if (localTimers.has(projectId)) return;
+    localTimers.set(
+      projectId,
+      setTimeout(() => {
+        localTimers.delete(projectId);
+        // 这是稍晚一点才跑的：应用正在退出、数据库已经关了的话就算了
+        try {
+          const project = db.projects.get(projectId);
+          if (project) void readLocal(project).then((status) => emit({ type: "local.status", status }), () => {});
+        } catch {
+          /* 已经关了 */
+        }
+      }, 300),
+    );
+  };
+
   /** 跑一次同步并记下来；noop 不记。引擎抛错也记成一条，不往外抛 */
   const sync = async (routeId: string, stopId: string | null, direction: "pull" | "push", run: () => ReturnType<SyncEngine["pullBeforeStop"]>): Promise<SyncLogEntry | null> => {
+    if (direction === "push") await waitLocal(routeId);
     const noteLocalEdits = () => {
       const projectId = db.routes.get(routeId)?.projectId;
       const files = projectId ? localEdits.get(projectId) : undefined;
@@ -348,6 +403,10 @@ export function createCore(opts: CoreOptions): Core {
       const r = await run();
       noteLocalEdits();
       if (r.status === "noop") return null;
+      if (r.status === "ok" && direction === "push") {
+        const projectId = db.routes.get(routeId)?.projectId;
+        if (projectId) refreshLocal(projectId);
+      }
       if (r.status === "ok") return log(routeId, stopId, direction, "ok", r.changed.map((c) => ({ path: c.path, note: c.kind })));
       // 冲突的文件：Local 里它上一次是哪一路哪一站带进去的；找不到就是你自己直接改的
       const projectId = db.routes.get(routeId)?.projectId;
@@ -558,8 +617,20 @@ export function createCore(opts: CoreOptions): Core {
     else activities.set(routeId, a);
     emit({ type: "route.activity", routeId, activity: a });
   };
-  const runStop = (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> =>
-    runStopInner(routeId, text, resolving, images).finally(() => setActivity(routeId, null));
+  const runStop = (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> => {
+    const route = db.routes.get(routeId);
+    if (!route?.local) return runStopInner(routeId, text, resolving, images).finally(() => setActivity(routeId, null));
+    // 专车：这一站回答期间，各路到站后先不进 Local
+    if (localBusy.has(route.projectId) || route.status === "answering" || route.status === "awaiting_permission") return runStopInner(routeId, text, resolving, images);
+    let done!: () => void;
+    localBusy.set(route.projectId, new Promise<void>((r) => (done = r)));
+    return runStopInner(routeId, text, resolving, images).finally(() => {
+      localBusy.delete(route.projectId);
+      done();
+      setActivity(routeId, null);
+      refreshLocal(route.projectId);
+    });
+  };
   const runStopInner = async (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> => {
       let route = mustRoute(routeId);
       if (!resolving) {
@@ -574,21 +645,31 @@ export function createCore(opts: CoreOptions): Core {
       const abort = new AbortController();
       running.set(routeId, abort);
 
-      let engine: SyncEngine;
-      try {
-        engine = await engineFor(mustProject(route.projectId));
-      } catch (e) {
-        running.delete(routeId);
-        setRoute(routeId, { status: before });
-        throw e;
-      }
+      // 专车直接在 Local 里干活：没有工作区，不做站前、站后同步；提问后面附上 Local 现在的样子
+      let engine: SyncEngine | null = null;
+      let brief = "";
+      if (route.local) {
+        const project = mustProject(route.projectId);
+        const status = await readLocal(project).catch(() => null);
+        const mine = terminals.list({ routeId }).filter((t) => t.status === "running");
+        brief = localBrief(project.localDir, status, db.routes.listByProject(project.id), db.stops.listByProject(project.id), mine);
+      } else {
+        try {
+          engine = await engineFor(mustProject(route.projectId));
+        } catch (e) {
+          running.delete(routeId);
+          setRoute(routeId, { status: before });
+          throw e;
+        }
 
-      // ── 站前：Local → 工作区 ──
-      const pulled = await sync(routeId, null, "pull", () => engine.pullBeforeStop(routeId));
-      if (pulled && pulled.status !== "ok") {
-        running.delete(routeId);
-        setRoute(routeId, { status: pulled.status === "conflict" ? "conflict" : before });
-        return { kind: "blocked", sync: pulled };
+        // ── 站前：Local → 工作区 ──
+        const eng = engine;
+        const pulled = await sync(routeId, null, "pull", () => eng.pullBeforeStop(routeId));
+        if (pulled && pulled.status !== "ok") {
+          running.delete(routeId);
+          setRoute(routeId, { status: pulled.status === "conflict" ? "conflict" : before });
+          return { kind: "blocked", sync: pulled };
+        }
       }
 
       // ── 回答 ──
@@ -632,7 +713,7 @@ export function createCore(opts: CoreOptions): Core {
         .ask({
           cwd: route.worktreePath,
           // 快线的第一个问题：连同交接摘要一起交给 Claude（这是个全新的会话，它看不到原来的对话）
-          prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : text,
+          prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : brief && !command ? `${text}\n\n${brief}` : text,
           images,
           sessionId: route.sessionId ?? undefined,
           ...runFor(route),
@@ -688,6 +769,11 @@ export function createCore(opts: CoreOptions): Core {
 
       // ── 没答完：不同步，工作区保留 ──
       if (result.outcome !== "completed") {
+        if (!engine) {
+          stop = setStop(stopId, { ...ended, status: "interrupted", syncState: "none", error: result.error ?? (result.outcome === "interrupted" ? "已停车" : "没有正常结束") });
+          setRoute(routeId, { status: "interrupted" });
+          return { kind: "answered", stop, text: result.text, sync: null };
+        }
         if (activities.get(routeId)?.kind === "stopping") setActivity(routeId, { kind: "stopping", step: "看一眼工作区", since: activities.get(routeId)!.since });
         const left = await engine.status(routeId).then(
           (s) => s.unsynced.length > 0,
@@ -700,7 +786,13 @@ export function createCore(opts: CoreOptions): Core {
 
       // ── 正常结束：先让这一站显示“已到站”，再做站后同步 ──
       stop = setStop(stopId, { ...ended, status: "done" });
-      const pushed = await sync(routeId, stopId, "push", () => engine.pushAfterStop(routeId));
+      if (!engine) {
+        setRoute(routeId, { status: "idle" });
+        setImmediate(() => dispatchNext(routeId));
+        return { kind: "answered", stop, text: result.text, sync: null };
+      }
+      const eng = engine;
+      const pushed = await sync(routeId, stopId, "push", () => eng.pushAfterStop(routeId));
       const earlier = previous.filter((s) => s.syncState === "unsynced" || s.syncState === "conflict");
       if (!pushed) {
         for (const s of earlier) setStop(s.id, { syncState: "none" });
@@ -963,7 +1055,7 @@ export function createCore(opts: CoreOptions): Core {
     setRoutePermissionMode(routeId, mode) {
       const before = mustRoute(routeId);
       const route = before.permissionMode === mode ? before : setRoute(routeId, { permissionMode: mode });
-      if (mustProject(route.projectId).permissionMode !== mode) emit({ type: "project.updated", project: db.projects.update(route.projectId, { permissionMode: mode }) });
+      if (!route.local && mustProject(route.projectId).permissionMode !== mode) emit({ type: "project.updated", project: db.projects.update(route.projectId, { permissionMode: mode }) });
       // 这一路正在等批准的：按新的方式能放行的现在就放行
       for (const [requestId, p] of pendingPermissions) {
         if (p.routeId !== routeId || !autoApproves(mode, p.tool)) continue;
@@ -1016,6 +1108,7 @@ export function createCore(opts: CoreOptions): Core {
 
     async truncate(routeId, stopId) {
       let route = mustRoute(routeId);
+      if (route.local) throw new CoreError("LOCAL_ROUTE", "专车改的是 Local 本身，改过的回不去，所以不能改站。可以从这一站开新对话（开出来是普通的一路）");
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路还在回答，等它到站再截线");
       if (distilling.has(routeId)) throw new CoreError("ROUTE_BUSY", "这一路正在提炼摘要，等它好了再截线");
       const all = db.stops.listByRoute(routeId);
@@ -1112,6 +1205,7 @@ export function createCore(opts: CoreOptions): Core {
 
     async changes(routeId) {
       const route = mustRoute(routeId);
+      if (route.local) return []; // 专车没有自己的工作区，改的直接就在 Local 里
       const engine = await engineFor(mustProject(route.projectId));
       return engine.changes(routeId);
     },
@@ -1126,6 +1220,69 @@ export function createCore(opts: CoreOptions): Core {
     },
 
     ask: async (routeId, text, images) => runStop(routeId, text, undefined, checkImages(images)),
+
+    localRoute(projectId) {
+      const project = mustProject(projectId);
+      const found = db.routes.listByProject(projectId).find((r) => r.local);
+      if (found) return found;
+      const route: Route = {
+        id: id("r"),
+        projectId,
+        number: 0,
+        express: null,
+        name: LOCAL_ROUTE_NAME,
+        status: "idle",
+        sessionId: null,
+        worktreePath: project.localDir,
+        parentRouteId: null,
+        forkStopId: null,
+        model: null,
+        effort: null,
+        permissionMode: project.permissionMode,
+        color: null,
+        contextTokens: null,
+        pinned: false,
+        folded: false,
+        orphanOf: null,
+        local: true,
+        createdAt: Date.now(),
+        archivedAt: null,
+      };
+      db.routes.insert(route);
+      emit({ type: "route.updated", route });
+      warmRoute(route);
+      return route;
+    },
+
+    async localStatus(projectId) {
+      const project = mustProject(projectId);
+      const status = await readLocal(project);
+      // 远端有没有新提交要 fetch 才知道：五分钟最多一次，在后台做，看到变化再推过去
+      if (!status.missing && status.upstream && Date.now() - (lastFetch.get(projectId) ?? 0) > 5 * 60_000) {
+        lastFetch.set(projectId, Date.now());
+        void fetchRemote(project.localDir).then((ok) => {
+          if (ok && db.projects.get(projectId)) refreshLocal(projectId);
+        });
+      }
+      return status;
+    },
+
+    localPresets(projectId) {
+      mustProject(projectId);
+      try {
+        const raw = db.settings.get(`local-presets:${projectId}`);
+        return raw ? (JSON.parse(raw) as LocalPreset[]) : null;
+      } catch {
+        return null;
+      }
+    },
+
+    setLocalPresets(projectId, presets) {
+      mustProject(projectId);
+      const clean = presets?.filter((p) => p.label.trim() && p.text.trim()).map((p) => ({ id: p.id, label: p.label.trim().slice(0, 20), text: p.text.trim().slice(0, 2000), ...(p.hidden ? { hidden: true } : {}), ...(p.builtin ? { builtin: p.builtin } : {}) }));
+      if (clean) db.settings.set(`local-presets:${projectId}`, JSON.stringify(clean));
+      else db.settings.delete(`local-presets:${projectId}`);
+    },
     images: (ownerId) => db.images.get(ownerId),
 
     async fork(routeId, stopId, name) {
@@ -1185,6 +1342,7 @@ export function createCore(opts: CoreOptions): Core {
 
     archiveRoute(routeId) {
       const route = mustRoute(routeId);
+      if (route.local) throw new CoreError("LOCAL_ROUTE", "Local 专车每个项目固定一辆，不能归档");
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能归档");
       if (route.status === "archived") return route;
       claude.cool(route.worktreePath);
@@ -1216,18 +1374,19 @@ export function createCore(opts: CoreOptions): Core {
 
     async deleteRoute(routeId, force = false, keepWorktree = false) {
       const route = mustRoute(routeId);
+      if (route.local) throw new CoreError("LOCAL_ROUTE", "Local 专车每个项目固定一辆，不能删除");
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能删除");
       const engine = await engineFor(mustProject(route.projectId));
       claude.cool(route.worktreePath); // 提前启动好的 Claude 占着这个目录，先关掉才删得了
       if (force || (await engine.status(routeId).then((s) => s.unsynced.length === 0, () => false))) await terminals.removeAll({ routeId }); // 后台终端也占着目录
       if (keepWorktree) await terminals.removeAll({ routeId });
       const removed = await engine.removeWorktree(routeId, { force: force || keepWorktree, keep: keepWorktree });
-      if (keepWorktree) db.kept.insert({ id: id("k"), projectId: route.projectId, path: route.worktreePath, label: `${route.express ? `快${route.express}` : `${route.number}路`} ${route.name}`, at: Date.now() });
+      if (keepWorktree) db.kept.insert({ id: id("k"), projectId: route.projectId, path: route.worktreePath, label: `${routeLabel(route)} ${route.name}`, at: Date.now() });
       if (removed.status === "has-unsynced") return { status: "has-unsynced", files: removed.files.map((f) => ({ path: f.path, note: f.kind })) };
       if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
       releaseQueue(route);
       // 从它分出去的路：记下父路当时的叫法，线路图上好标“从已删除的 2路 开出”
-      for (const child of db.routes.listByProject(route.projectId)) if (child.parentRouteId === routeId) setRoute(child.id, { orphanOf: route.express ? `快${route.express}` : `${route.number}路` });
+      for (const child of db.routes.listByProject(route.projectId)) if (child.parentRouteId === routeId) setRoute(child.id, { orphanOf: routeLabel(route) });
       db.routes.delete(routeId);
       db.images.prune();
       emit({ type: "route.deleted", routeId, projectId: route.projectId });
@@ -1240,11 +1399,12 @@ export function createCore(opts: CoreOptions): Core {
       if (routes.some((r) => r.status === "answering" || r.status === "awaiting_permission")) throw new CoreError("ROUTE_BUSY", "有路正在回答，到站或停车后才能移除这个项目");
       // Local 文件夹被挪走或删掉了也要能移除：这时没法问 git，工作区直接整个删掉
       const engine = await engineFor(project).catch(() => null);
-      const label = (r: Route) => `${r.express ? `快${r.express}` : `${r.number}路`} ${r.name}`;
+      const label = (r: Route) => `${routeLabel(r)} ${r.name}`;
 
       if (!force) {
         const blocked: Extract<RemoveProjectResult, { status: "has-unsynced" }>["routes"] = [];
         for (const r of routes) {
+          if (r.local) continue;
           const s = engine ? await engine.status(r.id).catch(() => null) : null;
           if (s?.unsynced.length) blocked.push({ routeId: r.id, label: label(r), files: s.unsynced.map((f) => ({ path: f.path, note: f.kind })) });
         }
@@ -1256,7 +1416,8 @@ export function createCore(opts: CoreOptions): Core {
         distilling.get(r.id)?.abort();
         claude.cool(r.worktreePath);
         await terminals.removeAll({ routeId: r.id });
-        if (engine) await engine.removeWorktree(r.id, { force: true }).catch(() => {});
+        // 专车的“工作区”就是 Local 本身：绝不能删
+        if (engine && !r.local) await engine.removeWorktree(r.id, { force: true }).catch(() => {});
         if (r.sessionId) await claude.deleteSession(r.sessionId).catch(() => {});
       }
       if (engine) for (const k of db.kept.listByProject(projectId)) await engine.removeFolder(k.path).catch(() => {});
@@ -1427,6 +1588,7 @@ export function createCore(opts: CoreOptions): Core {
 
     async discardChanges(routeId) {
       const route = mustRoute(routeId);
+      if (route.local) throw new CoreError("LOCAL_ROUTE", "专车改的就是 Local，没有单独的改动可以丢");
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能丢掉改动");
       const engine = await engineFor(mustProject(route.projectId));
       claude.cool(route.worktreePath);
@@ -1442,8 +1604,7 @@ export function createCore(opts: CoreOptions): Core {
       const route = mustRoute(routeId);
       const content = await self.history(routeId).catch(() => [] as StopContent[]);
       const byStop = new Map(content.map((c) => [c.stopId, c.items]));
-      const label = route.express ? `快${route.express}` : `${route.number}路`;
-      const out = [`# ${label} ${route.name}`, ""];
+      const out = [route.local ? `# ${route.name}` : `# ${routeLabel(route)} ${route.name}`, ""];
       for (const s of db.stops.listByRoute(routeId)) {
         out.push(`## ${s.kind === "summary" ? "摘要站" : `第 ${s.seq} 站：${s.name}`}`, "", s.kind === "summary" ? s.prompt : s.prompt.split("\n").map((l) => `> ${l}`).join("\n"), "");
         for (const it of byStop.get(s.id) ?? []) out.push(it.kind === "text" ? it.text : `- \`${it.tool}\` ${it.detail}`, "");
@@ -1454,6 +1615,7 @@ export function createCore(opts: CoreOptions): Core {
 
     async resync(routeId) {
       const route = mustRoute(routeId);
+      if (route.local) return [];
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答");
       const engine = await engineFor(mustProject(route.projectId));
       const entries: SyncLogEntry[] = [];
@@ -1510,6 +1672,8 @@ export function createCore(opts: CoreOptions): Core {
     warm: (routeId) => warmRoute(mustRoute(routeId)),
 
     dispose() {
+      for (const t of localTimers.values()) clearTimeout(t);
+      localTimers.clear();
       claude.dispose();
       void terminals.dispose();
     },

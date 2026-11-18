@@ -112,6 +112,10 @@ export function registerIpc(core: Core): void {
     },
 
     ask: (routeId, text, images) => fire(core.ask(routeId, text, images)),
+    localRoute: async (projectId) => core.localRoute(projectId),
+    localStatus: (projectId) => core.localStatus(projectId),
+    localPresets: async (projectId) => core.localPresets(projectId),
+    setLocalPresets: async (projectId, presets) => core.setLocalPresets(projectId, presets),
     images: async (ownerId) => core.images(ownerId),
   };
 

@@ -6,7 +6,7 @@ import type { OptionsState } from "../ui/claude-options";
 import { IconClose, IconFolder } from "../ui/icons";
 import { SUBMIT_KEYS } from "../ui/keys";
 import { Plate } from "../ui/Plate";
-import { routeColors } from "../ui/route-color";
+import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Dialog.module.css";
 import { FirstStop, NameRow, usableRun, type RunChoice } from "./FirstStop";
 import own from "./NewRoute.module.css";
@@ -50,7 +50,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
   const [chosen, setChosen] = useState<Partial<RunChoice>>({});
   const run = usableRun({ model: parent.model, effort: parent.effort, permissionMode: parent.permissionMode, ...chosen }, claudeOptions);
   const colors = routeColors({ number: nextNumber, express: null, color });
-  const parentLabel = parent.express ? `快${parent.express}` : `${parent.number}路`;
+  const parentLabel = routeLabel(parent);
   const label = `${nextNumber}路`;
   const context = contextTokens ? ` · 约 ${contextTokens >= 1000 ? `${(contextTokens / 1000).toFixed(1)}k` : contextTokens}` : "";
 

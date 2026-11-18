@@ -1,0 +1,146 @@
+/* 路线标签最左的 Local 专车（设计稿 9-10） */
+.wrap {
+  position: relative;
+  flex: none;
+}
+.tab {
+  height: var(--h-36);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-10) 0 var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  box-shadow: var(--e1);
+  color: var(--fg-1);
+  font: inherit;
+  font-size: var(--fs-13);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab:hover {
+  background: var(--surface-1);
+}
+.tab[aria-current="true"] {
+  border-color: var(--local);
+  box-shadow: 0 0 0 1px var(--local);
+  font-weight: 600;
+}
+.tab[data-tone="red"] {
+  border-color: var(--red);
+  box-shadow: 0 0 0 1px var(--red-line);
+}
+.l {
+  flex: none;
+  height: 20px; /* 例外：和路牌一样高 */
+  display: grid;
+  place-items: center;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-4);
+  background: var(--local);
+  color: var(--fg-on-color);
+  font-size: var(--fs-11);
+  font-weight: 800;
+}
+.branch {
+  font-family: var(--mono);
+  font-size: var(--fs-11);
+  font-weight: 500;
+  color: var(--fg-3);
+}
+.dim {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--fg-3);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 18px; /* 例外：标签里的小角标 */
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-11);
+  font-style: normal;
+  font-weight: 700;
+}
+.badge[data-tone="amber"] {
+  background: var(--amber-bg);
+  color: var(--amber-text);
+}
+.badge[data-tone="green"] {
+  background: var(--green-bg);
+  color: var(--green-text);
+}
+.badge[data-tone="red"] {
+  background: var(--red-bg);
+  color: var(--red-text);
+}
+.pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-round);
+  background: var(--green);
+  animation: pulse var(--t-loop) ease-in-out infinite;
+}
+.spin {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 2px solid var(--border);
+  border-top-color: var(--local);
+  border-radius: var(--r-round);
+  animation: spin var(--t-spin) linear infinite;
+}
+.card {
+  animation: pop var(--t-base) var(--ease);
+  position: absolute;
+  z-index: 8;
+  left: 0;
+  top: 42px; /* 例外：标签下面留 6px */
+  width: 300px;
+  padding: var(--sp-4) var(--sp-12) var(--sp-12);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.card p {
+  margin: var(--sp-8) 0 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.card > section {
+  background: var(--surface);
+  box-shadow: none;
+  padding: var(--sp-8) 0 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .pulse {
+    animation: none;
+  }
+}

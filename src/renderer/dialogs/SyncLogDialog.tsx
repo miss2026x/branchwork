@@ -4,6 +4,7 @@ import { IconClose, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./Dialog.module.css";
 import own from "./Extra.module.css";
+import { routeLabel } from "../ui/route-color";
 
 interface Props {
   project: Project;
@@ -57,7 +58,7 @@ export function SyncLogDialog({ project, entries, routes, stops, stopNumber, kep
           </button>
           {involved.map((r) => (
             <button key={r.id} role="radio" aria-checked={filter === r.id} onClick={() => setFilter(r.id)}>
-              {r.express ? `快${r.express}` : `${r.number}路`}
+              {routeLabel(r)}
             </button>
           ))}
         </div>

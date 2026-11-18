@@ -77,4 +77,6 @@ export const MIGRATIONS: string[] = [
   // 10：提问带的图片（一站的提问或候车区的一个问题；owner_id 是站或候车问题的 id）
   `CREATE TABLE image (owner_id TEXT NOT NULL, idx INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (owner_id, idx));
    ALTER TABLE stop ADD COLUMN images INTEGER NOT NULL DEFAULT 0; ALTER TABLE queue_item ADD COLUMN images INTEGER NOT NULL DEFAULT 0;`,
+  // 11：Local 专车（直接在 Local 里干活的那一路）
+  `ALTER TABLE route ADD COLUMN local INTEGER NOT NULL DEFAULT 0;`,
 ];

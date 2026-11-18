@@ -4,7 +4,7 @@ import { layoutMap } from "../map/layout";
 import { dayLabel } from "../palette/search";
 import { IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
-import { routeColors } from "../ui/route-color";
+import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Overview.module.css";
 
 interface Props {
@@ -49,7 +49,7 @@ export function Overview({ projects, routes, stops, queue, currentProjectId, onO
   const cards = projects
     .map((p) => {
       const rs = Object.values(routes)
-        .filter((r) => r.projectId === p.id && r.status !== "archived")
+        .filter((r) => r.projectId === p.id && r.status !== "archived" && !r.local)
         .sort((a, b) => a.number - b.number);
       const ss = Object.values(stops).filter((s) => rs.some((r) => r.id === s.routeId));
       const last = Math.max(p.createdAt, ...rs.map((r) => r.createdAt), ...ss.map((s) => s.endedAt ?? s.startedAt));
@@ -57,7 +57,7 @@ export function Overview({ projects, routes, stops, queue, currentProjectId, onO
     })
     .sort((a, b) => (sort === "name" ? a.p.name.localeCompare(b.p.name) : b.last - a.last));
   const busy = (r: Route) => r.status === "answering" || r.status === "awaiting_permission";
-  const label = (r: Route) => (r.express ? `快${r.express}` : `${r.number}路`);
+  const label = (r: Route) => routeLabel(r);
 
   return (
     <div className={css.page} data-ov>

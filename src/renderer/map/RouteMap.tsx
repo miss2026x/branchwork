@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { withoutImageMarks, type QueueItem, type QueueMode, type Route, type Stop, type SyncFile } from "../../shared";
 import { IconArrow, IconClose, IconCompress, IconCopy, IconCut, IconEdit, IconFit, IconFork, IconImage, IconMinus, IconMore, IconPlus, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
-import { routeColors } from "../ui/route-color";
+import { routeColors, routeLabel } from "../ui/route-color";
 import { useFit } from "../ui/useFit";
 import { firstStops } from "../stores/numbering";
 import { estimateTokens, parseSummary } from "../ui/summary-items";
@@ -12,6 +12,8 @@ import css from "./RouteMap.module.css";
 import { plainText } from "../ui/plain-text";
 
 interface Props {
+  /** 路线标签最左、固定不滚的那一格：Local 专车（设计稿 9-10） */
+  leading?: React.ReactNode;
   routes: Route[];
   stops: Stop[];
   /** 候车区里的问题：派给某一路的，在那一路的末尾画成虚线的站 */
@@ -88,7 +90,7 @@ function dotGrid(view: { k: number; x: number; y: number }): CSSProperties {
   return { backgroundSize: `${g}px ${g}px`, backgroundPosition: `${snap(view.x)}px ${snap(view.y)}px` };
 }
 
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages, activityLabel }: Props) {
+export function RouteMap({ leading, routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages, activityLabel }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -254,6 +256,9 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
 
   return (
     <div className={css.map}>
+      <div className={css.tabbar}>
+        {leading}
+        {leading && <i className={css.tabDivider} aria-hidden />}
       <div className={css.tabs}>
         {routes.map((r) => (
           <button key={r.id} className={css.tab} aria-current={r.id === selectedRouteId} style={r.id === selectedRouteId ? { borderColor: routeColors(r).line, boxShadow: `0 0 0 1px ${routeColors(r).line}` } : undefined} onClick={() => onSelectRoute(r.id)}>
@@ -261,6 +266,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
             <span className="ell">{r.name}</span>
           </button>
         ))}
+      </div>
       </div>
 
       <div className={css.zoom}>
@@ -556,7 +562,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
                     </button>
                     {source && (
                       <button onClick={() => (onJumpStop?.(source.spot.stop.id), setHover(null))}>
-                        跳到 {source.route.express ? `快${source.route.express}` : `${source.route.number}路`} 第 {stopNumber(source.spot.stop)} 站
+                        跳到 {routeLabel(source.route)} 第 {stopNumber(source.spot.stop)} 站
                       </button>
                     )}
                   </footer>
@@ -569,7 +575,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
           <div ref={cardBox} className={`${css.card} ${css.cardConflict}`} style={cardPlace(hoverStop.spot.x * view.k + view.x, hoverStop.spot.y * view.k + view.y, view.k, viewport.current, labelAbove(hoverStop.spot))} onPointerEnter={() => hoverOn(hover, 0)} onPointerLeave={() => hoverOn(null)}>
             {(() => {
               const files = conflicts[hoverStop.route.id]!;
-              const label = hoverStop.route.express ? `快${hoverStop.route.express}` : `${hoverStop.route.number}路`;
+              const label = routeLabel(hoverStop.route);
               return (
                 <>
                   <header>

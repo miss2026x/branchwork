@@ -58,6 +58,10 @@
   --route-8-tag: var(--express);
   --route-8-bg: var(--express-bg);
   --route-8-text: var(--express-text);
+  /* Local 专车（设计稿 9-10）：墨色，和 1–8 路的彩色都分开 */
+  --local: #161b22;
+  --local-bg: #eceff3;
+  --local-text: #161b22;
   /* 状态：同一处只出现一种 */
   --orange: #e0661c;
   --orange-bg: #fce9dc;

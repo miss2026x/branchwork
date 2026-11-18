@@ -67,6 +67,7 @@ export interface Db {
   settings: {
     get(key: string): string | null;
     set(key: string, value: string): void;
+    delete(key: string): void;
   };
   close(): void;
 }
@@ -137,6 +138,7 @@ export function openDb(file: string): Db {
       pinned: "pinned",
       folded: "folded",
       orphanOf: "orphan_of",
+      local: "local",
       createdAt: "created_at",
       archivedAt: "archived_at",
     },
@@ -159,6 +161,7 @@ export function openDb(file: string): Db {
       pinned: !!r.pinned,
       folded: !!r.folded,
       orphanOf: (r.orphan_of as string | null) ?? null,
+      ...(r.local ? { local: true } : {}),
       createdAt: r.created_at as number,
       archivedAt: r.archived_at as number | null,
     }),
@@ -287,6 +290,7 @@ export function openDb(file: string): Db {
     settings: {
       get: (key) => (one("SELECT value FROM setting WHERE key = ?", key)?.value as string | undefined) ?? null,
       set: (key, value) => run("INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value),
+      delete: (key) => run("DELETE FROM setting WHERE key = ?", key),
     },
     close: () => sql.close(),
   };

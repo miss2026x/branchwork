@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions } from "../../shared";
+import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus } from "../../shared";
 import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
+import { routeLabel } from "../ui/route-color";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -115,6 +116,8 @@ interface State {
     | { kind: "new-route" }
     | { kind: "import"; projectId: string }
     | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] }
+    /** 管理专车的常用提示 */
+    | { kind: "local-presets"; projectId: string }
     /** 移除项目；blocked 是第一次确认后发现的没进 Local 的改动和留下的工作区 */
     | { kind: "remove-project"; projectId: string; blocked: Extract<RemoveProjectResult, { status: "has-unsynced" }> | null; error: string | null };
   /** 正在问“这一路还在回答，怎么归档”的那一路 */
@@ -131,6 +134,10 @@ interface State {
   viewing: string | null;
   /** 后台终端，按编号记 */
   terminals: Record<string, Terminal>;
+  /** 各项目 Local 现在的样子（设计稿 9-10 Local 标签、专车面板） */
+  localStatus: Record<string, LocalStatus>;
+  /** 各项目专车的常用提示；null 是没改过（用自带的）；没有这一项是还没读 */
+  localPresets: Record<string, LocalPreset[] | null>;
   /** 正在看的那个后台终端和它到现在为止的输出 */
   terminalView: { id: string; output: string } | null;
   /** 正在看“改了什么”的那一路和它的改动；files 为空表示还在读 */
@@ -176,6 +183,15 @@ interface State {
   closeDialog(): void;
   setOverview(on: boolean): void;
   openLocal(projectId: string): Promise<void>;
+  /** 上 Local 专车：还没有就开一辆，然后选中它 */
+  openLocalRoute(projectId: string): Promise<void>;
+  /** 重新看一遍 Local 现在的样子 */
+  refreshLocal(projectId: string): void;
+  loadLocalPresets(projectId: string): void;
+  /** 打开“管理常用提示” */
+  openLocalPresets(projectId: string): void;
+  /** 存专车的常用提示；null 恢复自带的 */
+  saveLocalPresets(projectId: string, presets: LocalPreset[] | null): void;
   openSystemTerminal(terminalId: string): Promise<void>;
   /** 让用户选一个文件夹；取消返回 null */
   pickDirectory(): Promise<string | null>;
@@ -377,6 +393,9 @@ export const useStore = create<State>((set, get) => {
       case "stop.answered":
         set((s) => (s.live[e.stopId] ? { live: { ...s.live, [e.stopId]: { ...s.live[e.stopId]!, phase: "finishing" } } } : {}));
         break;
+      case "local.status":
+        set((s) => ({ localStatus: { ...s.localStatus, [e.status.projectId]: e.status } }));
+        break;
       case "route.activity":
         set((s) => {
           const activity = { ...s.activity };
@@ -525,6 +544,8 @@ export const useStore = create<State>((set, get) => {
     overview: false,
     viewing: null,
     terminals: {},
+    localStatus: {},
+    localPresets: {},
     terminalView: null,
     changesView: null,
     notices: [],
@@ -551,7 +572,7 @@ export const useStore = create<State>((set, get) => {
         set({ ready: true });
         if (first) {
           set({ selectedProjectId: first.id });
-          const route = snaps[0]!.routes.find((r) => r.status !== "archived");
+          const route = snaps[0]!.routes.find((r) => r.status !== "archived" && !r.local);
           if (route) get().selectRoute(route.id);
         }
       } catch (e) {
@@ -561,7 +582,7 @@ export const useStore = create<State>((set, get) => {
 
     selectProject(projectId) {
       const route = Object.values(get().routes)
-        .filter((r) => r.projectId === projectId && r.status !== "archived")
+        .filter((r) => r.projectId === projectId && r.status !== "archived" && !r.local)
         .sort((a, b) => a.number - b.number)[0];
       set({ selectedProjectId: projectId, selectedRouteId: route?.id ?? null });
       get().loadClaudeOptions(projectId);
@@ -690,6 +711,43 @@ export const useStore = create<State>((set, get) => {
     async openSystemTerminal(terminalId) {
       await window.bw.openSystemTerminal(terminalId).catch((e) => set({ error: message(e) }));
     },
+    async openLocalRoute(projectId) {
+      const found = Object.values(get().routes).find((r) => r.projectId === projectId && r.local);
+      try {
+        const route = found ?? (await window.bw.localRoute(projectId));
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+        get().selectRoute(route.id);
+        get().refreshLocal(projectId);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+
+    refreshLocal(projectId) {
+      void window.bw.localStatus(projectId).then(
+        (status) => set((s) => ({ localStatus: { ...s.localStatus, [projectId]: status } })),
+        () => {},
+      );
+    },
+
+    openLocalPresets(projectId) {
+      get().loadLocalPresets(projectId);
+      set({ dialog: { kind: "local-presets", projectId } });
+    },
+
+    loadLocalPresets(projectId) {
+      if (projectId in get().localPresets) return;
+      void window.bw.localPresets(projectId).then(
+        (list) => set((s) => ({ localPresets: { ...s.localPresets, [projectId]: list } })),
+        () => {},
+      );
+    },
+
+    saveLocalPresets(projectId, presets) {
+      set((s) => ({ localPresets: { ...s.localPresets, [projectId]: presets } }));
+      void window.bw.setLocalPresets(projectId, presets).catch((e) => set({ error: message(e) }));
+    },
+
     async openLocal(projectId) {
       await window.bw.openLocal(projectId).catch((e) => set({ error: message(e) }));
     },
@@ -953,7 +1011,7 @@ export const useStore = create<State>((set, get) => {
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         const source = get().routes[routeId];
-        const from = source ? `${source.express ? `快${source.express}` : `${source.number}路`} 照常` : "";
+        const from = source ? `${routeLabel(source)} 照常` : "";
         get().showToast({ title: `已开出 快${route.express} ${route.name}`, detail: [firstQuestion.trim() ? "第一个问题已发出" : "停在摘要站，等你提问", from].filter(Boolean).join("，"), route });
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
       } catch (e) {
@@ -1022,7 +1080,7 @@ export const useStore = create<State>((set, get) => {
       const files = await window.bw.changes(routeId).catch(() => []);
       if (!force && !keepWorktree && files.length > 0) return files.map((f) => ({ path: f.path, note: f.kind }));
       await get().flushDelete();
-      const label = route.express ? `快${route.express}` : `${route.number}路`;
+      const label = routeLabel(route);
       const waiting = (get().queue[route.projectId] ?? []).filter((q) => q.routeId === routeId);
       const children = Object.values(get().routes).filter((r) => r.parentRouteId === routeId);
       // 界面上先拿掉；过几秒才真的删，这期间可以撤销
@@ -1175,11 +1233,11 @@ function summarize(input: Record<string, unknown>): string {
   return JSON.stringify(input).slice(0, 300);
 }
 
-/** 当前项目里没归档的路，按路号 */
+/** 当前项目里没归档的路，按路号。不含 Local 专车（它不在左栏、地图上，只在路线标签最左） */
 export function useRoutes(projectId: string | null): Route[] {
   const routes = useStore((s) => s.routes);
   return Object.values(routes)
-    .filter((r) => r.projectId === projectId && r.status !== "archived")
+    .filter((r) => r.projectId === projectId && r.status !== "archived" && !r.local)
     .sort((a, b) => a.number - b.number);
 }
 

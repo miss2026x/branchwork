@@ -13,9 +13,11 @@ import { PromptView } from "./PromptView";
 import imgCss from "./Images.module.css";
 import { IconChevron, IconClip, IconEdit, IconEye, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
-import { routeColors } from "../ui/route-color";
+import { routeColors, routeLabel } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
 import css from "./ChatPanel.module.css";
+import { LocalIntro, LocalNow, LocalPresetBar, LocalWaiting, runningDev } from "./LocalCar";
+import type { PresetChip } from "./local-presets";
 import { Md, StreamingMd } from "./Md";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
@@ -94,6 +96,12 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const ask = useStore((s) => s.ask);
   const stop = useStore((s) => s.stop);
   const answerPermission = useStore((s) => s.answerPermission);
+  const localStatus = useStore((s) => (route.local ? s.localStatus[route.projectId] : undefined));
+  const openLocalPresets = useStore((s) => s.openLocalPresets);
+  const dev = route.local ? runningDev(terminals) : undefined;
+  /** 点了哪条常用提示、填进去的是什么、填之前输入框里本来写着什么（再点一次撤回用） */
+  const [picked, setPicked] = useState<{ id: string; text: string; before: string } | null>(null);
+  const pickedNow = picked && draft === picked.text ? picked.id : null;
 
   const colors = routeColors(route);
   const busy = route.status === "answering" || route.status === "awaiting_permission";
@@ -179,6 +187,22 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
       void ask(route.id, q.text, q.images);
     }
   };
+  const pickPreset = (chip: PresetChip, direct: boolean) => {
+    if (direct) {
+      if (busy) onQueue(chip.text, queueMode, []);
+      else void ask(route.id, chip.text, []);
+      setPicked(null);
+      return;
+    }
+    if (pickedNow === chip.preset.id) {
+      setDraft(route.id, picked!.before, []);
+      setPicked(null);
+    } else {
+      setPicked({ id: chip.preset.id, text: chip.text, before: pickedNow ? picked!.before : draft });
+      setDraft(route.id, chip.text, []);
+    }
+    input.current?.focus();
+  };
   const canDrop = !viewing && !blocked;
   const fileCount = (e: React.DragEvent) => [...e.dataTransfer.items].filter((i) => i.kind === "file").length;
 
@@ -237,7 +261,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
       <div className={css.meta}>
         <div className={css.metaRow}>
           <span className="ell">
-            {parent && !route.express && offset > 0 ? `从 ${parent.number}路第 ${offset} 站分出` : parent && route.express ? `从 ${parent.number}路 提炼开出` : "自己的工作区"}
+            {route.local ? `直接在 ${route.worktreePath} 里 · 不建工作区` : parent && !route.express && offset > 0 ? `从 ${parent.number}路第 ${offset} 站分出` : parent && route.express ? `从 ${parent.number}路 提炼开出` : "自己的工作区"}
             {route.sessionId ? `，会话 ${route.sessionId.slice(0, 8)}` : ""}
           </span>
           {route.contextTokens !== null && (
@@ -258,6 +282,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           </span>
           <IconChevron size={14} />
         </button>
+        {route.local && <LocalNow status={localStatus} dev={dev} dir={route.worktreePath} compact={stops.length > 0} />}
       </div>
 
       <div
@@ -281,7 +306,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <span>{firstStops(offset)}随 {parent.number}路 带来，Claude 记得{offset > 1 ? "它们" : "它"}</span>
           </button>
         )}
-        {stops.length === 0 && pending === undefined && <p className={css.hint}>{offset > 0 ? "这一路还没有自己的站。在下面写第一个问题，发车。" : "这一路还没有站。在下面写第一个问题，发车。"}</p>}
+        {route.local && stops.length === 0 && pending === undefined && <LocalIntro dir={route.worktreePath} />}
+        {!route.local && stops.length === 0 && pending === undefined && <p className={css.hint}>{offset > 0 ? "这一路还没有自己的站。在下面写第一个问题，发车。" : "这一路还没有站。在下面写第一个问题，发车。"}</p>}
 
         {shown.map((s) => {
           const l = live[s.id];
@@ -312,7 +338,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               {s.status === "interrupted" && (
                 <>
                 <p className={css.noteAmber}>
-                  没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（已停车）"}。这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。{" "}
+                  没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（已停车）"}。{route.local ? "专车直接改 Local：已经做了的改动就在 Local 里，接着问可以让它做完。" : "这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。"}{" "}
                   {s.syncState === "unsynced" && (
                     <button className={css.inlineLink} onClick={onViewChanges}>
                       看改了什么
@@ -380,7 +406,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 </div>
               </div>
             </div>
-            {queued > 0 && <small>候车区里排给 {route.express ? `快${route.express}` : `${route.number}路`} 的问题，会等这一站结束后再发。</small>}
+            {queued > 0 && <small>候车区里排给 {routeLabel(route)} 的问题，会等这一站结束后再发。</small>}
           </section>
         )}
 
@@ -389,7 +415,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <div className={css.ask} style={{ background: colors.tint }}>
               <PromptView text={pending} images={pendingImages} title="正在发出的提问" />
             </div>
-            <p className={css.waiting}>正在把 Local 的新变化带进这一路…</p>
+            <p className={css.waiting}>{route.local ? "正在看一眼 Local 现在的样子…" : "正在把 Local 的新变化带进这一路…"}</p>
           </section>
         )}
       </div>
@@ -474,7 +500,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         {busy && current && (
           <div className={css.statusRow}>
             <span className="ell">
-              第 {num(current)} 站还在回答，写好的先进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${route.express ? `快${route.express}` : `${route.number}路`} 候车`}
+              第 {num(current)} 站还在回答，写好的先进{queueMode === "unassigned" ? "候车区，先不派车" : ` ${routeLabel(route)} 候车`}
             </span>
             <div className={css.seg} role="radiogroup" aria-label="排队方式">
               {(["auto", "manual", "unassigned"] as const).map((m) => (
@@ -488,9 +514,11 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         {route.status === "interrupted" && (
           <p className={`${css.statusRow} ${css.afterStop}`}>
             <i aria-hidden />
-            <span className="ell">上一站没答完，改动还在工作区。接着问，下一站答完一起进 Local</span>
+            <span className="ell">{route.local ? "上一站没答完，已经做的改动就在 Local 里" : "上一站没答完，改动还在工作区。接着问，下一站答完一起进 Local"}</span>
           </p>
         )}
+        {route.local && <LocalWaiting projectId={route.projectId} />}
+        {route.local && !blocked && !busy && <LocalPresetBar route={route} status={localStatus} dev={dev} activeId={pickedNow} onPick={pickPreset} onManage={() => openLocalPresets(route.projectId)} />}
         {/* 设计稿 4-6：输入框、这一路的三个选择、发车按钮在同一个框里 */}
         <div className={css.box} data-disabled={blocked}>
           <PromptInput
@@ -502,7 +530,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             onEnter={send}
             newId={draftId}
             label="下一个问题"
-            placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，到站后自动发" : route.status === "interrupted" ? "接着说，比如：继续，把测试也补上" : "写下一个问题。Enter 发车，Shift+Enter 换行；图片可以直接粘贴、拖进来"}
+            placeholder={blocked ? "先解决冲突" : busy ? "这一站还在路上。写下一个问题，到站后自动发" : route.status === "interrupted" ? "接着说，比如：继续，把测试也补上" : route.local ? "让 Claude 在 Local 里做点什么，或者点上面的常用。Enter 发车，Shift+Enter 换行" : "写下一个问题。Enter 发车，Shift+Enter 换行；图片可以直接粘贴、拖进来"}
             disabled={blocked}
           />
           <div className={css.toolbar}>
@@ -510,9 +538,9 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
                 <IconClip size={16} />
               </button>
-              <PermissionModeControl mode={permissionMode} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
-              <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={onModel} />
-              <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={route.express ? `快${route.express}` : `${route.number}路`} onChange={(effort) => onModel(route.model, effort)} />
+              <PermissionModeControl mode={permissionMode} routeLabel={routeLabel(route)} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
+              <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={routeLabel(route)} onChange={onModel} />
+              <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={routeLabel(route)} onChange={(effort) => onModel(route.model, effort)} />
             </div>
             <button className={css.send} style={{ background: colors.tag }} disabled={blocked || status !== "ok"} title={status === "loading" ? "图片还在处理，等一下" : status === "bad" ? "有图片读不了：去掉它或换一张" : undefined} onClick={send}>
               {busy ? "排队" : route.status === "interrupted" ? "接着问" : "发车"} <kbd>↵</kbd>
@@ -553,6 +581,7 @@ export function activityText(a: RouteActivity): string {
   if (a.kind === "thinking") return "在想";
   if (a.kind === "writing") return a.target ? `正在写 ${baseName(a.target)}` : `正在准备 ${a.tool}`;
   if (a.kind === "running") return `在跑 ${a.tool === "Bash" ? a.detail : `${a.tool} ${baseName(a.detail)}`}`;
+  if (a.kind === "waiting-local") return "已到站 · 等 Local 专车这一站做完再进 Local";
   return `正在停车 · ${a.step}`;
 }
 

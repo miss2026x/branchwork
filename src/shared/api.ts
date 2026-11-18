@@ -1,6 +1,6 @@
 import type { BwListener, PermissionDecision } from "./events";
 import type { PromptImage } from "./images";
-import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
+import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, LocalPreset, LocalStatus, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -70,6 +70,14 @@ export interface BwApi {
    * images：带的图片；text 里用“[图 N]”标出第 N 张图的位置
    */
   ask(routeId: string, text: string, images?: PromptImage[]): Promise<void>;
+  /** 这个项目的 Local 专车（设计稿 9-10）；还没有就开一辆 */
+  localRoute(projectId: string): Promise<Route>;
+  /** Local 现在的样子；之后有变化走 local.status 事件 */
+  localStatus(projectId: string): Promise<LocalStatus>;
+  /** 专车的常用提示；没改过是 null，用自带的 */
+  localPresets(projectId: string): Promise<LocalPreset[] | null>;
+  /** 存专车的常用提示；null 恢复自带的 */
+  setLocalPresets(projectId: string, presets: LocalPreset[] | null): Promise<void>;
   /** 一站的提问、或候车区一个问题带的图片 */
   images(ownerId: string): Promise<PromptImage[]>;
   /** 从某一站开一条新的路（新会话、新工作区，带着到这一站为止的历史） */

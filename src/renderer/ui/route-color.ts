@@ -12,7 +12,8 @@ export const ROUTE_COLORS: [number, string][] = [1, 2, 3, 8, 4, 5, 6, 7].map((n)
  * 一路的四个颜色（设计稿“颜色”画板）：线（地图上的线和站）、角标（压白字，2 路用深一档的橙）、
  * 浅底（选中行、提问气泡）、深字（浅底上的字、“回答中”）。自己挑过颜色的用挑的，否则按路号轮着取
  */
-export function routeColors(route: Pick<Route, "number" | "express"> & { color?: number | null }) {
+export function routeColors(route: Pick<Route, "number" | "express"> & { color?: number | null; local?: boolean }) {
+  if (route.local) return { line: "var(--local)", tag: "var(--local)", tint: "var(--local-bg)", text: "var(--local-text)", faded: "color-mix(in srgb, var(--local) 34%, var(--canvas))" };
   if (route.express) {
     const c = "var(--express)";
     return { line: c, tag: c, tint: "var(--express-bg)", text: "var(--express-text)", faded: `color-mix(in srgb, ${c} 34%, var(--canvas))` };
@@ -26,4 +27,9 @@ export function routeColors(route: Pick<Route, "number" | "express"> & { color?:
     /** 没选中时线和站的颜色：往画布底色上靠，但不透明（透明的话叠在别的线上会透出来） */
     faded: `color-mix(in srgb, ${v(n, "")} 34%, var(--canvas))`,
   };
+}
+
+/** 一路的叫法：1路、快2；Local 专车就叫 Local 专车 */
+export function routeLabel(route: Pick<Route, "number" | "express"> & { local?: boolean }): string {
+  return route.local ? "Local 专车" : route.express ? `快${route.express}` : `${route.number}路`;
 }

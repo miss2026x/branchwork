@@ -4,6 +4,7 @@ import { IconClose, IconStop, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { since } from "./TerminalStrip";
 import css from "./Terminal.module.css";
+import { routeLabel } from "../ui/route-color";
 
 interface Props {
   terminal: Terminal;
@@ -30,7 +31,7 @@ export function TerminalDialog({ terminal: t, route, output, stopLabel, onStop, 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  const label = route.express ? `快${route.express}` : `${route.number}路`;
+  const label = routeLabel(route);
   const running = t.status === "running";
 
   return (

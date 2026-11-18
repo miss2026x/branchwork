@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, Project, PromptImage, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, LocalPreset, Project, PromptImage, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -31,6 +31,7 @@ export function installMockBw(): void {
   const logs = new Map<string, SyncLogEntry[]>();
   const aborts = new Map<string, () => void>();
   let queue: QueueItem[] = [];
+  const presets = new Map<string, LocalPreset[]>();
   const permissions = new Map<string, (d: string) => void>();
 
   // 和真的 Claude Code（2026-11）报的一样：常用的别名在前，后面是具体型号
@@ -334,6 +335,40 @@ export function installMockBw(): void {
       return named;
     },
     images: async (ownerId) => images.get(ownerId) ?? [],
+    async localRoute(projectId) {
+      const found = [...routes.values()].find((r) => r.projectId === projectId && r.local);
+      if (found) return found;
+      const p = projects.find((x) => x.id === projectId)!;
+      const r: Route = { ...addRoute(projectId, "Local 专车"), number: 0, local: true, worktreePath: p.localDir };
+      routes.set(r.id, r);
+      emit({ type: "route.updated", route: r });
+      return r;
+    },
+    // 演示用的 Local 现状（设计稿 9-10）：落后远端 3 个提交，5 个文件没提交，前 3 个是 1路 带进来的
+    async localStatus(projectId) {
+      const rs = [...routes.values()].filter((r) => r.projectId === projectId && !r.local);
+      const by = (i: number) => (rs[i] ? { routeId: rs[i]!.id, stopId: [...stops.values()].find((s) => s.routeId === rs[i]!.id)?.id ?? null } : null);
+      const conflict = q.has("local-conflict");
+      return {
+        projectId,
+        missing: false,
+        branch: "main",
+        upstream: "origin/main",
+        ahead: 1,
+        behind: 3,
+        files: [
+          { path: "src/auth/login-flow.ts", state: "added" as const, by: by(0) },
+          { path: "src/routes.ts", state: conflict ? ("conflict" as const) : ("modified" as const), by: by(0) },
+          { path: "src/auth/session.ts", state: "modified" as const, by: by(0) },
+          { path: "src/auth/github.ts", state: "added" as const, by: by(1) },
+          { path: "package.json", state: "modified" as const, by: by(1) },
+        ],
+        commands: { dev: "pnpm dev", test: "pnpm test" },
+        at: Date.now(),
+      };
+    },
+    localPresets: async (projectId) => presets.get(projectId) ?? null,
+    setLocalPresets: async (projectId, list) => void (list ? presets.set(projectId, list) : presets.delete(projectId)),
     async ask(routeId, text, pics) {
       const r = routes.get(routeId)!;
       if (r.status === "answering" || r.status === "awaiting_permission") throw new Error("这一路正在回答，等它到站或先停车");

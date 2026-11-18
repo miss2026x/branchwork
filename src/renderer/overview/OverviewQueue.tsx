@@ -99,7 +99,7 @@ export function OverviewQueue({ projects, routes, queue, currentProjectId, onAdd
             {loose.map((q) => {
               const open = dispatch?.id === q.id;
               const choices = Object.values(routes)
-                .filter((r) => r.projectId === q.projectId && r.status !== "archived")
+                .filter((r) => r.projectId === q.projectId && r.status !== "archived" && !r.local)
                 .sort((a, b) => a.number - b.number);
               return (
                 <div key={q.id} className={css.loose} data-open={open}>
