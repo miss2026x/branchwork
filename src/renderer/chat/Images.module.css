@@ -17,9 +17,13 @@
   outline: none;
   cursor: text;
 }
+/* 占位文字：横向铺满输入框（左右留和输入框一样的边距），不随外层收窄变成一字一行 */
 .editor[data-empty]::before {
   content: attr(data-placeholder);
   position: absolute;
+  left: 0;
+  right: 0;
+  padding-inline: inherit;
   color: var(--fg-4);
   pointer-events: none;
 }

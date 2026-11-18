@@ -39,7 +39,7 @@ export function FirstRoute({ project, onStart, onMore }: { project: Project | un
         <div className={css.firstInput}>
           <PromptInput ref={input} text={question.text} images={question.images} onChange={question.set} onImage={question.patch} onEnter={start} newId={draftId} label="第一站" placeholder="比如：先帮我梳理一下现在的认证结构" />
         </div>
-        <div>
+        <div className={css.firstActions}>
           <button type="button" className={css.firstAttach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" onClick={() => input.current?.pickFiles()}>
             <IconClip size={16} />
           </button>

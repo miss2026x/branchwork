@@ -417,13 +417,13 @@
   background: var(--surface-2);
   color: var(--fg-1);
 }
-.firstCard > div {
+.firstActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-8);
 }
-.firstCard > div span {
+.firstActions > span {
   flex: 1;
   font-size: var(--fs-12);
   color: var(--fg-3);

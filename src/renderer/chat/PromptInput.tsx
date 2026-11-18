@@ -81,6 +81,8 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
   /** 上一次读到或画上去的内容；和外面传进来的一样就不重画（重画会丢光标） */
   const last = useRef<string | null>(null);
   const composing = useRef(false);
+  /** 正在用输入法拼字：拼的字还没进 text，但占位文字要先藏起来，免得和拼音叠在一起 */
+  const [imeOpen, setImeOpen] = useState(false);
   /** 最后一次光标在输入框里的位置（拖到对话栏别处、点回形针时插在这里） */
   const lastRange = useRef<Range | null>(null);
   /** 从输入框复制出去的文字，和里面的图（粘贴回来时还原成标签） */
@@ -402,7 +404,7 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
         aria-label={label}
         aria-disabled={disabled || undefined}
         data-placeholder={placeholder}
-        data-empty={empty || undefined}
+        data-empty={(empty && !imeOpen) || undefined}
         data-compact={compact || undefined}
         contentEditable={!disabled}
         suppressContentEditableWarning
@@ -413,8 +415,8 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
           // 撤销找回来的东西是选中的，接着打字会把它换掉：光标放到它后面
           if ((e.nativeEvent as InputEvent).inputType === "historyUndo") getSelection()?.collapseToEnd();
         }}
-        onCompositionStart={() => (composing.current = true)}
-        onCompositionEnd={() => ((composing.current = false), sync())}
+        onCompositionStart={() => ((composing.current = true), setImeOpen(true))}
+        onCompositionEnd={() => ((composing.current = false), setImeOpen(false), sync())}
         onKeyDown={onKeyDown}
         onCopy={(e) => onCopy(e)}
         onCut={(e) => onCopy(e, true)}
