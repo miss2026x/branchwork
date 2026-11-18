@@ -242,6 +242,9 @@
   pointer-events: none;
 }
 .live > em:first-child {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-style: normal;
   font-size: var(--fs-12);
   font-weight: 700;

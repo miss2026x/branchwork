@@ -54,7 +54,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resolveConflict", "resync", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -116,7 +116,13 @@ describe("应用", () => {
     await page.keyboard.press("Enter");
     await expect.poll(() => page.getByRole("button", { name: "停车" }).isVisible(), { timeout: 30000 }).toBe(true);
     await page.getByRole("button", { name: "停车" }).click();
+    // 点下去马上变成“正在停车”，按钮不能再点（设计稿 4-8）
+    const stopping = page.getByRole("status").filter({ hasText: "正在停车 · 等 Claude 停下" });
+    await expect.poll(() => stopping.isVisible(), { timeout: 2000 }).toBe(true);
+    expect(await stopping.getByRole("button", { name: /停车中/ }).isDisabled()).toBe(true);
+    await shot("5-stopping");
     await expect.poll(() => page.getByText("第 3 站没答完").isVisible(), { timeout: 30000 }).toBe(true);
+    expect(await stopping.count()).toBe(0);
     expect(await page.getByText(/上一站没答完，改动还在工作区/).isVisible()).toBe(true);
     await shot("5-interrupted");
   });
@@ -440,6 +446,24 @@ describe("应用", () => {
     expect(reply).toBe("var(--shiki-token-keyword)");
   });
 
+  it("在做什么（设计稿 4-8）：在想（数秒、能展开看想的内容）→ 正在写文件（字数跟着涨）；地图上那一站也写着", async () => {
+    await composer().click();
+    await page.keyboard.type("想一想再写");
+    await page.keyboard.press("Enter");
+    const log = page.getByRole("log");
+    await expect.poll(() => log.getByText("在想", { exact: true }).isVisible(), { timeout: 30000 }).toBe(true);
+    expect(await page.locator("section[data-pane='map']").getByText("在想", { exact: true }).isVisible()).toBe(true);
+    await log.getByRole("button", { name: "看它在想什么" }).click();
+    await expect.poll(() => log.getByText(/先看一下要改哪里/).isVisible()).toBe(true);
+    await shot("35-thinking");
+    await expect.poll(() => log.getByText(/已生成 \d/).isVisible(), { timeout: 30000 }).toBe(true);
+    expect(await page.getByText("· 正在写 demo-notes.md").isVisible()).toBe(true);
+    expect(await page.locator("section[data-pane='map']").getByText("正在写 demo-notes.md").isVisible()).toBe(true);
+    await shot("36-writing");
+    await expect.poll(() => page.getByRole("button", { name: "停车" }).count(), { timeout: 60000 }).toBe(0);
+    expect(await log.getByText("在想", { exact: true }).count()).toBe(0);
+  });
+
   it("模型、起名、后台终端：选模型；站名稍后换成小模型起的；Claude 开的终端在一站结束后还在，能看输出、能停", async () => {
     // 列表是从 Claude Code 读的（演示模式下是假的三个）
     await page.getByRole("button", { name: /^模型：Default/ }).click();
@@ -696,8 +720,21 @@ describe("应用", () => {
     expect(await dialog.getByText(/4 问/).isVisible()).toBe(true);
     await dialog.getByRole("checkbox").first().check();
     await shot("33-import");
+    // 导入时有进度（设计稿 4-8）：每个会话一行，做到哪一步；导好了窗口自己关掉
+    const seen: string[] = [];
+    await page.exposeFunction("__importSeen", (t: string) => seen.push(t));
+    await page.evaluate(() => {
+      const mo = new MutationObserver(() => {
+        const d = document.querySelector('[role="dialog"][aria-label="正在导入"]');
+        if (d) (window as unknown as { __importSeen(t: string): void }).__importSeen(d.textContent ?? "");
+      });
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
     await dialog.getByRole("button", { name: "导入 1 个" }).click();
     await expect.poll(() => page.getByRole("heading", { name: "看一下 session 过期问题" }).isVisible(), { timeout: 30000 }).toBe(true);
+    expect(seen.some((t) => t.includes("看一下 session 过期问题") && /复制会话|读出每一站|建工作区/.test(t))).toBe(true);
+    await expect.poll(() => page.getByRole("dialog", { name: "正在导入" }).count()).toBe(0);
+    expect(await page.getByRole("button", { name: "正在导入，点开看进度" }).count()).toBe(0);
     await expect.poll(() => page.getByText("已到第 4 站").isVisible(), { timeout: 30000 }).toBe(true);
     // 已经导入过的不再列出来
     await page.getByRole("button", { name: "my-project 的菜单" }).click();

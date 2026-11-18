@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createClaudeClient, promptBlocks, type ClaudeEvent, type SdkFunctions } from "../../src/claude";
+import { inputProgress } from "../../src/claude/sdk-client";
 
 type Msg = Record<string, unknown>;
 const init = { type: "system", subtype: "init", session_id: "S1" };
@@ -40,6 +41,42 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
   };
   return fns;
 }
+
+describe("在做什么（设计稿 4-8）：在想、生成工具参数、工具跑完", () => {
+  const ev = (event: unknown) => ({ type: "stream_event", parent_tool_use_id: null, event });
+  it("把 SDK 的流事件变成：在想（带内容）、正在生成参数（字数、认出的文件名）、工具跑完", async () => {
+    const big = JSON.stringify({ file_path: "/wt/src/LoginFlow.ts", content: "a\n".repeat(300) });
+    const events: ClaudeEvent[] = [];
+    const client = createClaudeClient(
+      fakeSdk([
+        init,
+        ev({ type: "content_block_start", index: 0, content_block: { type: "thinking" } }),
+        ev({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "先读一下" } }),
+        ev({ type: "content_block_stop", index: 0 }),
+        ev({ type: "content_block_start", index: 1, content_block: { type: "tool_use", name: "Write" } }),
+        ev({ type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: big.slice(0, 40) } }),
+        ev({ type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: big.slice(40) } }),
+        ev({ type: "content_block_stop", index: 1 }),
+        { type: "user", parent_tool_use_id: null, message: { content: [{ type: "tool_result", is_error: false }] } },
+        success,
+      ]),
+    );
+    await client.ask({ cwd: "/wt", prompt: "写", onEvent: (e) => events.push(e) });
+    expect(events.filter((e) => e.type !== "started" && e.type !== "answered")).toEqual([
+      { type: "thinking", text: "" },
+      { type: "thinking", text: "先读一下" },
+      { type: "tool-input", tool: "Write", chars: 0, lines: 0 },
+      { type: "tool-input", tool: "Write", chars: 40, lines: 1, target: "/wt/src/LoginFlow.ts" },
+      { type: "tool-input", tool: "Write", chars: big.length, lines: 301, target: "/wt/src/LoginFlow.ts" },
+      { type: "tool-result", error: false },
+    ]);
+  });
+  it("生成到一半的参数：认出文件名或命令（转义的字符还原），数出几行", () => {
+    expect(inputProgress('{"command":"npm test -- \\"auth\\"","desc')).toEqual({ chars: 39, lines: 1, target: 'npm test -- "auth"' });
+    expect(inputProgress('{"file_path":"C:\\\\a.ts","content":"x\\ny\\nz')).toMatchObject({ lines: 3, target: "C:\\a.ts" });
+    expect(inputProgress("")).toEqual({ chars: 0, lines: 0 });
+  });
+});
 
 describe("提问带图片（设计稿 4-7）", () => {
   const png = { type: "image/png" as const, data: "AAAA", name: "a.png", width: 4, height: 4 };

@@ -1,0 +1,150 @@
+/* 导入终端会话的进度（设计稿 4-8） */
+.count {
+  margin-left: var(--sp-6);
+  font-size: var(--fs-14);
+  font-weight: 500;
+  color: var(--fg-3);
+}
+.bar {
+  height: 6px;
+  margin: var(--sp-4) 0 var(--sp-12);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--info);
+  transition: width var(--t-slow) var(--ease);
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  padding: var(--sp-10) var(--sp-12);
+  border-radius: var(--r-10);
+}
+.list li[data-state="running"] {
+  background: var(--info-bg);
+}
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.text b {
+  font-size: var(--fs-13);
+  color: var(--fg-1);
+}
+.text small {
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+  color: var(--fg-3);
+}
+.list li[data-state="waiting"] .text b,
+.list li[data-state="skipped"] .text b {
+  color: var(--fg-3);
+}
+.list li[data-state="failed"] .text small {
+  color: var(--red-text);
+}
+.list em {
+  flex: none;
+  font-size: var(--fs-12);
+  font-style: normal;
+  color: var(--fg-3);
+}
+.list li[data-state="running"] em {
+  font-weight: 600;
+  color: var(--info-text);
+}
+/* 左边的状态：空圈（等着）、转圈（在导）、勾（好了）、叉（没导成） */
+.mark {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--border);
+  border-radius: var(--r-round);
+}
+.list li[data-state="running"] .mark {
+  border-top-color: var(--info);
+  animation: spin var(--t-spin) linear infinite;
+}
+.list li[data-state="done"] .mark {
+  border: none;
+  background: var(--green);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12l5 5L20 7' stroke='currentColor' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.list li[data-state="failed"] .mark {
+  border-color: var(--red);
+}
+/* 放到后台：左下角一枚深色小条 */
+.pill {
+  position: fixed;
+  z-index: 40;
+  left: var(--sp-16);
+  bottom: 72px; /* 例外：放在左栏“新对话”按钮上面，不挡住它 */
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-10);
+  height: var(--h-40);
+  padding: 0 var(--sp-16) 0 var(--sp-12);
+  border-radius: var(--r-pill);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-size: var(--fs-13);
+  box-shadow: var(--e-dark);
+  animation: rise var(--t-base) var(--ease);
+}
+.pill span {
+  min-width: 0;
+  color: var(--on-dark-2);
+}
+.pill em {
+  flex: none;
+  font-style: normal;
+  font-weight: 600;
+}
+.spin {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--on-dark-hover);
+  border-top-color: var(--fg-on-color);
+  border-radius: var(--r-round);
+  animation: spin var(--t-spin) linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .list li[data-state="running"] .mark,
+  .spin,
+  .pill {
+    animation: none;
+  }
+}

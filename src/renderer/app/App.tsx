@@ -13,9 +13,10 @@ import { Overview } from "../overview/Overview";
 import { ForkDialog } from "../dialogs/ForkDialog";
 import { TerminalDialog } from "../terminal/TerminalDialog";
 import { ordinal, stopOffset } from "../stores/numbering";
-import { ChatPanel } from "../chat/ChatPanel";
+import { activityText, ChatPanel } from "../chat/ChatPanel";
 import { ImageViewer } from "../chat/ImageViewer";
 import { StopImages } from "../chat/StopImages";
+import { ImportPill, ImportProgressDialog } from "../dialogs/ImportProgress";
 import { Notices } from "../notices/Notices";
 import { Settings } from "./Settings";
 import { Welcome } from "./Welcome";
@@ -69,6 +70,11 @@ export function App() {
   const toast = useStore((s) => s.toast);
   const dismissToast = useStore((s) => s.dismissToast);
   const importSessions = useStore((s) => s.importSessions);
+  const activities = useStore((s) => s.activity);
+  const imports = useStore((s) => s.imports);
+  const importShown = useStore((s) => s.importShown);
+  const showImport = useStore((s) => s.showImport);
+  const importCancel = useStore((s) => s.importCancel);
   const removeProject = useStore((s) => s.removeProject);
   const lastSync = useStore((s) => s.lastSync);
   const openSystemTerminal = useStore((s) => s.openSystemTerminal);
@@ -550,6 +556,7 @@ export function App() {
                       <>
                         <RouteMap
                           resizing={!!anim}
+                          activityLabel={(routeId) => (activities[routeId] ? activityText(activities[routeId]!) : null)}
                           stopImages={(stop) => <StopImages ownerId={stop.id} count={stop.images ?? 0} title={`第 ${stopNumber(stop)} 站`} />}
                           routes={routes}
                           stops={projectStops}
@@ -861,6 +868,14 @@ export function App() {
         </div>
       )}
       <ImageViewer />
+      {/* 导入终端会话的进度（设计稿 4-8）：窗口，或放到后台时左下角的小条 */}
+      {importShown && imports[importShown] && <ImportProgressDialog progress={imports[importShown]!} onBackground={() => showImport(null)} onCancel={() => importCancel(importShown)} onClose={() => showImport(null)} />}
+      {Object.values(imports)
+        .filter((p) => !p.finished && p.jobId !== importShown)
+        .slice(0, 1)
+        .map((p) => (
+          <ImportPill key={p.jobId} progress={p} onOpen={() => showImport(p.jobId)} />
+        ))}
     </div>
   );
 }

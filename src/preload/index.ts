@@ -28,6 +28,7 @@ const api: BwApi = {
   environment: call("environment"),
   terminalSessions: call("terminalSessions"),
   importSessions: call("importSessions"),
+  importCancel: call("importCancel"),
   projectLog: call("projectLog"),
   openLocal: call("openLocal"),
   openSystemTerminal: call("openSystemTerminal"),

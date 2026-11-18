@@ -1,4 +1,4 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, Project, PromptImage, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, Project, PromptImage, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -11,6 +11,7 @@ export function installMockBw(): void {
   const slow = q.has("slow") ? 6 : 1;
   const listeners = new Set<BwListener>();
   const emit = (e: BwEvent) => listeners.forEach((l) => l(e));
+  const importCancelled = new Set<string>();
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms * slow));
   let n = 0;
   const id = (p: string) => `${p}${++n}`;
@@ -231,7 +232,29 @@ export function installMockBw(): void {
             { id: "t1", title: "看一下 session 过期问题", questions: 4, lastModified: Date.now() - 6 * 86_400_000 },
             { id: "t2", title: "升级依赖", questions: 2, lastModified: Date.now() - 32 * 86_400_000 },
           ],
-    importSessions: async () => [],
+    // 演示导入的进度（设计稿 4-8）：每个会话三步，各磨蹭一会儿；不真的画出路来
+    async importSessions(projectId, ids) {
+      const titles: Record<string, string> = { t1: "看一下 session 过期问题", t2: "升级依赖" };
+      const progress: ImportProgress = { jobId: id("i"), projectId, items: ids.map((sid) => ({ sessionId: sid, title: titles[sid] ?? sid, prompts: null, state: "waiting" as const })), finished: false };
+      importCancelled.delete(progress.jobId);
+      const report = () => emit({ type: "import.progress", progress: structuredClone(progress) });
+      report();
+      for (const item of progress.items) {
+        if (importCancelled.has(progress.jobId)) break;
+        for (const step of ["复制会话", "读出每一站", "建工作区"]) {
+          Object.assign(item, { state: "running", step });
+          report();
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+        Object.assign(item, { state: "done", step: undefined, prompts: 4 });
+        report();
+      }
+      for (const item of progress.items) if (item.state === "waiting") item.state = "skipped";
+      progress.finished = true;
+      report();
+      return [];
+    },
+    importCancel: async (jobId) => void importCancelled.add(jobId),
     droppedPath: (file) => `/Users/me/code/${file.name}`,
     inspectDirectory: async (dir) => ({ dir, name: dir.split(/[\\/]/).filter(Boolean).at(-1) ?? dir, exists: true, isRepo: !dir.includes("bad"), branch: "main", dirty: dir.includes("dirty") ? 3 : 0, hasClaudeMd: true, projectId: null }),
     projectLog: async (projectId) => {

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage, RunSettings } from "../../src/claude";
+import type { AskOptions, AskResult, ClaudeClient, ClaudeEvent, ClaudeTool, HistoryMessage, RunSettings } from "../../src/claude";
 import type { ClaudeOptions, PermissionDecision } from "../../src/shared";
 
 export interface FakeTurn {
@@ -11,6 +11,8 @@ export interface FakeTurn {
   signal: AbortSignal;
   say(text: string): void;
   tool(name: string, input?: Record<string, unknown>): void;
+  /** 发一个任意的事件（在想、生成参数、工具跑完……） */
+  emit(event: ClaudeEvent): void;
   askPermission(tool: string, input?: Record<string, unknown>, canRemember?: boolean): Promise<PermissionDecision | { deny: string }>;
   /** 调用应用提供的工具（不经过批准），返回它给 Claude 看的文字 */
   callTool(name: string, input?: Record<string, unknown>): Promise<string>;
@@ -50,6 +52,7 @@ export class FakeClaude implements ClaudeClient {
           opts.onEvent?.({ type: "text", text: t });
         },
         tool: (name, input = {}) => opts.onEvent?.({ type: "tool", tool: name, input }),
+        emit: (event) => opts.onEvent?.(event),
         askPermission: (tool, input = {}, canRemember = true) => (opts.onPermission ? opts.onPermission({ tool, input, canRemember }) : Promise.resolve("deny")),
         callTool: (name, input = {}) => {
           const tool = this.tools.find((t) => t.name === name);

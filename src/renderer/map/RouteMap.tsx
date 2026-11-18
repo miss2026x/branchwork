@@ -64,6 +64,8 @@ interface Props {
   resizing?: boolean;
   /** 带图的站：悬停卡片里放一排小图（图片由外面去取、去显示） */
   stopImages?: (stop: Stop) => ReactNode;
+  /** 正在回答的那一站上方那行字：这一路此刻在做什么（设计稿 4-8，“在想”“正在写 a.ts”……）；没有就写“回答中” */
+  activityLabel?: (routeId: string) => string | null;
 }
 
 const MIN = 0.3;
@@ -86,7 +88,7 @@ function dotGrid(view: { k: number; x: number; y: number }): CSSProperties {
   return { backgroundSize: `${g}px ${g}px`, backgroundPosition: `${snap(view.x)}px ${snap(view.y)}px` };
 }
 
-export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages }: Props) {
+export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages, activityLabel }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -390,6 +392,7 @@ export function RouteMap({ routes, stops, queue = [], selectedRouteId, onSelectR
             <LaneNodes
               key={lane.route.id}
               lane={lane}
+              activity={activityLabel?.(lane.route.id) ?? null}
               waiting={queue.filter((q) => q.routeId === lane.route.id)}
               on={lane.route.id === selectedRouteId}
               ringed={ringed}
@@ -756,6 +759,8 @@ function menuPlace(x: number, y: number, k: number, box: HTMLElement | null): { 
 
 interface LaneProps {
   lane: Lane;
+  /** 这一路此刻在做什么（一句话） */
+  activity: string | null;
   waiting: QueueItem[];
   on: boolean;
   ringed: string | null;
@@ -772,7 +777,7 @@ interface LaneProps {
   onDropItem(item: QueueItem, routeId: string, mode: QueueMode): void;
 }
 
-function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, onSelect, onStop, onStopMenu, onRename, onHover, dragging, onDropItem }: LaneProps) {
+function LaneNodes({ lane, activity, waiting, on, ringed, viewingStopId, number, detail, onSelect, onStop, onStopMenu, onRename, onHover, dragging, onDropItem }: LaneProps) {
   const [over, setOver] = useState<QueueMode | null>(null);
   const colors = routeColors(lane.route);
   const line = on ? colors.line : colors.faded;
@@ -805,8 +810,8 @@ function LaneNodes({ lane, waiting, on, ringed, viewingStopId, number, detail, o
             {answering && (
               // 设计稿：站上方一行字，用线路的颜色；等批准时换成琥珀色。还在起名就并排放一个“起名中”
               <span className={css.live}>
-                <em style={lane.route.status === "awaiting_permission" ? undefined : { color: line }} data-waiting={lane.route.status === "awaiting_permission"}>
-                  {lane.route.status === "awaiting_permission" ? "等你批准" : "回答中"}
+                <em style={lane.route.status === "awaiting_permission" || activity?.startsWith("正在停车") ? undefined : { color: line }} data-waiting={lane.route.status === "awaiting_permission" || !!activity?.startsWith("正在停车")}>
+                  {lane.route.status === "awaiting_permission" ? "等你批准" : (activity ?? "回答中")}
                 </em>
                 {stop.nameState === "temp" && latest && detail === "full" && (
                   <em className={css.naming}>

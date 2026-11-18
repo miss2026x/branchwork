@@ -252,3 +252,23 @@ export interface StopContent {
   stopId: string;
   items: ChatItem[];
 }
+
+/** 一路此刻在做什么（设计稿 4-8）。since：这件事从什么时候开始（界面据此计时） */
+export type RouteActivity =
+  | { kind: "thinking"; since: number }
+  /** 正在生成一次工具调用的参数（写大文件时要几十秒）：已经生成的字数、行数，认出来的文件名或命令 */
+  | { kind: "writing"; tool: string; target?: string; chars: number; lines: number; since: number }
+  /** 工具在跑 */
+  | { kind: "running"; tool: string; detail: string; since: number }
+  /** 点了停车，正在停：step 是在等哪一步 */
+  | { kind: "stopping"; step: string; since: number };
+
+/** 导入终端会话的进度 */
+export interface ImportProgress {
+  jobId: string;
+  projectId: string;
+  /** 每个会话一行 */
+  items: { sessionId: string; title: string; prompts: number | null; state: "waiting" | "running" | "done" | "failed" | "skipped"; step?: string; error?: string }[];
+  /** 全部结束了（导完、出错或被停止） */
+  finished: boolean;
+}

@@ -22,7 +22,7 @@ interface SdkMessage {
   errors?: string[];
   result?: string;
   parent_tool_use_id?: string | null;
-  event?: { type: string; delta?: { type: string; text?: string } };
+  event?: { type: string; index?: number; delta?: { type: string; text?: string; thinking?: string; partial_json?: string }; content_block?: { type: string; name?: string } };
   message?: { content?: unknown };
 }
 
@@ -260,7 +260,12 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         }
       }
       turn.onPermission = opts.onPermission;
-      const onAbort = () => abort.abort();
+      // 停车：先请它停下；5 秒还没停下就强制结束进程（设计稿 4-8）
+      let force: ReturnType<typeof setTimeout> | undefined;
+      const onAbort = () => {
+        abort.abort();
+        force = setTimeout(() => (stream as { close?(): void } | null)?.close?.(), 5000);
+      };
       if (opts.signal?.aborted) abort.abort();
       opts.signal?.addEventListener("abort", onAbort, { once: true });
 
@@ -279,14 +284,34 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         stream ??= fns.query({ prompt: promptInput(opts.prompt, opts.images), options: processOptions(opts.cwd, opts.sessionId, opts, abort, turn, clientOpts, tools) });
         const title = titles();
         if (prewarmed) markStarted(); // 进程早就启动好了
+        /** 正在生成参数的那次工具调用：参数一段段来，记下字数，从里面认出文件名或命令 */
+        let toolInput: { tool: string; json: string; sent: number } | null = null;
         for await (const raw of stream) {
           const m = raw as SdkMessage;
           if (m.session_id) sessionId = m.session_id;
           if (m.type === "system" && m.subtype === "init") markStarted();
 
           if (m.type === "stream_event" && !m.parent_tool_use_id) {
-            const d = m.event?.delta;
-            if (m.event?.type === "content_block_delta" && d?.type === "text_delta" && d.text) opts.onEvent?.({ type: "text", text: d.text });
+            const ev = m.event;
+            const d = ev?.delta;
+            if (ev?.type === "content_block_delta" && d?.type === "text_delta" && d.text) opts.onEvent?.({ type: "text", text: d.text });
+            else if (ev?.type === "content_block_start" && ev.content_block?.type === "thinking") opts.onEvent?.({ type: "thinking", text: "" });
+            else if (ev?.type === "content_block_delta" && d?.type === "thinking_delta") opts.onEvent?.({ type: "thinking", text: d.thinking ?? "" });
+            else if (ev?.type === "content_block_start" && ev.content_block?.type === "tool_use" && ev.content_block.name) {
+              toolInput = { tool: title.get(ev.content_block.name) ?? ev.content_block.name, json: "", sent: 0 };
+              opts.onEvent?.({ type: "tool-input", tool: toolInput.tool, chars: 0, lines: 0 });
+            } else if (ev?.type === "content_block_delta" && d?.type === "input_json_delta" && toolInput) {
+              toolInput.json += d.partial_json ?? "";
+              // 参数一段段来得很碎：每多 400 字报一次
+              if (toolInput.json.length - toolInput.sent >= 400 || toolInput.sent === 0) {
+                toolInput.sent = toolInput.json.length;
+                opts.onEvent?.({ type: "tool-input", tool: toolInput.tool, ...inputProgress(toolInput.json) });
+              }
+            } else if (ev?.type === "content_block_stop") toolInput = null;
+          } else if (m.type === "user" && !m.parent_tool_use_id) {
+            // 工具的结果回来了：它跑完了
+            const results = asBlocks(m.message?.content).filter((b) => b.type === "tool_result");
+            if (results.length > 0) opts.onEvent?.({ type: "tool-result", error: results.some((b) => b.is_error === true) });
           } else if (m.type === "assistant" && !m.parent_tool_use_id) {
             const u = (m.message as { usage?: Record<string, unknown> } | undefined)?.usage;
             if (u) {
@@ -323,6 +348,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         }
       } finally {
         opts.signal?.removeEventListener("abort", onAbort);
+        clearTimeout(force);
         turn.onPermission = undefined;
       }
       if (abort.signal.aborted && outcome === "completed") outcome = "interrupted";
@@ -537,7 +563,7 @@ async function stopMessageIds(fns: SdkFunctions, sessionId: string, afterMessage
   }
 }
 
-function asBlocks(content: unknown): { type?: string; text?: unknown; name?: unknown; input?: unknown }[] {
+function asBlocks(content: unknown): { type?: string; text?: unknown; name?: unknown; input?: unknown; is_error?: unknown }[] {
   return Array.isArray(content) ? (content as { type?: string }[]) : [];
 }
 
@@ -557,6 +583,20 @@ function promptInput(text: string, images?: PromptImage[]): string | AsyncIterab
   return (async function* () {
     yield message;
   })();
+}
+
+/** 生成到一半的工具参数（JSON 还没写完）：已经生成了多少字、几行，认得出的文件名或命令 */
+export function inputProgress(json: string): { chars: number; lines: number; target?: string } {
+  const pick = (key: string) => new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(json)?.[1];
+  const raw = pick("file_path") ?? pick("path") ?? pick("command") ?? pick("pattern") ?? pick("url");
+  let target: string | undefined;
+  try {
+    target = raw === undefined ? undefined : (JSON.parse(`"${raw}"`) as string);
+  } catch {
+    target = raw;
+  }
+  // 参数里的换行是转义过的 \n：大致等于生成了几行
+  return { chars: json.length, lines: (json.match(/\\n/g)?.length ?? 0) + (json.length > 0 ? 1 : 0), ...(target ? { target } : {}) };
 }
 
 /** 用户自己打的提问（而不是工具结果） */

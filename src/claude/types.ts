@@ -14,7 +14,16 @@ export type ClaudeEvent =
   /** Claude 给出了这一站的结果；之后它的进程还要收尾退出，可能再花几秒 */
   | { type: "answered" }
   | { type: "text"; text: string }
-  | { type: "tool"; tool: string; input: Record<string, unknown> };
+  | { type: "tool"; tool: string; input: Record<string, unknown> }
+  /** 它在想（设计稿 4-8）：text 是想的内容（有的模型不给内容，只有空的开始） */
+  | { type: "thinking"; text: string }
+  /**
+   * 它在生成一次工具调用的参数（写大文件时要几十秒）：chars 是已经生成的字数，
+   * target 是从参数里认出来的文件名或命令（还没生成出来时为空）
+   */
+  | { type: "tool-input"; tool: string; chars: number; lines: number; target?: string }
+  /** 工具跑完了（结果回来了）；error：跑出错了 */
+  | { type: "tool-result"; error: boolean };
 
 export interface PermissionRequest {
   tool: string;

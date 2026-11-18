@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, PermissionDecision, PermissionMode, Project, PromptImage, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions } from "../../shared";
+import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions } from "../../shared";
 import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
@@ -85,6 +85,16 @@ interface State {
   pendingAsk: Record<string, string>;
   /** 那个提问带的图片 */
   pendingImages: Record<string, PromptImage[]>;
+  /** 每一路此刻在做什么（设计稿 4-8：在想、正在写文件、工具在跑、停车中） */
+  activity: Record<string, RouteActivity>;
+  /** 正在回答的站：它想的内容 */
+  thinking: Record<string, string>;
+  /** 导入终端会话的进度，按导入任务 */
+  imports: Record<string, ImportProgress>;
+  /** 正在显示进度窗口的导入任务；null：在后台（左下角小条） */
+  importShown: string | null;
+  /** 刚点了导入、进度窗口还没出现：等这个项目的第一条进度来了就打开 */
+  importAwaiting: string | null;
   permissions: Record<string, PendingPermission>;
   lastSync: Record<string, SyncLogEntry>;
   /** 各项目候车区里的问题 */
@@ -153,6 +163,9 @@ interface State {
   /** 确认移除；force：连没进 Local 的改动和留下的工作区一起删 */
   removeProject(force: boolean): Promise<void>;
   importSessions(projectId: string, sessionIds: string[]): Promise<void>;
+  /** 进度窗口：打开（看某个导入）、放到后台 */
+  showImport(jobId: string | null): void;
+  importCancel(jobId: string): void;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
   startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; permissionMode?: PermissionMode; question?: string; itemId?: string }): Promise<void>;
@@ -362,6 +375,26 @@ export const useStore = create<State>((set, get) => {
       case "stop.answered":
         set((s) => (s.live[e.stopId] ? { live: { ...s.live, [e.stopId]: { ...s.live[e.stopId]!, phase: "finishing" } } } : {}));
         break;
+      case "route.activity":
+        set((s) => {
+          const activity = { ...s.activity };
+          if (e.activity) activity[e.routeId] = e.activity;
+          else delete activity[e.routeId];
+          return { activity };
+        });
+        break;
+      case "stop.thinking":
+        set((s) => ({ thinking: { ...s.thinking, [e.stopId]: (s.thinking[e.stopId] ?? "") + e.text } }));
+        break;
+      case "import.progress": {
+        const p = e.progress;
+        set((s) => ({
+          imports: { ...s.imports, [p.jobId]: p },
+          // 刚点了导入（或添加项目时勾了导入）：第一条进度来了就打开进度窗口
+          ...(s.importAwaiting === p.projectId && !p.finished ? { importShown: p.jobId, importAwaiting: null, dialog: s.dialog?.kind === "import" ? null : s.dialog } : {}),
+        }));
+        break;
+      }
       case "stop.delta":
         set((s) => {
           const cur = s.live[e.stopId] ?? { phase: "answering" as const, items: [] };
@@ -466,6 +499,11 @@ export const useStore = create<State>((set, get) => {
     live: {},
     pendingAsk: {},
     pendingImages: {},
+    activity: {},
+    thinking: {},
+    imports: {},
+    importShown: null,
+    importAwaiting: null,
     permissions: {},
     lastSync: {},
     queue: {},
@@ -586,16 +624,22 @@ export const useStore = create<State>((set, get) => {
     },
 
     async importSessions(projectId, sessionIds) {
+      set({ importAwaiting: projectId });
       try {
         const routes = await window.bw.importSessions(projectId, sessionIds);
-        set((s) => ({ dialog: s.dialog?.kind === "import" ? null : s.dialog }));
+        const job = Object.values(get().imports).find((p) => p.projectId === projectId && p.finished && p.items.length === sessionIds.length);
+        const failed = job?.items.some((i) => i.state === "failed");
+        // 全导好了：进度窗口自己关掉；有没导成的，窗口留着让人看原因
+        set((s) => ({ dialog: s.dialog?.kind === "import" ? null : s.dialog, importAwaiting: null, importShown: failed ? s.importShown : null }));
         await loadProject(projectId);
         if (routes[0]) get().selectRoute(routes[0].id);
         if (routes.length > 0) get().showToast({ title: `导入了 ${routes.length} 个会话`, detail: "每个会话画成了一路；终端里原来的会话没动" });
       } catch (e) {
-        set({ error: message(e) });
+        set({ error: message(e), importAwaiting: null });
       }
     },
+    showImport: (jobId) => set({ importShown: jobId }),
+    importCancel: (jobId) => void window.bw.importCancel(jobId),
 
     openNewRoute() {
       if (get().projects.length > 0) set({ dialog: { kind: "new-route" } });

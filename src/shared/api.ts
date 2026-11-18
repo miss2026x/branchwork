@@ -20,7 +20,10 @@ export interface BwApi {
   /** 这个文件夹下在终端里用 claude 命令开过的会话 */
   terminalSessions(dir: string): Promise<TerminalSession[]>;
   /** 把终端里开过的会话导进来，每个画成一路 */
+  /** 导入终端里的会话：每个画成一路。进度走 import.progress 事件 */
   importSessions(projectId: string, sessionIds: string[]): Promise<Route[]>;
+  /** 停止导入：已经导好的留下，没开始的不导 */
+  importCancel(jobId: string): Promise<void>;
   addProject(localDir: string, name?: string): Promise<Project>;
   /** 这个项目所有路的同步记录，新的在前 */
   projectLog(projectId: string): Promise<SyncLogEntry[]>;

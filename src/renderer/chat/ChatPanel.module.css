@@ -739,23 +739,131 @@
 }
 
 /* 工具还在跑：三个点 */
-.toolRunning {
+/* ---- 在做什么（设计稿 4-8）---- */
+/* 转圈 */
+.spin {
   flex: none;
-  width: 22px;
-  height: 4px;
-  background: radial-gradient(circle, var(--route-2) 2px, transparent 2.5px) 0 0 / 9px 4px repeat-x;
-  animation: toolDots var(--t-loop) steps(4) infinite;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--info);
+  border-radius: var(--r-round);
+  animation: spin var(--t-spin) linear infinite;
 }
-@keyframes toolDots {
-  0% {
-    clip-path: inset(0 100% 0 0);
+/* 正在写的文件、在跑的工具：浅蓝底，一道流光扫过 */
+.tool[data-active] {
+  position: relative;
+  background: linear-gradient(90deg, transparent, var(--info-bg), transparent) no-repeat -160px 0 / 160px 100%, var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--info-bg);
+  animation: shimmer 1.6s linear infinite; /* 例外：流光一圈的时长，比 --t-loop 慢一点更沉稳 */
+}
+.toolMeta {
+  flex: none;
+  font: var(--fs-12) var(--mono);
+  font-style: normal;
+  color: var(--fg-3);
+}
+/* 在想：三个点 + 计时，可以展开看想的内容 */
+.thinking {
+  margin: var(--sp-6) 0;
+}
+.thinkingHead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+.thinkingHead b {
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.thinkingHead button {
+  margin-left: auto;
+  color: var(--info-text);
+  text-decoration: none;
+}
+.dots {
+  display: inline-flex;
+  gap: var(--sp-2);
+}
+.dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-round);
+  background: var(--fg-3);
+  animation: dot var(--t-loop) ease-in-out infinite;
+}
+.dots i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.dots i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+.thought {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: var(--sp-6) 0 0 var(--sp-12);
+  padding: var(--sp-6) var(--sp-10);
+  border-left: 2px solid var(--divider);
+  font-size: var(--fs-12);
+  line-height: var(--lh-20);
+  color: var(--fg-3);
+  white-space: pre-wrap;
+}
+/* 底部状态行：回答中后面跟一句在做什么；停车中整行变琥珀色 */
+.running em {
+  min-width: 0;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--fg-3);
+}
+.running[data-stopping] {
+  padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-12);
+  border-radius: var(--r-10);
+  background: var(--amber-bg);
+}
+.running[data-stopping] span {
+  color: var(--amber-text);
+}
+.running[data-stopping] i {
+  background: var(--amber);
+}
+.running[data-stopping] button {
+  color: var(--fg-3);
+}
+.running[data-stopping] .spin {
+  border-top-color: var(--fg-3);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
+}
+@keyframes shimmer {
+  to {
+    background-position:
+      calc(100% + 160px) 0,
+      0 0;
+  }
+}
+@keyframes dot {
+  0%,
+  80%,
   100% {
-    clip-path: inset(0 -34% 0 0);
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .toolRunning {
+  .spin,
+  .tool[data-active],
+  .dots i {
     animation: none;
   }
 }

@@ -43,11 +43,26 @@ export function createDemoClaudeClient(): ClaudeClient {
       let outcome: AskResult["outcome"] = "completed";
       if (!stopped()) {
         opts.onEvent?.({ type: "started" });
+        // 先想一下（设计稿 4-8 的“在想”）；提问里带“想”字时想得久一点，方便看
+        opts.onEvent?.({ type: "thinking", text: "" });
+        for (const piece of ["先看一下要改哪里。", "demo-notes.md 在工作区根目录，", "往最后追加一行就行。"]) {
+          if (stopped()) break;
+          opts.onEvent?.({ type: "thinking", text: piece });
+          await sleep(opts.prompt.includes("想") ? 1200 : 60, opts.signal);
+        }
+      }
+      if (!stopped()) {
         await say(`这是演示模式，没有真的调用 Claude。这是这一路的第 ${n} 个问题：\n\n> ${opts.prompt}\n\n${opts.images?.length ? `看到了 ${opts.images.length} 张图。\n\n` : ""}我会在工作区里往 \`demo-notes.md\` 追加一行。\n\n`);
       }
       if (!stopped()) {
         const file = path.join(opts.cwd, "demo-notes.md");
         const input = { file_path: file };
+        // 生成参数（设计稿 4-8 的“正在写文件”）：字数一点点涨
+        for (const chars of [0, 420, 860]) {
+          if (stopped()) break;
+          opts.onEvent?.({ type: "tool-input", tool: "Write", chars, lines: Math.ceil(chars / 40), ...(chars > 0 ? { target: file } : {}) });
+          await sleep(opts.prompt.includes("想") ? 1200 : 40, opts.signal);
+        }
         blocks.push({ type: "tool_use", name: "Write", input });
         opts.onEvent?.({ type: "tool", tool: "Write", input });
         const decision = opts.onPermission ? await opts.onPermission({ tool: "Write", input, canRemember: true }) : "deny";
@@ -55,6 +70,7 @@ export function createDemoClaudeClient(): ClaudeClient {
           await say("你没有批准，文件没有改。");
         } else if (!stopped()) {
           await fs.appendFile(file, `- 第 ${n} 站：${opts.prompt.replace(/\s+/g, " ")}\n`);
+          opts.onEvent?.({ type: "tool-result", error: false });
           // 带“拖”字：写完文件后再磨蹭几秒，方便试“改了一半就停车”
           if (opts.prompt.includes("拖")) await sleep(6000, opts.signal);
           await say("写好了。到站后这个改动会同步到 Local。");
@@ -71,8 +87,11 @@ export function createDemoClaudeClient(): ClaudeClient {
         if (decision === "deny" || typeof decision === "object") await say("\n\n你没有批准，后台终端没有开。");
         else if (!stopped()) await say("\n\n" + (await start.run(input, { cwd: opts.cwd }).catch((e: unknown) => String(e))));
       }
-      if (stopped()) outcome = "interrupted";
-      else opts.onEvent?.({ type: "answered" });
+      if (stopped()) {
+        outcome = "interrupted";
+        // 真的 Claude 停下来要一会儿：带“慢”字的问题停车后磨蹭 1.5 秒，方便看“正在停车”
+        if (opts.prompt.includes("慢")) await new Promise((r) => setTimeout(r, 1500));
+      } else opts.onEvent?.({ type: "answered" });
       history.push({ id: randomUUID(), role: "assistant", content: blocks });
       return { outcome, sessionId, text: blocks.map((b) => b.text ?? "").join(""), error: null, promptMessageId, lastMessageId: history.at(-1)!.id };
     },

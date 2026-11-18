@@ -1,4 +1,4 @@
-import type { ClaudeOptions, Project, QueueItem, Route, Stop, SyncLogEntry, Terminal } from "./model";
+import type { ClaudeOptions, ImportProgress, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -19,6 +19,12 @@ export type BwEvent =
   | { type: "stop.answered"; routeId: string; stopId: string }
   /** 回答的流式文字 */
   | { type: "stop.delta"; routeId: string; stopId: string; text: string }
+  /** 它在想的内容（流式；有的模型不给内容） */
+  | { type: "stop.thinking"; routeId: string; stopId: string; text: string }
+  /** 这一路此刻在做什么（设计稿 4-8：在想、正在写文件、工具在跑、停车中）；null：在出字或者闲着 */
+  | { type: "route.activity"; routeId: string; activity: RouteActivity | null }
+  /** 导入终端会话的进度（设计稿 4-8） */
+  | { type: "import.progress"; progress: ImportProgress }
   /** Claude 用了一个工具 */
   | { type: "stop.tool"; routeId: string; stopId: string; tool: string; input: Record<string, unknown>; /** 一行说明：文件名、命令等 */ detail: string; added?: number; removed?: number }
   /** 等你批准；用 answerPermission(requestId, …) 回答 */

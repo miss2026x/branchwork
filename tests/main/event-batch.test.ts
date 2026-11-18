@@ -13,9 +13,21 @@ describe("发给界面的事件：碎字攒一下再发", () => {
     push(delta("s1", "你"));
     push(delta("s1", "好"));
     push(delta("s2", "嗯"));
+    push(delta("s2", "哦"));
     expect(sent).toEqual([]);
     vi.advanceTimersByTime(40);
-    expect(sent).toEqual([delta("s1", "你好"), delta("s2", "嗯")]);
+    expect(sent).toEqual([delta("s1", "你好"), delta("s2", "嗯哦")]);
+  });
+  it("在想的内容也攒着发；和回答的字交替时各自成段，顺序不变", () => {
+    const sent: BwEvent[] = [];
+    const push = batchEvents((e) => sent.push(e), 40);
+    const think = (t: string): BwEvent => ({ type: "stop.thinking", routeId: "r", stopId: "s1", text: t });
+    push(think("先"));
+    push(think("想想"));
+    push(delta("s1", "好"));
+    push(think("再想"));
+    vi.advanceTimersByTime(40);
+    expect(sent).toEqual([think("先想想"), delta("s1", "好"), think("再想")]);
   });
   it("别的事件马上发，发之前先把攒着的字发掉，顺序不乱", () => {
     const sent: BwEvent[] = [];

@@ -91,7 +91,9 @@ describe("问一站", () => {
       write(t.cwd, "b.txt", "x\n");
     };
     await core.ask(route.id, "改一下");
-    expect(types()).toEqual(["route.updated", "stop.created", "stop.started", "stop.delta", "stop.tool", "stop.delta", "route.updated", "stop.updated", "sync.result", "stop.updated", "route.updated"]);
+    // 用了工具以后“工具在跑”，再出字时清掉（设计稿 4-8）
+    expect(types()).toEqual(["route.updated", "stop.created", "stop.started", "stop.delta", "stop.tool", "route.activity", "route.activity", "stop.delta", "route.updated", "stop.updated", "sync.result", "stop.updated", "route.updated"]);
+    expect(events.filter((e) => e.type === "route.activity").map((e) => (e.type === "route.activity" ? e.activity?.kind ?? null : ""))).toEqual(["running", null]);
     const done = events.find((e) => e.type === "stop.updated")!;
     expect(done).toMatchObject({ stop: { status: "done", syncState: "none" } }); // 先到站，同步在后
     expect(events.at(-1)).toMatchObject({ route: { status: "idle" } });
@@ -207,6 +209,53 @@ describe("没答完", () => {
       ["done", "synced"],
     ]);
     expect(routeOf(route.id).status).toBe("idle");
+  });
+
+  it("停车：点下去马上发“正在停车”（等 Claude 停下 → 看一眼工作区），停好了清掉；再点不重复发", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = async (t) => {
+      t.say("正在改……");
+      await new Promise<void>((r) => t.signal.addEventListener("abort", () => r()));
+    };
+    const asking = core.ask(route.id, "改两个文件");
+    await until("stop.delta");
+    events.length = 0;
+    core.stop(route.id);
+    core.stop(route.id);
+    expect(events.map((e) => (e.type === "route.activity" ? e.activity : e.type))).toEqual([{ kind: "stopping", step: "等 Claude 停下", since: expect.any(Number) }]);
+    await asking;
+    const steps = events.filter((e) => e.type === "route.activity").map((e) => (e.type === "route.activity" ? (e.activity?.kind === "stopping" ? e.activity.step : e.activity) : ""));
+    expect(steps).toEqual(["等 Claude 停下", "看一眼工作区", null]);
+  });
+
+  it("站前同步时点停车：显示“同步完就停”，同步完不启动 Claude", async () => {
+    const route = await core.createRoute(project.id);
+    const asking = core.ask(route.id, "改一下");
+    core.stop(route.id);
+    expect(events.filter((e) => e.type === "route.activity").at(-1)).toMatchObject({ activity: { kind: "stopping", step: "同步完就停" } });
+    expect(await asking).toMatchObject({ stop: { status: "interrupted" } });
+    expect(claude.asks).toHaveLength(0);
+  });
+
+  it("在做什么（设计稿 4-8）：在想 → 正在写文件（字数跟着涨）→ 工具在跑 → 看结果在想 → 出字时清掉", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = (t) => {
+      t.emit({ type: "thinking", text: "" });
+      t.emit({ type: "thinking", text: "先看看" });
+      t.emit({ type: "tool-input", tool: "Write", chars: 0, lines: 0 });
+      t.emit({ type: "tool-input", tool: "Write", chars: 800, lines: 20, target: path.join(t.cwd, "src", "a.ts") });
+      t.tool("Write", { file_path: path.join(t.cwd, "src", "a.ts"), content: "x" });
+      t.emit({ type: "tool-result", error: false });
+      t.say("写好了");
+    };
+    events.length = 0;
+    await core.ask(route.id, "写个文件");
+    const acts = events.filter((e) => e.type === "route.activity").map((e) => (e.type === "route.activity" ? e.activity : null));
+    expect(acts.map((a) => a?.kind ?? null)).toEqual(["thinking", "writing", "writing", "running", "thinking", null]);
+    expect(acts[2]).toMatchObject({ kind: "writing", tool: "Write", target: "src/a.ts", chars: 800, lines: 20 });
+    expect(acts[3]).toMatchObject({ kind: "running", tool: "Write", detail: "src/a.ts" });
+    expect(acts[1]!.since).toBe(acts[2]!.since); // 同一次写文件，计时不重来
+    expect(events.filter((e) => e.type === "stop.thinking").map((e) => (e.type === "stop.thinking" ? e.text : ""))).toEqual(["先看看"]);
   });
 
   it("停车后 Claude 没有马上停下、还在往外吐字：这些字不再送给界面", async () => {
@@ -1446,6 +1495,32 @@ describe("导入终端里开过的会话", () => {
     // 从导入的第一站分叉
     const child = await core.fork(route!.id, stops[0]!.id);
     expect(claude.sessions.get(child.sessionId!)!.map((m) => m.id)).toEqual(["u1", "a1", "t1", "a2"]);
+  });
+
+  it("导入的进度（设计稿 4-8）：每个会话一行，报到哪一步；一次最多两个；停止后没开始的不导", async () => {
+    seed();
+    for (const n of [3, 4, 5]) claude.sessions.set(`term-${n}`, [{ id: `u${n}`, role: "user", content: `问题 ${n}` }, { id: `a${n}`, role: "assistant", content: [{ type: "text", text: "嗯" }] }]);
+    events.length = 0;
+    const routes = await core.importSessions(project.id, ["term-1", "term-3"]);
+    expect(routes.map((r) => r.name)).toEqual(["看一下 session 过期问题", "问题 3"]);
+    const reports = events.flatMap((e) => (e.type === "import.progress" ? [e.progress] : []));
+    expect(reports[0]!.items.map((i) => i.state)).toEqual(["waiting", "waiting"]);
+    const steps = reports.map((r) => r.items[0]!.step).filter(Boolean);
+    expect([...new Set(steps)]).toEqual(["复制会话", "读出每一站", "建工作区"]);
+    // 两个是一起导的：第一个还没导完，第二个就开始了
+    expect(reports.some((r) => r.items.every((i) => i.state === "running"))).toBe(true);
+    expect(reports.at(-1)).toMatchObject({ finished: true, items: [{ state: "done", prompts: 2 }, { state: "done", prompts: 1 }] });
+
+    // 停止导入：正在导的导完，没开始的跳过
+    events.length = 0;
+    const off = core.on((e) => {
+      if (e.type === "import.progress" && e.progress.items[1]!.state === "running") core.importCancel(e.progress.jobId);
+    });
+    const some = await core.importSessions(project.id, ["term-3", "term-4", "term-5"]);
+    off();
+    const last = events.flatMap((e) => (e.type === "import.progress" ? [e.progress] : [])).at(-1)!;
+    expect(last.items.map((i) => i.state)).toEqual(["done", "done", "skipped"]);
+    expect(some).toHaveLength(2);
   });
 
   it("终端里记的特殊消息：斜杠命令还原成 /命令，中断和命令输出不算提问，只在本机执行的命令不算一站，“好的”画成小点", async () => {

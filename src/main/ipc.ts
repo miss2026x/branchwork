@@ -33,6 +33,7 @@ export function registerIpc(core: Core): void {
     environment: () => core.environment(),
     terminalSessions: (dir) => core.terminalSessions(dir),
     importSessions: (projectId, ids) => core.importSessions(projectId, ids),
+    importCancel: async (jobId) => core.importCancel(jobId),
     projectLog: async (projectId) => core.projectLog(projectId),
     async openLocal(projectId) {
       const project = core.listProjects().find((p) => p.id === projectId);

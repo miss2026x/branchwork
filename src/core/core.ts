@@ -18,6 +18,8 @@ import type {
   Project,
   ProjectSnapshot,
   PromptImage,
+  RouteActivity,
+  ImportProgress,
   QueueItem,
   ClaudeOptions,
   QueueMode,
@@ -86,6 +88,8 @@ export interface Core {
    * 新的工作区，代码从 Local 的现在开始。
    */
   importSessions(projectId: string, sessionIds: string[]): Promise<Route[]>;
+  /** 停止正在进行的导入：已经导好的留下，没开始的不导 */
+  importCancel(jobId: string): void;
   /** 这个项目所有路的同步记录，新的在前 */
   projectLog(projectId: string): SyncLogEntry[];
   listProjects(): Project[];
@@ -541,7 +545,22 @@ export function createCore(opts: CoreOptions): Core {
   const tempName = stopName;
 
   /** 在一路上跑一站。resolving：这一站是在解决冲突，这一路此刻已经被占住了 */
-  const runStop = async (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> => {
+  /** 正在进行的导入（停止导入用） */
+  const importJobs = new Map<string, { cancelled: boolean }>();
+  /** 每一路此刻在做什么（设计稿 4-8），变了才发事件 */
+  const activities = new Map<string, RouteActivity | null>();
+  const setActivity = (routeId: string, a: RouteActivity | null) => {
+    const cur = activities.get(routeId) ?? null;
+    if (cur === null && a === null) return;
+    // 停车中的时候，回答那边再报的“在想”“在写”都不算了
+    if (cur?.kind === "stopping" && a !== null && a.kind !== "stopping") return;
+    if (a === null) activities.delete(routeId);
+    else activities.set(routeId, a);
+    emit({ type: "route.activity", routeId, activity: a });
+  };
+  const runStop = (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> =>
+    runStopInner(routeId, text, resolving, images).finally(() => setActivity(routeId, null));
+  const runStopInner = async (routeId: string, text: string, resolving?: { name: string }, images: PromptImage[] = []): Promise<AskReport> => {
       let route = mustRoute(routeId);
       if (!resolving) {
         if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，等它到站或先停车");
@@ -622,10 +641,29 @@ export function createCore(opts: CoreOptions): Core {
           onEvent: (e) => {
             // 停车之后 Claude 进程可能还要几秒才真正停下，这期间它吐出来的内容不再往界面送
             if (abort.signal.aborted) return;
+            const now = Date.now();
+            const cur = activities.get(routeId);
             if (e.type === "started") emit({ type: "stop.started", routeId, stopId });
-            else if (e.type === "answered") emit({ type: "stop.answered", routeId, stopId });
-            else if (e.type === "text") emit({ type: "stop.delta", routeId, stopId, text: e.text });
-            else if (e.type === "tool") emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail: toolDetail(e.input, route.worktreePath), ...toolStat(e.input) });
+            else if (e.type === "answered") {
+              setActivity(routeId, null);
+              emit({ type: "stop.answered", routeId, stopId });
+            } else if (e.type === "text") {
+              setActivity(routeId, null);
+              emit({ type: "stop.delta", routeId, stopId, text: e.text });
+            } else if (e.type === "thinking") {
+              if (cur?.kind !== "thinking") setActivity(routeId, { kind: "thinking", since: now });
+              if (e.text) emit({ type: "stop.thinking", routeId, stopId, text: e.text });
+            } else if (e.type === "tool-input") {
+              const target = e.target ? toolDetail(e.tool === "Bash" ? { command: e.target } : { file_path: e.target }, route.worktreePath) : undefined;
+              setActivity(routeId, { kind: "writing", tool: e.tool, ...(target ? { target } : {}), chars: e.chars, lines: e.lines, since: cur?.kind === "writing" ? cur.since : now });
+            } else if (e.type === "tool") {
+              const detail = toolDetail(e.input, route.worktreePath);
+              emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail, ...toolStat(e.input) });
+              setActivity(routeId, { kind: "running", tool: e.tool, detail, since: now });
+            } else if (e.type === "tool-result") {
+              // 工具的结果交回去了：它在看结果、想下一步
+              setActivity(routeId, { kind: "thinking", since: now });
+            }
           },
           onPermission: (req) =>
             new Promise<PermissionDecision | { deny: string }>((resolve) => {
@@ -650,6 +688,7 @@ export function createCore(opts: CoreOptions): Core {
 
       // ── 没答完：不同步，工作区保留 ──
       if (result.outcome !== "completed") {
+        if (activities.get(routeId)?.kind === "stopping") setActivity(routeId, { kind: "stopping", step: "看一眼工作区", since: activities.get(routeId)!.since });
         const left = await engine.status(routeId).then(
           (s) => s.unsynced.length > 0,
           () => true,
@@ -723,15 +762,39 @@ export function createCore(opts: CoreOptions): Core {
     async importSessions(projectId, sessionIds) {
       const project = mustProject(projectId);
       const engine = await engineFor(project);
-      const titles = new Map((await claude.listSessions(project.localDir).catch(() => [])).map((s) => [s.id, s.title]));
-      const made: Route[] = [];
-      for (const source of sessionIds) {
+      const listed = await claude.listSessions(project.localDir).catch(() => []);
+      const titles = new Map(listed.map((s) => [s.id, s.title]));
+      // 进度（设计稿 4-8）：每个会话一行，做到哪一步都告诉界面
+      const progress: ImportProgress = {
+        jobId: id("i"),
+        projectId,
+        items: sessionIds.map((sid) => ({ sessionId: sid, title: titles.get(sid) || "终端里的会话", prompts: null, state: "waiting" as const })),
+        finished: false,
+      };
+      const report = () => emit({ type: "import.progress", progress: structuredClone(progress) });
+      const job = { cancelled: false };
+      importJobs.set(progress.jobId, job);
+      report();
+      const made: (Route | undefined)[] = [];
+      const errors: unknown[] = [];
+
+      const importOne = async (index: number) => {
+        const source = sessionIds[index]!;
+        const item = progress.items[index]!;
+        const step = (name: string) => {
+          item.state = "running";
+          item.step = name;
+          report();
+        };
         // 复制一份：之后在 Branchwork 里接着问，终端里原来那个会话不受影响
+        step("复制会话");
         const sessionId = await claude.fork(source);
+        step("读出每一站");
         const history = await claude.history(sessionId);
         const routeId = id("r");
         let worktreePath: string;
         try {
+          step("建工作区");
           worktreePath = (await engine.createWorktree(routeId)).path;
         } catch (e) {
           await claude.deleteSession(sessionId).catch(() => {});
@@ -749,6 +812,7 @@ export function createCore(opts: CoreOptions): Core {
           if (local && !history.slice(i + 1, end + 1).some((m) => m.role === "assistant")) continue;
           asks.push({ at: i, end, text });
         }
+        item.prompts = asks.length;
         const route: Route = {
           id: routeId,
           projectId,
@@ -796,9 +860,43 @@ export function createCore(opts: CoreOptions): Core {
           db.stops.insert(stop);
           emit({ type: "stop.created", stop });
         }
-        made.push(route);
+        made[index] = route;
+        item.state = "done";
+        delete item.step;
+        report();
+      };
+
+      // 一次最多导两个：建工作区是最慢的一步，两个一起建快一倍，再多会和别的事抢磁盘
+      let next = 0;
+      const lane = async () => {
+        while (next < sessionIds.length && !job.cancelled) {
+          const index = next++;
+          await importOne(index).catch((e: unknown) => {
+            errors.push(e);
+            const item = progress.items[index]!;
+            item.state = "failed";
+            item.error = e instanceof Error ? e.message : String(e);
+            delete item.step;
+            report();
+          });
+        }
+      };
+      try {
+        await Promise.all([lane(), lane()]);
+      } finally {
+        for (const item of progress.items) if (item.state === "waiting") item.state = "skipped";
+        progress.finished = true;
+        importJobs.delete(progress.jobId);
+        report();
       }
-      return made;
+      const routes = made.filter((r): r is Route => !!r);
+      if (routes.length === 0 && errors.length > 0) throw errors[0];
+      return routes;
+    },
+
+    importCancel(jobId) {
+      const job = importJobs.get(jobId);
+      if (job) job.cancelled = true;
     },
 
     projectLog(projectId) {
@@ -1293,7 +1391,11 @@ export function createCore(opts: CoreOptions): Core {
     },
 
     stop(routeId) {
-      running.get(routeId)?.abort();
+      const abort = running.get(routeId);
+      if (!abort || abort.signal.aborted) return;
+      // 点下去马上告诉界面“正在停车”（真正停下、记好、看完工作区还要几秒）
+      setActivity(routeId, { kind: "stopping", step: runningStop.has(routeId) ? "等 Claude 停下" : "同步完就停", since: Date.now() });
+      abort.abort();
       dropPermissions(routeId); // 正在等批准的话，按拒绝处理，让回答能结束
     },
 

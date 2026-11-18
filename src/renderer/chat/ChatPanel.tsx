@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ChatItem, Effort, PermissionMode, PromptImage, QueueItem, QueueMode, Route, Stop, Terminal, SyncFile } from "../../shared";
+import type { ChatItem, Effort, PermissionMode, PromptImage, QueueItem, QueueMode, Route, RouteActivity, Stop, Terminal, SyncFile } from "../../shared";
 import { currentModel, type OptionsState } from "../ui/claude-options";
 import { TerminalStrip } from "../terminal/TerminalStrip";
 import { ModelControl } from "./ModelControl";
@@ -83,6 +83,9 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const draft = useStore((s) => s.drafts[route.id] ?? "");
   const draftImages = useStore((s) => s.draftImages[route.id] ?? NO_IMAGES);
   const pendingImages = useStore((s) => s.pendingImages[route.id]);
+  const activity = useStore((s) => s.activity[route.id]);
+  const thinking = useStore((s) => s.thinking);
+  const now = useNow(!!activity);
   const setDraft = useStore((s) => s.setDraft);
   const patchDraftImage = useStore((s) => s.patchDraftImage);
   const input = useRef<PromptInputHandle>(null);
@@ -304,8 +307,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 <PromptView text={s.prompt} ownerId={s.id} count={s.images ?? 0} title={`第 ${num(s)} 站`} />
               </div>
               <div className={css.who}>Claude</div>
-              <Items items={items} streaming={l?.phase === "answering"} />
-              {l && items.length === 0 && <p className={css.waiting}>{l.phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>}
+              <Items items={items} streaming={l?.phase === "answering"} activity={l ? activity : undefined} now={now} />
+              {l && <Activity activity={activity} thought={thinking[s.id]} now={now} empty={items.length === 0} phase={l.phase} />}
               {s.status === "interrupted" && (
                 <>
                 <p className={css.noteAmber}>
@@ -444,17 +447,30 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         </div>
       )}
       <footer className={css.composer} hidden={!!viewing}>
-        {busy && (
-          <div className={css.running}>
-            <span style={{ color: route.status === "awaiting_permission" ? "var(--amber-text)" : colors.tag }}>
-              <i style={{ background: route.status === "awaiting_permission" ? "var(--amber)" : colors.line }} />
-              {route.status === "awaiting_permission" ? "等你批准" : pending !== undefined ? "同步中" : currentLive?.phase === "starting" ? "启动中" : currentLive?.phase === "finishing" ? "收尾中" : "回答中"}
-            </span>
-            <button onClick={() => stop(route.id)}>
-              <IconStop size={12} /> 停车
-            </button>
-          </div>
-        )}
+        {busy &&
+          (activity?.kind === "stopping" ? (
+            // 点了停车：马上变成琥珀色的“正在停车”，按钮不能再点（设计稿 4-8）
+            <div className={css.running} data-stopping role="status">
+              <span>
+                <i />
+                正在停车 · {activity.step}
+              </span>
+              <button disabled>
+                <span className={css.spin} /> 停车中…
+              </button>
+            </div>
+          ) : (
+            <div className={css.running}>
+              <span style={{ color: route.status === "awaiting_permission" ? "var(--amber-text)" : colors.tag }}>
+                <i style={{ background: route.status === "awaiting_permission" ? "var(--amber)" : colors.line }} />
+                {route.status === "awaiting_permission" ? "等你批准" : pending !== undefined ? "同步中" : currentLive?.phase === "starting" ? "启动中" : currentLive?.phase === "finishing" ? "收尾中" : "回答中"}
+                {route.status === "answering" && activity && <em className="ell">· {activityText(activity)}</em>}
+              </span>
+              <button onClick={() => stop(route.id)}>
+                <IconStop size={12} /> 停车
+              </button>
+            </div>
+          ))}
         {busy && current && (
           <div className={css.statusRow}>
             <span className="ell">
@@ -517,7 +533,72 @@ function StatusLine({ route, n, phase }: { route: Route; n: number; phase?: Live
   return <>{n === 0 ? "还没发车" : `已到第 ${n} 站`}</>;
 }
 
-function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean }) {
+/** 有事在做时每秒走一下，给计时用 */
+function useNow(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [active]);
+  return now;
+}
+const secs = (since: number, now: number) => `${Math.max(0, Math.round((now - since) / 1000))} 秒`;
+const kchars = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+const baseName = (p: string) => p.split(/[\\/]/).pop() || p;
+
+/** 一句话说这一路在做什么（底部状态行、地图上那一站用） */
+export function activityText(a: RouteActivity): string {
+  if (a.kind === "thinking") return "在想";
+  if (a.kind === "writing") return a.target ? `正在写 ${baseName(a.target)}` : `正在准备 ${a.tool}`;
+  if (a.kind === "running") return `在跑 ${a.tool === "Bash" ? a.detail : `${a.tool} ${baseName(a.detail)}`}`;
+  return `正在停车 · ${a.step}`;
+}
+
+/** 回答下面的“在做什么”（设计稿 4-8）：在想（数秒，能展开看想的内容）、正在写文件（字数跟着涨） */
+function Activity({ activity, thought, now, empty, phase }: { activity?: RouteActivity; thought?: string; now: number; empty: boolean; phase: LiveStop["phase"] }) {
+  const [open, setOpen] = useState(false);
+  if (activity?.kind === "writing") {
+    return (
+      <div className={css.tools}>
+        <div className={css.tool} data-active>
+          <span>{activity.tool}</span>
+          <code className="ell" title={activity.target}>
+            {activity.target ?? "…"}
+          </code>
+          <i className={css.spin} />
+          <em className={css.toolMeta}>{activity.chars > 0 ? `已生成 ${kchars(activity.chars)} 字 · ${activity.lines} 行` : secs(activity.since, now)}</em>
+        </div>
+      </div>
+    );
+  }
+  if (activity?.kind === "thinking") {
+    return (
+      <div className={css.thinking}>
+        <div className={css.thinkingHead}>
+          <span className={css.dots} aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
+          <b>在想</b>
+          <span>{secs(activity.since, now)}</span>
+          {thought && (
+            <button className={css.inlineLink} aria-expanded={open} onClick={() => setOpen(!open)}>
+              {open ? "收起" : "看它在想什么"}
+            </button>
+          )}
+        </div>
+        {open && thought && <p className={css.thought}>{thought.slice(-1500)}</p>}
+      </div>
+    );
+  }
+  if (empty && !activity) return <p className={css.waiting}>{phase === "starting" ? "正在启动 Claude…" : "Claude 在想…"}</p>;
+  return null;
+}
+
+function Items({ items, streaming, activity, now = 0 }: { items: ChatItem[]; streaming?: boolean; activity?: RouteActivity; now?: number }) {
   // 连着的工具调用收成一组
   const blocks: ({ kind: "text"; text: string; last: boolean } | { kind: "tools"; tools: Extract<ChatItem, { kind: "tool" }>[] })[] = [];
   items.forEach((it, i) => {
@@ -534,7 +615,7 @@ function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean })
             {streaming ? <StreamingMd>{b.text}</StreamingMd> : <Md>{b.text}</Md>}
           </div>
         ) : (
-          <Tools key={i} tools={b.tools} running={!!streaming && i === blocks.length - 1} />
+          <Tools key={i} tools={b.tools} running={!!streaming && i === blocks.length - 1 && activity?.kind === "running" ? activity : undefined} now={now} />
         ),
       )}
     </>
@@ -542,7 +623,7 @@ function Items({ items, streaming }: { items: ChatItem[]; streaming?: boolean })
 }
 
 /** 一组工具调用。超过 4 次时只显示最后 3 次，其余收起来 */
-function Tools({ tools, running }: { tools: Extract<ChatItem, { kind: "tool" }>[]; running?: boolean }) {
+function Tools({ tools, running, now = 0 }: { tools: Extract<ChatItem, { kind: "tool" }>[]; running?: Extract<RouteActivity, { kind: "running" }>; now?: number }) {
   const [open, setOpen] = useState(false);
   const many = tools.length > 4;
   const shown = many && !open ? tools.slice(-3) : tools;
@@ -559,12 +640,18 @@ function Tools({ tools, running }: { tools: Extract<ChatItem, { kind: "tool" }>[
         </button>
       )}
       {shown.map((t, i) => (
-        <div key={i} className={css.tool}>
+        <div key={i} className={css.tool} data-active={(running && i === shown.length - 1) || undefined}>
           <span>{t.tool}</span>
           <code className="ell" title={t.detail}>
             {t.detail}
           </code>
-          {running && i === shown.length - 1 && t.added === undefined && <span className={css.toolRunning} role="img" aria-label="正在运行" />}
+          {/* 工具在跑（设计稿 4-8）：转圈、计时 */}
+          {running && i === shown.length - 1 && (
+            <>
+              <i className={css.spin} role="img" aria-label="正在运行" />
+              <em className={css.toolMeta}>{secs(running.since, now)}</em>
+            </>
+          )}
           {t.added !== undefined && (
             <em>
               {t.added > 0 && <b>+{t.added}</b>}
