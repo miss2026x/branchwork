@@ -1497,6 +1497,21 @@ describe("导入终端里开过的会话", () => {
     expect(claude.sessions.get(child.sessionId!)!.map((m) => m.id)).toEqual(["u1", "a1", "t1", "a2"]);
   });
 
+  it("开新车、开新对话的进度：建工作区时报到哪一步，做完发 null", async () => {
+    events.length = 0;
+    const route = await core.createRoute(project.id);
+    const steps = events.flatMap((e) => (e.type === "route.preparing" ? [e.step] : []));
+    expect(steps).toEqual(["记下 Local 现在的样子", "检出文件", "带上 Local 没提交的改动", null]);
+    await core.ask(route.id, "第一站");
+    events.length = 0;
+    await core.fork(route.id, stopsOf(route.id)[0]!.id);
+    expect(events.flatMap((e) => (e.type === "route.preparing" ? [e.step] : []))).toEqual(["复制对话", "记下 Local 现在的样子", "检出文件", "带上 Local 没提交的改动", null]);
+    // 同一个项目里的建工作区排队：后来的先报“在等”
+    events.length = 0;
+    await Promise.all([core.createRoute(project.id), core.createRoute(project.id)]);
+    expect(events.flatMap((e) => (e.type === "route.preparing" ? [e.step] : []))).toContain("等别的路同步完");
+  });
+
   it("导入的进度（设计稿 4-8）：每个会话一行，报到哪一步；一次最多两个；停止后没开始的不导", async () => {
     seed();
     for (const n of [3, 4, 5]) claude.sessions.set(`term-${n}`, [{ id: `u${n}`, role: "user", content: `问题 ${n}` }, { id: `a${n}`, role: "assistant", content: [{ type: "text", text: "嗯" }] }]);
@@ -1505,8 +1520,9 @@ describe("导入终端里开过的会话", () => {
     expect(routes.map((r) => r.name)).toEqual(["看一下 session 过期问题", "问题 3"]);
     const reports = events.flatMap((e) => (e.type === "import.progress" ? [e.progress] : []));
     expect(reports[0]!.items.map((i) => i.state)).toEqual(["waiting", "waiting"]);
-    const steps = reports.map((r) => r.items[0]!.step).filter(Boolean);
-    expect([...new Set(steps)]).toEqual(["复制会话", "读出每一站", "建工作区"]);
+    const steps = reports.map((r) => r.items[0]!.step).filter(Boolean) as string[];
+    expect([...new Set(steps.map((t) => t.split(" · ")[0]))]).toEqual(["复制会话", "读出每一站", "建工作区"]);
+    expect(steps).toContain("建工作区 · 检出文件");
     // 两个是一起导的：第一个还没导完，第二个就开始了
     expect(reports.some((r) => r.items.every((i) => i.state === "running"))).toBe(true);
     expect(reports.at(-1)).toMatchObject({ finished: true, items: [{ state: "done", prompts: 2 }, { state: "done", prompts: 1 }] });

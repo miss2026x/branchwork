@@ -369,6 +369,37 @@
   font-size: var(--fs-11);
   color: var(--on-dark-2);
 }
+/* 点了发车、正在建工作区（设计稿 4-8 的做法）：按钮不能再点，左边写着做到哪一步 */
+.go:disabled {
+  opacity: 0.85;
+  cursor: progress;
+}
+.preparing {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-12);
+  color: var(--fg-2);
+}
+.spin {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--on-dark-hover);
+  border-top-color: var(--fg-on-color);
+  border-radius: var(--r-round);
+  animation: spin var(--t-spin) linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
 
 /* 提示里要强调的一句（从某站开新对话：代码不回到那一站） */
 .workspace b {

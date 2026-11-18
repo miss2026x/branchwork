@@ -743,8 +743,10 @@ export function createCore(opts: CoreOptions): Core {
     },
 
     async environment() {
-      const [c, gitVersion] = await Promise.all([claude.environment().catch(() => ({ version: null, loggedIn: null })), gitVersionText()]);
-      return { claudeVersion: c.version, loggedIn: c.loggedIn, gitVersion };
+      const dirs = db.projects.list().map((p) => p.localDir);
+      const [c, gitVersion] = await Promise.all([claude.environment(dirs).catch(() => ({ version: null, loggedIn: null, auth: undefined })), gitVersionText()]);
+      const auth = c.auth && c.auth.state !== "missing" ? { how: c.auth.how, account: c.auth.account, where: c.auth.where } : undefined;
+      return { claudeVersion: c.version, loggedIn: c.loggedIn, ...(auth ? { auth } : {}), gitVersion };
     },
 
     async terminalSessions(localDir) {
@@ -795,7 +797,7 @@ export function createCore(opts: CoreOptions): Core {
         let worktreePath: string;
         try {
           step("建工作区");
-          worktreePath = (await engine.createWorktree(routeId)).path;
+          worktreePath = (await engine.createWorktree(routeId, (t) => step(`建工作区 · ${t}`))).path;
         } catch (e) {
           await claude.deleteSession(sessionId).catch(() => {});
           throw e;
@@ -975,36 +977,41 @@ export function createCore(opts: CoreOptions): Core {
 
     async createRoute(projectId, name) {
       const project = mustProject(projectId);
-      const engine = await engineFor(project);
-      const routeId = id("r");
-      const { path: worktreePath } = await engine.createWorktree(routeId);
-      const number = db.routes.nextNumber(projectId);
-      const route: Route = {
-        id: routeId,
-        projectId,
-        number,
-        express: null,
-        name: name?.trim() || NEW_ROUTE_NAME,
-        status: "idle",
-        sessionId: null,
-        worktreePath,
-        parentRouteId: null,
-        forkStopId: null,
-        model: null,
-        effort: null,
-        permissionMode: project.permissionMode,
-        color: null,
-        contextTokens: null,
-        pinned: false,
-        folded: false,
-        orphanOf: null,
-        createdAt: Date.now(),
-        archivedAt: null,
-      };
-      db.routes.insert(route);
-      emit({ type: "route.updated", route });
-      warmRoute(route);
-      return route;
+      const step = (t: string) => emit({ type: "route.preparing", projectId: projectId, step: t });
+      try {
+        const engine = await engineFor(project);
+        const routeId = id("r");
+        const { path: worktreePath } = await engine.createWorktree(routeId, step);
+        const number = db.routes.nextNumber(projectId);
+        const route: Route = {
+          id: routeId,
+          projectId,
+          number,
+          express: null,
+          name: name?.trim() || NEW_ROUTE_NAME,
+          status: "idle",
+          sessionId: null,
+          worktreePath,
+          parentRouteId: null,
+          forkStopId: null,
+          model: null,
+          effort: null,
+          permissionMode: project.permissionMode,
+          color: null,
+          contextTokens: null,
+          pinned: false,
+          folded: false,
+          orphanOf: null,
+          createdAt: Date.now(),
+          archivedAt: null,
+        };
+        db.routes.insert(route);
+        emit({ type: "route.updated", route });
+        warmRoute(route);
+        return route;
+      } finally {
+        emit({ type: "route.preparing", projectId: projectId, step: null });
+      }
     },
 
     async truncate(routeId, stopId) {
@@ -1128,46 +1135,52 @@ export function createCore(opts: CoreOptions): Core {
       if (stop.status === "answering") throw new CoreError("CANNOT_FORK", "这一站还在回答，到站后才能从它开新对话");
       if (!parent.sessionId || !stop.lastMessageId) throw new CoreError("CANNOT_FORK", "这一站没有留下对话记录（还没开始回答就停车了），不能从它开新对话");
       const project = mustProject(parent.projectId);
-      const engine = await engineFor(project);
-
-      // 对话：复制到这一站的最后一条消息为止，得到新的会话；原会话不变
-      const sessionId = await claude.fork(parent.sessionId, stop.lastMessageId);
-      // 代码：新的工作区，从 Local 的现在开始
-      const newId = id("r");
-      let worktreePath: string;
+      const step = (t: string) => emit({ type: "route.preparing", projectId: project.id, step: t });
       try {
-        worktreePath = (await engine.createWorktree(newId)).path;
-      } catch (e) {
-        await claude.deleteSession(sessionId).catch(() => {});
-        throw e;
+        const engine = await engineFor(project);
+
+        // 对话：复制到这一站的最后一条消息为止，得到新的会话；原会话不变
+        step("复制对话");
+        const sessionId = await claude.fork(parent.sessionId, stop.lastMessageId);
+        // 代码：新的工作区，从 Local 的现在开始
+        const newId = id("r");
+        let worktreePath: string;
+        try {
+          worktreePath = (await engine.createWorktree(newId, step)).path;
+        } catch (e) {
+          await claude.deleteSession(sessionId).catch(() => {});
+          throw e;
+        }
+        const number = db.routes.nextNumber(project.id);
+        const route: Route = {
+          id: newId,
+          projectId: project.id,
+          number,
+          express: null,
+          name: name?.trim() || NEW_ROUTE_NAME,
+          status: "idle",
+          sessionId,
+          worktreePath,
+          parentRouteId: parent.id,
+          forkStopId: stop.id,
+          model: parent.model,
+          effort: parent.effort,
+          permissionMode: parent.permissionMode,
+          color: null,
+          contextTokens: null,
+          pinned: false,
+          folded: false,
+          orphanOf: null,
+          createdAt: Date.now(),
+          archivedAt: null,
+        };
+        db.routes.insert(route);
+        emit({ type: "route.updated", route });
+        warmRoute(route);
+        return route;
+      } finally {
+        emit({ type: "route.preparing", projectId: project.id, step: null });
       }
-      const number = db.routes.nextNumber(project.id);
-      const route: Route = {
-        id: newId,
-        projectId: project.id,
-        number,
-        express: null,
-        name: name?.trim() || NEW_ROUTE_NAME,
-        status: "idle",
-        sessionId,
-        worktreePath,
-        parentRouteId: parent.id,
-        forkStopId: stop.id,
-        model: parent.model,
-        effort: parent.effort,
-        permissionMode: parent.permissionMode,
-        color: null,
-        contextTokens: null,
-        pinned: false,
-        folded: false,
-        orphanOf: null,
-        createdAt: Date.now(),
-        archivedAt: null,
-      };
-      db.routes.insert(route);
-      emit({ type: "route.updated", route });
-      warmRoute(route);
-      return route;
     },
 
     archiveRoute(routeId) {
@@ -1295,56 +1308,61 @@ export function createCore(opts: CoreOptions): Core {
       const stop = db.stops.get(stopId);
       if (!stop || stop.routeId !== routeId) throw new CoreError("NOT_FOUND", `这一路上没有这一站：${stopId}`);
       const project = mustProject(source.projectId);
-      const engine = await engineFor(project);
-      const newId = id("r");
-      const { path: worktreePath } = await engine.createWorktree(newId);
-      const express = db.routes.nextExpress(project.id);
-      const route: Route = {
-        id: newId,
-        projectId: project.id,
-        number: db.routes.nextNumber(project.id),
-        express,
-        name: name?.trim() || `${source.name} · 续`,
-        status: "idle",
-        sessionId: null,
-        worktreePath,
-        parentRouteId: source.id,
-        forkStopId: stop.id,
-        model: source.model,
-        effort: source.effort,
-        permissionMode: source.permissionMode,
-        color: null,
-        contextTokens: null,
-        pinned: false,
-        folded: false,
-        orphanOf: null,
-        createdAt: Date.now(),
-        archivedAt: null,
-      };
-      db.routes.insert(route);
-      // 第一站就是这份摘要
-      const head: Stop = {
-        id: id("s"),
-        routeId: newId,
-        seq: 1,
-        kind: "summary",
-        name: "交接摘要",
-        nameState: "final",
-        prompt: summary.trim(),
-        status: "done",
-        syncState: "none",
-        messageId: null,
-        lastMessageId: null,
-        error: null,
-        startedAt: Date.now(),
-        endedAt: Date.now(),
-      };
-      db.stops.insert(head);
-      emit({ type: "route.updated", route });
-      emit({ type: "stop.created", stop: head });
-      emit({ type: "stop.updated", stop: head });
-      warmRoute(route);
-      return route;
+      const step = (t: string) => emit({ type: "route.preparing", projectId: project.id, step: t });
+      try {
+        const engine = await engineFor(project);
+        const newId = id("r");
+        const { path: worktreePath } = await engine.createWorktree(newId, step);
+        const express = db.routes.nextExpress(project.id);
+        const route: Route = {
+          id: newId,
+          projectId: project.id,
+          number: db.routes.nextNumber(project.id),
+          express,
+          name: name?.trim() || `${source.name} · 续`,
+          status: "idle",
+          sessionId: null,
+          worktreePath,
+          parentRouteId: source.id,
+          forkStopId: stop.id,
+          model: source.model,
+          effort: source.effort,
+          permissionMode: source.permissionMode,
+          color: null,
+          contextTokens: null,
+          pinned: false,
+          folded: false,
+          orphanOf: null,
+          createdAt: Date.now(),
+          archivedAt: null,
+        };
+        db.routes.insert(route);
+        // 第一站就是这份摘要
+        const head: Stop = {
+          id: id("s"),
+          routeId: newId,
+          seq: 1,
+          kind: "summary",
+          name: "交接摘要",
+          nameState: "final",
+          prompt: summary.trim(),
+          status: "done",
+          syncState: "none",
+          messageId: null,
+          lastMessageId: null,
+          error: null,
+          startedAt: Date.now(),
+          endedAt: Date.now(),
+        };
+        db.stops.insert(head);
+        emit({ type: "route.updated", route });
+        emit({ type: "stop.created", stop: head });
+        emit({ type: "stop.updated", stop: head });
+        warmRoute(route);
+        return route;
+      } finally {
+        emit({ type: "route.preparing", projectId: project.id, step: null });
+      }
     },
 
     async resolveConflict(routeId) {

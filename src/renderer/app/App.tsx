@@ -16,7 +16,7 @@ import { ordinal, stopOffset } from "../stores/numbering";
 import { activityText, ChatPanel } from "../chat/ChatPanel";
 import { ImageViewer } from "../chat/ImageViewer";
 import { StopImages } from "../chat/StopImages";
-import { ImportPill, ImportProgressDialog } from "../dialogs/ImportProgress";
+import { ImportPill, ImportProgressDialog, PreparingPill } from "../dialogs/ImportProgress";
 import { Notices } from "../notices/Notices";
 import { Settings } from "./Settings";
 import { Welcome } from "./Welcome";
@@ -75,6 +75,7 @@ export function App() {
   const importShown = useStore((s) => s.importShown);
   const showImport = useStore((s) => s.showImport);
   const importCancel = useStore((s) => s.importCancel);
+  const preparing = useStore((s) => s.preparing);
   const removeProject = useStore((s) => s.removeProject);
   const lastSync = useStore((s) => s.lastSync);
   const openSystemTerminal = useStore((s) => s.openSystemTerminal);
@@ -757,6 +758,7 @@ export function App() {
           claudeOptions={(id) => allOptions[id]}
           onLoadClaudeOptions={loadClaudeOptions}
           onCreate={(o) => void startRoute(o)}
+          preparing={preparing}
           onCancel={closeDialog}
         />
       )}
@@ -870,6 +872,8 @@ export function App() {
       <ImageViewer />
       {/* 导入终端会话的进度（设计稿 4-8）：窗口，或放到后台时左下角的小条 */}
       {importShown && imports[importShown] && <ImportProgressDialog progress={imports[importShown]!} onBackground={() => showImport(null)} onCancel={() => importCancel(importShown)} onClose={() => showImport(null)} />}
+      {/* 开新的一路时窗口已经关了（开新对话、快线、空项目的第一路）：左下角小条显示进度；“开一路新车”的窗口自己显示 */}
+      {preparing && dialog?.kind !== "new-route" && <PreparingPill {...preparing} />}
       {Object.values(imports)
         .filter((p) => !p.finished && p.jobId !== importShown)
         .slice(0, 1)

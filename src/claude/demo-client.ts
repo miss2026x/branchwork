@@ -115,7 +115,7 @@ export function createDemoClaudeClient(): ClaudeClient {
         { id: "demo-terminal-2", title: "升级依赖", lastModified: Date.now() - 30 * 86_400_000 },
       ];
     },
-    environment: async () => ({ version: "演示模式", loggedIn: true }),
+    environment: async () => ({ version: "演示模式", loggedIn: true, auth: { state: "ok", how: "演示模式，不需要登录" } }),
     options: async () => ({
       models: [
         { value: "default", label: "Default (recommended)", description: "Opus 5.5 · Best for everyday, complex tasks", efforts: ["low", "medium", "high", "xhigh", "max"], autoMode: true },

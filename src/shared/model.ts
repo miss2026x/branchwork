@@ -210,6 +210,8 @@ export interface Environment {
   claudeVersion: string | null;
   /** 有没有登录 Claude：true 有；false 没有；null 在这里确认不了（比如凭据存在系统钥匙串里） */
   loggedIn: boolean | null;
+  /** 用什么登录的：方式（“Claude 账号”“API Key”“中转 api.x.com”“Amazon Bedrock”）、账号、在哪儿配的 */
+  auth?: { how?: string; account?: string; where?: string };
   /** git 的版本；没装为空 */
   gitVersion: string | null;
 }

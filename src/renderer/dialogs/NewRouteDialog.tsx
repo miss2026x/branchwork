@@ -20,6 +20,8 @@ interface Props {
   claudeOptions(projectId: string): OptionsState;
   onLoadClaudeOptions(projectId: string): void;
   onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; permissionMode: PermissionMode; question: string; itemId?: string }): void;
+  /** 点了发车、正在建工作区：做到哪一步（设计稿 4-8 的做法：按钮马上变样，显示步骤和计时） */
+  preparing?: { step: string; since: number } | null;
   onCancel(): void;
 }
 
@@ -27,7 +29,7 @@ interface Props {
  * “开一路新车”（设计稿 3-4）：一栏。项目、名称和颜色在上；下面就是这一路第一站的输入框，
  * 和对话栏底下的输入框一个样子，左下角是这一路的批准方式、模型、思考强度，右下角从候车区选
  */
-export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, onCancel }: Props) {
+export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, preparing, onCancel }: Props) {
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
@@ -49,7 +51,13 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  const create = () => onCreate({ projectId, name, color, ...run, question, itemId: from && question.trim() === from.text ? from.id : undefined });
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!preparing) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [preparing]);
+  const create = () => !preparing && onCreate({ projectId, name, color, ...run, question, itemId: from && question.trim() === from.text ? from.id : undefined });
   const submit = (e: FormEvent) => (e.preventDefault(), create());
 
   return (
@@ -101,13 +109,28 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
         </div>
 
         <footer className={own.foot}>
-          <code className="ell" title="同样的设置在终端里这样写（思考强度没有对应的参数）">$ {cliCommand(run)}</code>
-          <button type="button" className={own.cancel} onClick={onCancel}>
+          {preparing ? (
+            <span className={`${own.preparing} ell`} role="status">
+              正在建工作区 · {preparing.step}
+              {now - preparing.since >= 2000 ? ` · ${Math.round((now - preparing.since) / 1000)} 秒` : ""}
+            </span>
+          ) : (
+            <code className="ell" title="同样的设置在终端里这样写（思考强度没有对应的参数）">$ {cliCommand(run)}</code>
+          )}
+          <button type="button" className={own.cancel} onClick={onCancel} disabled={!!preparing}>
             取消
           </button>
-          <button type="submit" className={own.go} style={{ background: colors.tag }}>
-            {question.trim() ? "发车" : `开出 ${label}`}
-            <kbd>{SUBMIT_KEYS}</kbd>
+          <button type="submit" className={own.go} style={{ background: colors.tag }} disabled={!!preparing}>
+            {preparing ? (
+              <>
+                <i className={own.spin} /> 正在开出 {label}…
+              </>
+            ) : (
+              <>
+                {question.trim() ? "发车" : `开出 ${label}`}
+                <kbd>{SUBMIT_KEYS}</kbd>
+              </>
+            )}
           </button>
         </footer>
       </form>

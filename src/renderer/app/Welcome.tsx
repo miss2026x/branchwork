@@ -29,15 +29,28 @@ export function EnvironmentChecks({ env }: { env: Environment | null }) {
             </>,
           )
         : row("bad", "没有找到 claude 命令。重新安装 Branchwork 试试")}
-      {env.loggedIn === true && row("ok", "已登录 Claude 账号")}
+      {env.loggedIn === true &&
+        row(
+          "ok",
+          // 说清楚是用什么登录的：账号、API Key、中转、Bedrock……以及在哪儿配的
+          <>
+            {env.auth?.account ? `已登录 ${env.auth.account}` : env.auth?.how && env.auth.how !== "Claude 账号" ? `用 ${env.auth.how}` : "已登录 Claude 账号"}
+            {env.auth?.where && (
+              <small>
+                {" "}
+                · 来自 <code>{env.auth.where}</code>
+              </small>
+            )}
+          </>,
+        )}
       {env.loggedIn === false &&
         row(
           "bad",
           <>
-            还没有登录 Claude 账号。在终端里运行一次 <code>claude</code>，按提示登录后再回来
+            没找到 Claude 的登录凭据。在终端里运行一次 <code>claude</code> 按提示登录；用 API Key 或中转的，在 <code>~/.claude/settings.json</code> 的 <code>env</code> 里配好再回来
           </>,
         )}
-      {env.loggedIn === null && row("unknown", "登录状态在这里确认不了（凭据存在系统钥匙串里），第一次提问时就知道了")}
+      {env.loggedIn === null && row("unknown", env.auth?.account ? `上次登录的是 ${env.auth.account}，但在这里确认不了凭据还在不在，第一次提问时就知道了` : "登录状态在这里确认不了（凭据存在系统钥匙串里），第一次提问时就知道了")}
       {env.gitVersion
         ? row("ok", "git 可用，用来给每一路建独立工作区")
         : row("bad", "没有找到 git。Branchwork 靠 git 给每一路建独立工作区，先装好 git")}

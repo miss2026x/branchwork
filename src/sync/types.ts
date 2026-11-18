@@ -109,7 +109,8 @@ export interface SyncEngineOptions {
 
 export interface SyncEngine {
   /** 新开一路：从 Local 当前状态（含未提交的改动）建工作区 */
-  createWorktree(routeId: string): Promise<{ path: string }>;
+  /** onStep：做到哪一步（“等别的路同步完”“记下 Local 现在的样子”“检出文件”“带上 Local 没提交的改动”），界面显示进度用 */
+  createWorktree(routeId: string, onStep?: (step: string) => void): Promise<{ path: string }>;
   /** 站前：把 Local 的新变化合并进工作区 */
   pullBeforeStop(routeId: string): Promise<SyncResult>;
   /** 站后（只在这一站正常结束时调）：把工作区的变化写回 Local */

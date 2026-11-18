@@ -1,3 +1,4 @@
+import type { AuthInfo } from "./auth";
 import type { ClaudeOptions, Effort, PermissionDecision, PermissionMode, PromptImage } from "../shared";
 
 /** 一个 Claude 进程按什么设置启动：启动后就改不了，变了就得换一个进程 */
@@ -131,5 +132,6 @@ export interface ClaudeClient {
    */
   options(cwd: string): Promise<ClaudeOptions>;
   /** Claude 的版本、有没有登录。只看本机的文件，不启动 Claude */
-  environment(): Promise<{ version: string | null; loggedIn: boolean | null }>;
+  /** projectDirs：各项目的 Local 文件夹（项目里的 .claude/settings.json 也能配 Key） */
+  environment(projectDirs?: string[]): Promise<{ version: string | null; loggedIn: boolean | null; auth?: AuthInfo }>;
 }

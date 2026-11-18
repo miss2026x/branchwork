@@ -95,6 +95,8 @@ interface State {
   importShown: string | null;
   /** 刚点了导入、进度窗口还没出现：等这个项目的第一条进度来了就打开 */
   importAwaiting: string | null;
+  /** 正在开新的一路（开新车、开新对话、压缩成快线）：在开哪一路、做到哪一步、从什么时候开始（设计稿 4-8 的做法） */
+  preparing: { label: string; step: string; since: number } | null;
   permissions: Record<string, PendingPermission>;
   lastSync: Record<string, SyncLogEntry>;
   /** 各项目候车区里的问题 */
@@ -386,6 +388,9 @@ export const useStore = create<State>((set, get) => {
       case "stop.thinking":
         set((s) => ({ thinking: { ...s.thinking, [e.stopId]: (s.thinking[e.stopId] ?? "") + e.text } }));
         break;
+      case "route.preparing":
+        if (e.step) set((s) => (s.preparing ? { preparing: { ...s.preparing, step: e.step! } } : {}));
+        break;
       case "import.progress": {
         const p = e.progress;
         set((s) => ({
@@ -504,6 +509,7 @@ export const useStore = create<State>((set, get) => {
     imports: {},
     importShown: null,
     importAwaiting: null,
+    preparing: null,
     permissions: {},
     lastSync: {},
     queue: {},
@@ -646,6 +652,9 @@ export const useStore = create<State>((set, get) => {
     },
 
     async startRoute({ projectId, name, color, model, effort, permissionMode, question, itemId }) {
+      if (get().preparing) return; // 已经在开了：别点两下开出两路
+      const next = Math.max(0, ...Object.values(get().routes).filter((r) => r.projectId === projectId).map((r) => r.number)) + 1;
+      set({ preparing: { label: `开出 ${next}路`, step: "准备", since: Date.now() } });
       try {
         let route = await window.bw.createRoute(projectId, name?.trim() || undefined);
         if (color) route = await window.bw.setRouteColor(route.id, color);
@@ -656,6 +665,8 @@ export const useStore = create<State>((set, get) => {
         if (question?.trim()) void get().ask(route.id, question);
       } catch (e) {
         set({ error: message(e) });
+      } finally {
+        set({ preparing: null });
       }
     },
 
@@ -755,8 +766,11 @@ export const useStore = create<State>((set, get) => {
     closeViewer: () => set({ viewer: null }),
 
     async fork(routeId, stopId, name, firstQuestion, opts = {}) {
+      if (get().preparing) return;
+      set({ preparing: { label: "开新对话", step: "准备", since: Date.now() } });
       try {
         let route = await window.bw.fork(routeId, stopId, name);
+        set({ preparing: null });
         if (opts.color) route = await window.bw.setRouteColor(route.id, opts.color);
         route = await applyRun(route, opts.run);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
@@ -766,6 +780,8 @@ export const useStore = create<State>((set, get) => {
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
       } catch (e) {
         set({ error: message(e) });
+      } finally {
+        set({ preparing: null });
       }
     },
 
@@ -927,8 +943,11 @@ export const useStore = create<State>((set, get) => {
     },
 
     async createExpress(routeId, stopId, summary, name, firstQuestion, itemId, run) {
+      if (get().preparing) return;
+      set({ preparing: { label: "开出快线", step: "准备", since: Date.now() } });
       try {
         const route = await applyRun(await window.bw.createExpress(routeId, stopId, summary, name), run);
+        set({ preparing: null });
         if (itemId) void window.bw.queueRemove(itemId).catch(() => {});
         get().dropDistill(stopId);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
@@ -939,6 +958,8 @@ export const useStore = create<State>((set, get) => {
         if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
       } catch (e) {
         set({ error: message(e) });
+      } finally {
+        set({ preparing: null });
       }
     },
 

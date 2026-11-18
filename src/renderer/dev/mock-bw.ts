@@ -12,6 +12,14 @@ export function installMockBw(): void {
   const listeners = new Set<BwListener>();
   const emit = (e: BwEvent) => listeners.forEach((l) => l(e));
   const importCancelled = new Set<string>();
+  /** 演示建工作区的几步（设计稿 4-8 的做法），各磨蹭一会儿 */
+  const preparing = async (projectId: string, first: string[] = []) => {
+    for (const step of [...first, "记下 Local 现在的样子", "检出文件", "带上 Local 没提交的改动"]) {
+      emit({ type: "route.preparing", projectId, step });
+      await new Promise((r) => setTimeout(r, 700));
+    }
+    emit({ type: "route.preparing", projectId, step: null });
+  };
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms * slow));
   let n = 0;
   const id = (p: string) => `${p}${++n}`;
@@ -319,6 +327,7 @@ export function installMockBw(): void {
       }
     },
     async createRoute(projectId, name) {
+      await preparing(projectId);
       const r = addRoute(projectId, name ?? "");
       const named = { ...r, name: name ?? "新对话" };
       routes.set(r.id, named);
@@ -333,6 +342,7 @@ export function installMockBw(): void {
     },
     async fork(routeId, stopId, name) {
       const parent = routes.get(routeId)!;
+      await preparing(parent.projectId, ["复制对话"]);
       const r = addRoute(parent.projectId, "", { parentRouteId: routeId, forkStopId: stopId, sessionId: "fork" });
       const named = { ...r, name: name?.trim() || "新对话" };
       routes.set(r.id, named);

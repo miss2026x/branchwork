@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { ImportProgress } from "../../shared";
 import { IconClose } from "../ui/icons";
 import css from "./Dialog.module.css";
@@ -74,5 +75,25 @@ export function ImportPill({ progress, onOpen }: { progress: ImportProgress; onO
       )}
       <em>查看</em>
     </button>
+  );
+}
+
+/** 正在开新的一路（开新对话、压缩成快线时窗口已经关了）：左下角一枚小条，写着在做哪一步、多久了 */
+export function PreparingPill({ label, step, since }: { label: string; step: string; since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const secs = Math.round((now - since) / 1000);
+  return (
+    <div className={own.pill} role="status">
+      <i className={own.spin} />
+      <b>正在{label}</b>
+      <span className="ell">
+        {step}
+        {secs >= 2 ? ` · ${secs} 秒` : ""}
+      </span>
+    </div>
   );
 }

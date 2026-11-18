@@ -84,11 +84,15 @@ class Engine implements SyncEngine {
     return path.join(this.worktreesDir, routeId);
   }
 
-  createWorktree(routeId: string): Promise<{ path: string }> {
+  createWorktree(routeId: string, onStep?: (step: string) => void): Promise<{ path: string }> {
+    // 同一个项目的同步和建工作区一个一个来：前面还有在做的，先告诉界面在等
+    if (this.running > 0) onStep?.("等别的路同步完");
     return this.serial(async () => {
       const wt = this.worktreePath(routeId);
       if (await exists(wt)) throw new SyncError("WORKTREE_EXISTS", `工作区已存在：${wt}`);
+      onStep?.("记下 Local 现在的样子");
       const local = await this.snapLocal(true);
+      onStep?.("检出文件");
       const add = await git(this.localDir, ["worktree", "add", "--detach", wt, "HEAD"], { okCodes: [128] });
       if (add.code !== 0) {
         // 多半是上次删目录后 git 里还留着登记：清一下再试
@@ -96,6 +100,7 @@ class Engine implements SyncEngine {
         await git(this.localDir, ["worktree", "add", "--detach", wt, "HEAD"]);
       }
       // 把 Local 未提交的改动也带过去，但不提交：工作区里看到的 git 状态和 Local 一样
+      onStep?.("带上 Local 没提交的改动");
       await git(wt, ["read-tree", "--reset", "-u", local]);
       await Promise.all([git(wt, ["reset", "-q"]), this.setBase(routeId, local)]);
       return { path: wt };
@@ -312,8 +317,11 @@ class Engine implements SyncEngine {
 
   // ───────────── 内部 ─────────────
 
+  /** 排在队里（含正在做的）的同步、建工作区有几个 */
+  private running = 0;
   private serial<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(fn, fn);
+    this.running++;
+    const run = this.queue.then(fn, fn).finally(() => this.running--);
     this.queue = run.catch(() => {});
     return run;
   }

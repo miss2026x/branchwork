@@ -5,6 +5,7 @@ import * as sdk from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, Options } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
 import { z } from "zod";
+import { detectAuth, explainAuthError, type AuthInfo } from "./auth";
 import { splitPrompt, type ClaudeOptions, type Effort, type PermissionMode, type PromptImage } from "../shared";
 import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage, RunSettings } from "./types";
 
@@ -334,7 +335,8 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
               outcome = "interrupted";
             } else {
               outcome = "failed";
-              error = m.errors?.join("; ") || m.terminal_reason || m.subtype || "未知错误";
+              const raw = m.errors?.join("; ") || (m.is_error && typeof m.result === "string" ? m.result : "") || m.terminal_reason || m.subtype || "未知错误";
+              error = explainAuthError(raw) ?? raw;
             }
           }
         }
@@ -344,7 +346,8 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
           outcome = "interrupted";
         } else {
           outcome = "failed";
-          error = e instanceof Error ? e.message : String(e);
+          const raw = e instanceof Error ? e.message : String(e);
+          error = explainAuthError(raw) ?? raw;
         }
       } finally {
         opts.signal?.removeEventListener("abort", onAbort);
@@ -403,12 +406,12 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       };
     },
 
-    environment: () => readEnvironment(),
+    environment: (projectDirs) => readEnvironment(projectDirs),
   };
 }
 
-/** Claude 的版本（SDK 的 package.json 里写着它带的是哪一版）和登录状态（只看本机的凭据文件） */
-async function readEnvironment(): Promise<{ version: string | null; loggedIn: boolean | null }> {
+/** Claude 的版本（SDK 的 package.json 里写着它带的是哪一版）和登录状态（auth.ts：环境变量、settings、凭据、钥匙串都看） */
+async function readEnvironment(projectDirs: string[] = []): Promise<{ version: string | null; loggedIn: boolean | null; auth: AuthInfo }> {
   let version: string | null = null;
   try {
     const require = createRequire(import.meta.url);
@@ -420,10 +423,8 @@ async function readEnvironment(): Promise<{ version: string | null; loggedIn: bo
   } catch {
     // 找不到就不显示版本
   }
-  const home = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
-  const hasFile = await fs.access(path.join(home, ".credentials.json")).then(() => true, () => false);
-  const loggedIn = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || hasFile ? true : process.platform === "darwin" ? null : false;
-  return { version, loggedIn };
+  const auth = await detectAuth(projectDirs);
+  return { version, loggedIn: auth.state === "ok" ? true : auth.state === "missing" ? false : null, auth };
 }
 
 /**

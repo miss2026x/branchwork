@@ -23,6 +23,8 @@ export type BwEvent =
   | { type: "stop.thinking"; routeId: string; stopId: string; text: string }
   /** 这一路此刻在做什么（设计稿 4-8：在想、正在写文件、工具在跑、停车中）；null：在出字或者闲着 */
   | { type: "route.activity"; routeId: string; activity: RouteActivity | null }
+  /** 正在开新的一路（开新车、开新对话、压缩成快线）：做到哪一步；step 为 null 表示做完了 */
+  | { type: "route.preparing"; projectId: string; step: string | null }
   /** 导入终端会话的进度（设计稿 4-8） */
   | { type: "import.progress"; progress: ImportProgress }
   /** Claude 用了一个工具 */
