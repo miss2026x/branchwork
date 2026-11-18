@@ -206,38 +206,18 @@
   color: var(--fg-on-color);
   font-weight: 700;
 }
-.panel form {
+.addRow {
   margin-top: var(--sp-12);
 }
-.panel form > span {
+.addRow > span {
   display: block;
   margin-bottom: var(--sp-8);
   font-size: var(--fs-12);
   color: var(--fg-2);
 }
-.panel form > div {
+.addRow > div {
   display: flex;
   gap: var(--sp-8);
-}
-.panel form input {
-  flex: 1;
-  min-width: 0;
-  height: var(--h-44);
-  padding: 0 var(--sp-12);
-  border: 1px dashed var(--line-1);
-  border-radius: var(--r-10);
-}
-.panel form button {
-  flex: none;
-  height: var(--h-44);
-  padding: 0 var(--sp-12);
-  border-radius: var(--r-10);
-  background: var(--fg-1);
-  color: var(--fg-on-color);
-  font-weight: 700;
-}
-.panel form button:disabled {
-  opacity: 0.45;
 }
 @media (max-width: 1100px) {
   .panel {

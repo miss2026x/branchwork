@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { QueueItem, Route, Stop } from "../../shared";
+import type { PromptImage, QueueItem, Route, Stop } from "../../shared";
 import type { RunSettings } from "../stores/store";
 import type { OptionsState } from "../ui/claude-options";
 import { IconClose, IconCompress, IconFolder } from "../ui/icons";
@@ -7,6 +7,7 @@ import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import { Select } from "../ui/Select";
 import css from "./Dialog.module.css";
+import { useDraft } from "../chat/use-draft";
 import own from "./Compress.module.css";
 import { FirstStop, usableRun, type RunChoice } from "./FirstStop";
 import sheet from "./NewRoute.module.css";
@@ -47,7 +48,7 @@ interface Props {
   onDiscard(): void;
   /** 只是收起弹窗：提炼继续，摘要留着 */
   onClose(): void;
-  onCreate(summary: string, name: string, firstQuestion: string, itemId?: string, run?: RunSettings): void;
+  onCreate(summary: string, name: string, firstQuestion: string, itemId?: string, run?: RunSettings, images?: PromptImage[]): void;
   /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的）：快线默认沿用来源那一路 */
   claudeOptions: OptionsState;
 }
@@ -62,7 +63,7 @@ export function CompressDialog({ source, stop, stopNumber, choices, contextToken
   const [keep, setKeep] = useState("");
   const [name, setName] = useState(distill?.name ?? "");
   const [direct, setDirect] = useState(false);
-  const [question, setQuestion] = useState("");
+  const question = useDraft();
   const [picked, setPicked] = useState<QueueItem | null>(null);
   const [chosen, setChosen] = useState<Partial<RunChoice>>({});
   const run = usableRun({ model: source.model, effort: source.effort, permissionMode: source.permissionMode, ...chosen }, claudeOptions);
@@ -93,7 +94,11 @@ export function CompressDialog({ source, stop, stopNumber, choices, contextToken
     change(next);
   };
 
-  const create = () => onCreate(distill!.summary, name, question, picked && question.trim() === picked.text ? picked.id : undefined, run);
+  const create = () => {
+    if (question.status === "loading" || question.status === "bad") return;
+    const q = question.prompt();
+    onCreate(distill!.summary, name, q.text, picked && q.text === picked.text ? picked.id : undefined, run, q.images);
+  };
 
   const plate = (
     <span className={own.dashedPlate} style={{ borderColor: green }}>
@@ -263,8 +268,7 @@ export function CompressDialog({ source, stop, stopNumber, choices, contextToken
               </div>
               <FirstStop
                 title="第一个问题"
-                value={question}
-                onChange={setQuestion}
+                draft={question}
                 placeholder="可以先不填。Claude 会连同摘要一起看到它"
                 onSubmit={() => (distill?.summary ?? "").trim() && create()}
                 run={run}

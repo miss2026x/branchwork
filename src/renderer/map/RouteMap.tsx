@@ -9,11 +9,12 @@ import { estimateTokens, parseSummary } from "../ui/summary-items";
 import { nameRepeat, repeatMark } from "../stores/numbering";
 import { layoutMap, type Lane } from "./layout";
 import css from "./RouteMap.module.css";
+import { RouteTabs } from "./RouteTabs";
 import { plainText } from "../ui/plain-text";
 
 interface Props {
-  /** 路线标签最左、固定不滚的那一格：Local 专车（设计稿 9-10） */
-  leading?: React.ReactNode;
+  /** 路线标签最左、固定不滚的那一格：Local 专车（设计稿 9-10）；compact：标签挤的时候只剩“L” */
+  leading?: (compact: boolean) => ReactNode;
   routes: Route[];
   stops: Stop[];
   /** 候车区里的问题：派给某一路的，在那一路的末尾画成虚线的站 */
@@ -256,18 +257,7 @@ export function RouteMap({ leading, routes, stops, queue = [], selectedRouteId, 
 
   return (
     <div className={css.map}>
-      <div className={css.tabbar}>
-        {leading}
-        {leading && <i className={css.tabDivider} aria-hidden />}
-      <div className={css.tabs}>
-        {routes.map((r) => (
-          <button key={r.id} className={css.tab} aria-current={r.id === selectedRouteId} style={r.id === selectedRouteId ? { borderColor: routeColors(r).line, boxShadow: `0 0 0 1px ${routeColors(r).line}` } : undefined} onClick={() => onSelectRoute(r.id)}>
-            <Plate route={r} />
-            <span className="ell">{r.name}</span>
-          </button>
-        ))}
-      </div>
-      </div>
+      <RouteTabs routes={routes} selectedRouteId={selectedRouteId} onSelectRoute={onSelectRoute} leading={leading} />
 
       <div className={css.zoom}>
         <button aria-label="缩小" onClick={() => zoomBy(1 / 1.2)}>

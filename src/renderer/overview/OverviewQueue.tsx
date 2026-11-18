@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import type { Project, QueueItem, QueueMode, Route } from "../../shared";
+import { QuickAsk } from "../chat/QuickAsk";
+import { useState } from "react";
+import type { Project, PromptImage, QueueItem, QueueMode, Route } from "../../shared";
 import { Plate } from "../ui/Plate";
 import css from "./OverviewQueue.module.css";
 
@@ -9,7 +10,7 @@ interface Props {
   queue: Record<string, QueueItem[]>;
   /** 新放进来的问题归到哪个项目 */
   currentProjectId: string | null;
-  onAdd(projectId: string, text: string): void;
+  onAdd(projectId: string, text: string, images: PromptImage[]): void;
   onAssign(itemId: string, routeId: string | null, mode: QueueMode): void;
   onBoard(itemId: string): void;
   onStartNew(itemId: string): void;
@@ -20,7 +21,6 @@ const busy = (r: Route) => r.status === "answering" || r.status === "awaiting_pe
 
 /** “全部项目”页右边的候车区：所有项目候车的问题放在一起看，在这里就能派车、登车 */
 export function OverviewQueue({ projects, routes, queue, currentProjectId, onAdd, onAssign, onBoard, onStartNew, onRemove }: Props) {
-  const [text, setText] = useState("");
   /** 正在派车的那一条，以及选好的去向和方式 */
   const [dispatch, setDispatch] = useState<{ id: string; target: string | null; mode: "auto" | "manual" } | null>(null);
   const items = projects.flatMap((p) => queue[p.id] ?? []);
@@ -31,12 +31,6 @@ export function OverviewQueue({ projects, routes, queue, currentProjectId, onAdd
   const loose = items.filter((q) => !q.routeId);
   const target = currentProjectId ?? projects[0]?.id ?? null;
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!text.trim() || !target) return;
-    onAdd(target, text.trim());
-    setText("");
-  };
 
   const assigned = (q: QueueItem) => {
     const route = routes[q.routeId!];
@@ -163,15 +157,12 @@ export function OverviewQueue({ projects, routes, queue, currentProjectId, onAdd
           </>
         )}
       </div>
-      <form onSubmit={submit}>
+      <div className={css.addRow}>
         <span>放一条进来{several && target ? `（进 ${names.get(target)}）` : ""}</span>
         <div>
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="写个问题，先放着" aria-label="写个问题，先放着" disabled={!target} />
-          <button type="submit" disabled={!text.trim() || !target}>
-            放进来
-          </button>
+          <QuickAsk label="写个问题，先放着" placeholder="写个问题，先放着（能放图）" button="放进来" disabled={!target} onSubmit={(text, images) => target && onAdd(target, text, images)} />
         </div>
-      </form>
+      </div>
     </aside>
   );
 }

@@ -86,6 +86,8 @@ export function installMockBw(): void {
     addStop(r3.id, "写回 session", "把剩下的字段写回 session。", [{ kind: "tool", tool: "Edit", detail: "src/auth/session.ts" }, { kind: "text", text: "写好了。" }], { syncState: "conflict" });
     logs.set(r3.id, [{ id: "y1", routeId: r3.id, stopId: null, direction: "push", status: "conflict", files: [{ path: "src/auth/session.ts", note: "both-modified", lines: [42, 58], by: { routeId: r1.id, stopId: fork.id } }], message: null, at: Date.now() }]);
     const r4 = addRoute(p.id, "修复 CI 缓存", { status: "interrupted" });
+    // ?many：路多到顶部标签放不下（设计稿 9-11）
+    if (q.has("many")) for (const [name, status] of [["升级依赖", "awaiting_permission"], ["首页性能", "answering"], ["日志格式", "idle"], ["埋点", "idle"], ["暗色模式", "idle"]] as const) addRoute(p.id, name, { status });
     addStop(r4.id, "看 CI 配置", "CI 的缓存为什么总是不命中？", [{ kind: "text", text: "缓存的 key 里带了提交号，所以每次都" }], { status: "interrupted", syncState: "unsynced", error: "已停车" });
     addRoute("p2", "首页改版");
     queue = [
@@ -368,6 +370,12 @@ export function installMockBw(): void {
       };
     },
     localPresets: async (projectId) => presets.get(projectId) ?? null,
+    async resetLocal(routeId) {
+      const gone = [...stops.values()].filter((s) => s.routeId === routeId).map((s) => s.id);
+      gone.forEach((sid) => stops.delete(sid));
+      emit({ type: "stops.removed", routeId, stopIds: gone });
+      return setRoute(routeId, { sessionId: null, contextTokens: null, status: "idle" });
+    },
     setLocalPresets: async (projectId, list) => void (list ? presets.set(projectId, list) : presets.delete(projectId)),
     async ask(routeId, text, pics) {
       const r = routes.get(routeId)!;

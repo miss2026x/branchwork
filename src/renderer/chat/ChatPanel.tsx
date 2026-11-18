@@ -11,12 +11,12 @@ import { draftStatus, toPrompt, type DraftImage } from "./draft";
 import { PromptInput, type PromptInputHandle } from "./PromptInput";
 import { PromptView } from "./PromptView";
 import imgCss from "./Images.module.css";
-import { IconChevron, IconClip, IconEdit, IconEye, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
+import { IconChevron, IconClip, IconEdit, IconEye, IconFork, IconMore, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
 import css from "./ChatPanel.module.css";
-import { LocalIntro, LocalNow, LocalPresetBar, LocalWaiting, runningDev } from "./LocalCar";
+import { LocalIntro, LocalMenu, LocalNow, LocalPresetBar, LocalResetConfirm, LocalWaiting, runningDev } from "./LocalCar";
 import type { PresetChip } from "./local-presets";
 import { Md, StreamingMd } from "./Md";
 
@@ -60,6 +60,8 @@ interface Props {
   whoChanged?: (by: NonNullable<SyncFile["by"]>) => string;
   /** 窄窗口里面板是盖在地图上的抽屉：给了就显示收起按钮 */
   onCollapse?: () => void;
+  /** 从某一站开新对话（专车的站不在地图上，入口在对话里，设计稿 9-11） */
+  onFork?: (stop: Stop) => void;
 }
 
 const NO_IMAGES: DraftImage[] = [];
@@ -74,7 +76,7 @@ const REASONS: Record<string, string> = {
   "local-file-in-the-way": "Local 里已经有一个被忽略的同名文件",
 };
 
-export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, viewing, onBackToLatest, onModel, claudeOptions, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
+export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissionMode, onPermissionMode, waiting, onOpenWaiting, onQueue, focus, onCollapse, onFork, viewing, onBackToLatest, onModel, claudeOptions, terminals, onOpenTerminal, onStopTerminal, onViewChanges, onDiscard, whoChanged }: Props) {
   const resolveConflict = useStore((s) => s.resolveConflict);
   const resync = useStore((s) => s.resync);
   const content = useStore((s) => s.content);
@@ -102,6 +104,10 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   /** 点了哪条常用提示、填进去的是什么、填之前输入框里本来写着什么（再点一次撤回用） */
   const [picked, setPicked] = useState<{ id: string; text: string; before: string } | null>(null);
   const pickedNow = picked && draft === picked.text ? picked.id : null;
+  const [localMenu, setLocalMenu] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const resetLocal = useStore((s) => s.resetLocal);
+  const exportRoute = useStore((s) => s.exportRoute);
 
   const colors = routeColors(route);
   const busy = route.status === "answering" || route.status === "awaiting_permission";
@@ -251,12 +257,19 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             {!viewing && busy && waiting[0] && <span>下一站 {total + 1} {waiting[0].mode === "auto" ? "自动登车" : "等你登车"}</span>}
           </p>
         </div>
+        {route.local && (
+          <button className={css.collapse} data-local-menu aria-label="专车的更多操作" aria-expanded={localMenu} title="更多" onClick={() => setLocalMenu(!localMenu)}>
+            <IconMore size={16} />
+          </button>
+        )}
         {onCollapse && (
           <button className={css.collapse} aria-label="收起对话" title="收起对话" onClick={onCollapse}>
             <IconChevron size={16} />
           </button>
         )}
       </header>
+      {route.local && localMenu && <LocalMenu busy={busy} onReset={() => (setLocalMenu(false), setConfirmReset(true))} onExport={() => (setLocalMenu(false), void exportRoute(route.id))} onClose={() => setLocalMenu(false)} />}
+      {route.local && confirmReset && stops.length > 0 && <LocalResetConfirm stops={total} onYes={() => (setConfirmReset(false), void resetLocal(route.id))} onNo={() => setConfirmReset(false)} />}
 
       <div className={css.meta}>
         <div className={css.metaRow}>
@@ -327,6 +340,11 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <section key={s.id} className={css.stop} data-stop={s.id} data-flash={flash === s.id}>
               {/* 设计稿：站号小字在提问上方靠右；短确认（小点）不占站号 */}
               <div className={`${css.askNo} ell`}>
+                {route.local && onFork && s.status !== "answering" && s.lastMessageId && (
+                  <button className={css.forkLink} onClick={() => onFork(s)}>
+                    <IconFork size={12} /> 从这一站开新对话
+                  </button>
+                )}
                 {s.kind === "minor" ? `接着第 ${num(s)} 站` : `第 ${num(s)} 站`} · {s.name}
               </div>
               <div className={css.ask} style={{ background: colors.tint }}>

@@ -116,6 +116,7 @@ export function registerIpc(core: Core): void {
     localStatus: (projectId) => core.localStatus(projectId),
     localPresets: async (projectId) => core.localPresets(projectId),
     setLocalPresets: async (projectId, presets) => core.setLocalPresets(projectId, presets),
+    resetLocal: (routeId) => core.resetLocal(routeId),
     images: async (ownerId) => core.images(ownerId),
   };
 

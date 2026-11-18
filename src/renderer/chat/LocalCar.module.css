@@ -271,3 +271,80 @@
     transform: translateY(4px);
   }
 }
+
+/* 车头“⋯”的菜单和重新开始的确认（设计稿 9-11） */
+.headMenu {
+  animation: pop var(--t-base) var(--ease);
+  position: absolute;
+  z-index: 9;
+  right: var(--sp-16);
+  top: 78px; /* 例外：车头下面 */
+  width: 280px;
+  padding: var(--sp-6);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.headMenu button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-8) var(--sp-10);
+  border-radius: var(--r-8);
+  text-align: left;
+  font-size: var(--fs-13);
+}
+.headMenu button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.headMenu button:disabled {
+  opacity: 0.6;
+}
+.headMenu b {
+  font-weight: 600;
+}
+.headMenu small {
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.confirm {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  margin: var(--sp-12) var(--sp-16) 0;
+  padding: var(--sp-12);
+  border-radius: var(--r-12);
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+}
+.confirm b {
+  font-size: var(--fs-13);
+}
+.confirm div {
+  display: flex;
+  gap: var(--sp-8);
+  margin-top: var(--sp-4);
+}
+.yes,
+.no {
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-8);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+.yes {
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+}
+.no {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-1);
+}

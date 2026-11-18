@@ -23,14 +23,14 @@ import { Welcome } from "./Welcome";
 import { OverviewQueue } from "../overview/OverviewQueue";
 import { CommandPalette } from "../palette/CommandPalette";
 import { LocalTab } from "../map/LocalTab";
+import { FirstRoute } from "./FirstRoute";
 import { LocalPresetsDialog } from "../dialogs/LocalPresetsDialog";
 import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
-import { BusMark, IconChat, IconFolder, IconSearch, IconSliders } from "../ui/icons";
+import { BusMark, IconChat, IconSearch, IconSliders } from "../ui/icons";
 import { Plate } from "../ui/Plate";
-import { modeInfo } from "../ui/claude-options";
 import css from "./App.module.css";
 import { useTier } from "./use-tier";
 import { PANES, dividerTarget, edgeHidden, flexPane, hiddenBetween, loadLayout, saveLayout, setWidth, targetWidths, toggle, visible, type Layout, type PaneId } from "./layout";
@@ -97,6 +97,7 @@ export function App() {
   const stopRoute = useStore((s) => s.stop);
   const resync = useStore((s) => s.resync);
   const setDraft = useStore((s) => s.setDraft);
+  const editQueued = useStore((s) => s.editQueued);
   const ensureHistory = useStore((s) => s.ensureHistory);
   const terminals = useStore((s) => s.terminals);
   const terminalView = useStore((s) => s.terminalView);
@@ -133,7 +134,6 @@ export function App() {
   const [truncating, setTruncating] = useState<{ stop: Stop; requeue: boolean } | null>(null);
   /** 正从候车区拖出来的问题 */
   const [dragging, setDragging] = useState<QueueItem | null>(null);
-  const [firstQuestion, setFirstQuestion] = useState("");
   const [palette, setPalette] = useState(false);
   const [waitingSignal, setWaitingSignal] = useState(0);
   const tier = useTier();
@@ -345,7 +345,7 @@ export function App() {
                 project={{ id: projectId!, name: projects.find((p) => p.id === projectId)?.name ?? "" }}
                 projectNames={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
                 selectedRoute={route ?? undefined}
-                onAdd={(text) => projectId && void queueAdd(projectId, text)}
+                onAdd={(text, images) => projectId && void queueAdd(projectId, text, null, undefined, images)}
                 onAssign={(itemId, toRoute, mode) => void queueAssign(itemId, toRoute, mode)}
                 onRemove={(itemId) => void queueRemove(itemId)}
                 onBoard={(itemId) => void queueBoard(itemId)}
@@ -378,14 +378,14 @@ export function App() {
             onStop={stopRoute}
             onBoard={(itemId) => void queueBoard(itemId)}
             onEditFirst={(itemId, id, text) => {
-              setDraft(id, text);
-              void queueRemove(itemId);
-              goToRoute(id);
+              const item = Object.values(allQueues).flat().find((q) => q.id === itemId);
+              if (item) void editQueued(item, id).then(() => setDrawer(true));
+              else (setDraft(id, text), void queueRemove(itemId), goToRoute(id));
             }}
           />
   );
   const chatEl = route ? (
-    <ChatPanel key={route!.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode, images) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode, images)} />
+    <ChatPanel key={route!.id} whoChanged={whoChanged} viewing={viewing ? allStops[viewing] : undefined} onBackToLatest={() => viewStop(null)} onModel={(model, effort) => void setRouteModel(route.id, model, effort)} claudeOptions={allOptions[route.projectId]} terminals={routeTerminals} onOpenTerminal={viewTerminal} onStopTerminal={(id) => void stopTerminal(id)} onViewChanges={() => viewChanges(route.id)} onDiscard={() => void discardChanges(route.id)} focus={focus} onCollapse={tier === "narrow" ? () => setDrawer(false) : undefined} route={route} stops={stops} offset={stopOffset(route, allRoutes, allStops)} parent={route.parentRouteId ? allRoutes[route.parentRouteId] : undefined} onGoToRoute={selectRoute} permissionMode={route.permissionMode} onPermissionMode={(mode) => void setRouteMode(route.id, mode)} waiting={queue.filter((q) => q.routeId === route.id)} onOpenWaiting={() => setWaitingSignal((n) => n + 1)} onQueue={(text, mode, images) => void queueAdd(route.projectId, text, mode === "unassigned" ? null : route.id, mode, images)} onFork={setForkFrom} />
   ) : null;
 
   return (
@@ -445,7 +445,7 @@ export function App() {
             routes={allRoutes}
             queue={allQueues}
             currentProjectId={projectId}
-            onAdd={(pid, text) => void queueAdd(pid, text)}
+            onAdd={(pid, text, images) => void queueAdd(pid, text, null, undefined, images)}
             onAssign={(id, routeId, mode) => void queueAssign(id, routeId, mode)}
             onBoard={(id) => void queueBoard(id)}
             onStartNew={(id) => void queueStartNew(id)}
@@ -502,66 +502,11 @@ export function App() {
                     {!ready ? null : projects.length === 0 ? (
                       <Welcome onPick={() => void openAddProject()} onDrop={addDropped} loadEnvironment={environment} />
                     ) : routes.length === 0 ? (
-                      <form
-                        className={css.first}
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          if (projectId)
-                            void startRoute({
-                              projectId,
-                              question: firstQuestion,
-                            });
-                          setFirstQuestion("");
-                        }}
-                      >
-                        <div className={css.firstLine} aria-hidden>
-                          <span>
-                            <b>1路</b>
-                            <i>等你发车</i>
-                          </span>
-                          <em />
-                        </div>
-                        <h1>{project?.name} 还没有车</h1>
-                        <p>问第一个问题，就开出 1路。之后从任何一站都能分出新的一路。</p>
-                        <div className={css.firstCard}>
-                          <label htmlFor="first-stop">第一站</label>
-                          <textarea
-                            id="first-stop"
-                            rows={3}
-                            value={firstQuestion}
-                            onChange={(e) => setFirstQuestion(e.target.value)}
-                            placeholder="比如：先帮我梳理一下现在的认证结构"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                                e.preventDefault();
-                                e.currentTarget.form?.requestSubmit();
-                              }
-                            }}
-                          />
-                          <div>
-                            <span>
-                              动手前：
-                              {modeInfo(project?.permissionMode ?? "ask").label}
-                            </span>
-                            <button type="button" className={css.firstMore} onClick={() => openNewRoute()}>
-                              更多选项…
-                            </button>
-                            <button type="submit" className={css.firstGo}>
-                              {firstQuestion.trim() ? "发车" : "开出 1路"}
-                            </button>
-                          </div>
-                        </div>
-                        <p className={css.firstNote}>
-                          <IconFolder size={16} />
-                          <span>
-                            1路 在自己的工作区里改代码，每站答完，改动自动同步进 <code>{project?.localDir}</code>。
-                          </span>
-                        </p>
-                      </form>
+                      <FirstRoute project={project} onStart={(question, images) => projectId && void startRoute({ projectId, question, images })} onMore={() => openNewRoute()} />
                     ) : (
                       <>
                         <RouteMap
-                          leading={projectId ? <LocalTab projectId={projectId} selected={!!route?.local} /> : undefined}
+                          leading={projectId ? (compact) => <LocalTab projectId={projectId} selected={!!route?.local} compact={compact} /> : undefined}
                           resizing={!!anim}
                           activityLabel={(routeId) => (activities[routeId] ? activityText(activities[routeId]!) : null)}
                           stopImages={(stop) => <StopImages ownerId={stop.id} count={stop.images ?? 0} title={`第 ${stopNumber(stop)} 站`} />}
@@ -600,12 +545,7 @@ export function App() {
                             setWaitingSignal((n) => n + 1);
                           }}
                           onQueueMode={(item, mode) => void queueAssign(item.id, item.routeId, mode)}
-                          onQueueEdit={(item) => {
-                            if (!item.routeId) return;
-                            setDraft(item.routeId, item.text);
-                            void queueRemove(item.id);
-                            goToRoute(item.routeId);
-                          }}
+                          onQueueEdit={(item) => item.routeId && void editQueued(item, item.routeId).then(() => setDrawer(true))}
                           onQueueRemove={(item) => void queueRemove(item.id)}
                           dragging={dragging}
                           onDropItem={(item, id, mode) => (setDragging(null), void queueAssign(item.id, id, mode))}
@@ -712,8 +652,8 @@ export function App() {
           }}
           onClose={() => openCompress(null)}
           claudeOptions={allOptions[allRoutes[compressFrom.routeId]!.projectId]}
-          onCreate={(summary, name, question, itemId, run) => {
-            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question, itemId, run);
+          onCreate={(summary, name, question, itemId, run, images) => {
+            void createExpress(compressFrom.routeId, compressFrom.id, summary, name, question, itemId, run, images);
             openCompress(null);
           }}
         />

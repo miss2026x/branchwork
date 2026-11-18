@@ -383,21 +383,30 @@
   background: var(--surface);
   box-shadow: var(--e3);
 }
-.firstCard label {
+.firstLabel {
   font-size: var(--fs-13);
   font-weight: 700;
 }
-.firstCard textarea {
-  resize: vertical;
-  padding: var(--sp-12);
+/* 第一站的输入框：和对话栏同一个，能带图 */
+.firstInput {
   border: 1px solid var(--border);
   border-radius: var(--r-10);
-  font: inherit;
-  line-height: var(--lh-22);
 }
-.firstCard textarea:focus {
-  outline: none;
+.firstInput:focus-within {
   border-color: var(--route-1);
+}
+.firstAttach {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  color: var(--fg-3);
+}
+.firstAttach:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
 }
 .firstCard > div {
   display: flex;

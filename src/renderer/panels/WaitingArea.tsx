@@ -1,6 +1,7 @@
+import { QuickAsk } from "../chat/QuickAsk";
 import { withoutImageMarks } from "../../shared";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import type { QueueItem, QueueMode, Route } from "../../shared";
+import { useEffect, useState, type ReactNode } from "react";
+import type { PromptImage, QueueItem, QueueMode, Route } from "../../shared";
 import { IconClose, IconMore, IconWait, IconImage } from "../ui/icons";
 import imgCss from "../chat/Images.module.css";
 import { Plate } from "../ui/Plate";
@@ -34,7 +35,7 @@ interface Props {
   building?: Building[];
   onOpenBuilding?(stopId: string): void;
   onCancelBuilding?(stopId: string): void;
-  onAdd(text: string): void;
+  onAdd(text: string, images: PromptImage[]): void;
   onAssign(itemId: string, routeId: string | null, mode?: QueueMode): void;
   onRemove(itemId: string): void;
   onBoard(itemId: string): void;
@@ -70,7 +71,6 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
   useEffect(() => {
     if (openSignal > 0) setOpen(true);
   }, [openSignal]);
-  const [text, setText] = useState("");
   /** 哪个问题正展开着“派给谁”或“更多操作” */
   const [expanded, setExpanded] = useState<string | null>(null);
   const byId = new Map(allRoutes.map((r) => [r.id, r]));
@@ -84,12 +84,6 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
     else groups.auto.push(it);
   }
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!text.trim()) return;
-    onAdd(text);
-    setText("");
-  };
 
   const row = (it: QueueItem, sub: string, action?: ReactNode) => {
     const route = it.routeId ? byId.get(it.routeId) : undefined;
@@ -345,12 +339,9 @@ export function WaitingArea({ items: everything, routes: allRoutes, project, pro
             )}
           </div>
 
-          <form className={css.add} onSubmit={submit}>
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="写个问题，先放着" aria-label="放一个问题进候车区" />
-            <button type="submit" disabled={!text.trim()}>
-              放进来
-            </button>
-          </form>
+          <div className={css.add}>
+            <QuickAsk label="放一个问题进候车区" placeholder="写个问题，先放着（能放图）" button="放进来" onSubmit={onAdd} />
+          </div>
         </section>
       )}
     </div>

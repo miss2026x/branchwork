@@ -142,6 +142,8 @@ export interface Core {
   /** 专车的常用提示；没改过是 null（用自带的） */
   localPresets(projectId: string): LocalPreset[] | null;
   setLocalPresets(projectId: string, presets: LocalPreset[] | null): void;
+  /** 专车重新开始（设计稿 9-11）：清掉它的对话，从第 1 站重来。Local 里的文件不动 */
+  resetLocal(routeId: string): Promise<Route>;
   /** 一站的提问、或候车区一个问题带的图片 */
   images(ownerId: string): PromptImage[];
   /**
@@ -1265,6 +1267,21 @@ export function createCore(opts: CoreOptions): Core {
         });
       }
       return status;
+    },
+
+    async resetLocal(routeId) {
+      const route = mustRoute(routeId);
+      if (!route.local) throw new CoreError("LOCAL_ROUTE", "只有 Local 专车能重新开始");
+      if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "专车正在回答，到站或停车后再重新开始");
+      const removed = db.stops.listByRoute(routeId).map((s) => s.id);
+      claude.cool(route.worktreePath);
+      db.stops.deleteFrom(routeId, 1);
+      db.images.prune();
+      if (removed.length) emit({ type: "stops.removed", routeId, stopIds: removed });
+      const next = setRoute(routeId, { sessionId: null, contextTokens: null, status: "idle" });
+      if (route.sessionId) await claude.deleteSession(route.sessionId).catch(() => {});
+      warmRoute(next);
+      return next;
     },
 
     localPresets(projectId) {

@@ -269,30 +269,6 @@
   padding: var(--sp-12) var(--sp-16) var(--sp-16);
   border-top: 1px solid var(--divider);
 }
-.add input {
-  flex: 1;
-  min-width: 0;
-  height: var(--h-40);
-  padding: 0 var(--sp-12);
-  border: 1px dashed var(--line-1);
-  border-radius: var(--r-8);
-}
-.add input:focus {
-  outline: none;
-  border: 1px solid var(--fg-1);
-}
-.add input::placeholder {
-  color: var(--fg-4);
-}
-.add button {
-  flex: none;
-  height: var(--h-40);
-  padding: 0 var(--sp-12);
-  border-radius: var(--r-8);
-  background: var(--fg-1);
-  color: var(--fg-on-color);
-  font-weight: 700;
-}
 
 .fabIcon {
   position: relative;

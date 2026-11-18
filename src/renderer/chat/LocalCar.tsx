@@ -214,3 +214,44 @@ export function LocalWaiting({ projectId }: { projectId: string }) {
     </div>
   );
 }
+
+/** 专车车头右边“⋯”（设计稿 9-11）：重新开始、导出对话 */
+export function LocalMenu({ busy, onReset, onExport, onClose }: { busy: boolean; onReset(): void; onExport(): void; onClose(): void }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => !box.current?.contains(e.target as Node) && !(e.target as HTMLElement).closest("[data-local-menu]") && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => (window.removeEventListener("pointerdown", onDown), window.removeEventListener("keydown", onKey));
+  }, [onClose]);
+  return (
+    <div ref={box} className={css.headMenu} role="menu" aria-label="专车的更多操作">
+      <button role="menuitem" disabled={busy} onClick={onReset}>
+        <b>重新开始…</b>
+        <small>{busy ? "专车正在回答，到站或停车后再重新开始" : "清掉专车的对话，从第 1 站重来。Local 里的文件不动"}</small>
+      </button>
+      <button role="menuitem" onClick={onExport}>
+        <b>导出对话…</b>
+      </button>
+    </div>
+  );
+}
+
+/** 重新开始之前问一句 */
+export function LocalResetConfirm({ stops, onYes, onNo }: { stops: number; onYes(): void; onNo(): void }) {
+  return (
+    <div className={css.confirm} role="alertdialog" aria-label="清掉专车的对话">
+      <b>专车的 {stops} 站对话都清掉？</b>
+      <span>Claude 不再记得之前在 Local 里做过什么。Local 里的文件、提交都不动。</span>
+      <div>
+        <button className={css.yes} onClick={onYes}>
+          清掉，重新开始
+        </button>
+        <button className={css.no} onClick={onNo}>
+          不了
+        </button>
+      </div>
+    </div>
+  );
+}

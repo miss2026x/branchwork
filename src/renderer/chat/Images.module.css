@@ -23,6 +23,14 @@
   color: var(--fg-4);
   pointer-events: none;
 }
+.editor[data-compact] {
+  min-height: 0;
+  max-height: 120px;
+  padding: var(--sp-6) var(--sp-8);
+  border-radius: var(--r-8);
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+}
 .editor[contenteditable="false"] {
   cursor: default;
 }

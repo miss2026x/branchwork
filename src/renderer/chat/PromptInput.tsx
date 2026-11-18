@@ -36,6 +36,8 @@ interface Props {
   label: string;
   placeholder: string;
   disabled?: boolean;
+  /** 一行高的小输入框（候车区里“写个问题，先放着”） */
+  compact?: boolean;
 }
 
 const isTag = (n: Node | null | undefined): n is HTMLElement => n instanceof HTMLElement && !!n.dataset.img;
@@ -70,7 +72,7 @@ function read(el: HTMLElement): { text: string; ids: string[] } {
 
 const keyOf = (text: string, ids: string[]) => `${text}\u0000${ids.join(",")}`;
 
-export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptInput({ text, images, onChange, onImage, onEnter, newId, label, placeholder, disabled }, ref) {
+export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptInput({ text, images, onChange, onImage, onEnter, newId, label, placeholder, disabled, compact }, ref) {
   const el = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -401,6 +403,7 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
         aria-disabled={disabled || undefined}
         data-placeholder={placeholder}
         data-empty={empty || undefined}
+        data-compact={compact || undefined}
         contentEditable={!disabled}
         suppressContentEditableWarning
         spellCheck={false}

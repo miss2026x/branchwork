@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { QueueItem, Route, Stop } from "../../shared";
+import type { PromptImage, QueueItem, Route, Stop } from "../../shared";
 import { firstStops } from "../stores/numbering";
 import type { RunSettings } from "../stores/store";
 import type { OptionsState } from "../ui/claude-options";
@@ -8,6 +8,7 @@ import { SUBMIT_KEYS } from "../ui/keys";
 import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Dialog.module.css";
+import { useDraft } from "../chat/use-draft";
 import { FirstStop, NameRow, usableRun, type RunChoice } from "./FirstStop";
 import own from "./NewRoute.module.css";
 
@@ -25,7 +26,7 @@ interface Props {
   /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的） */
   claudeOptions: OptionsState;
   onCancel(): void;
-  onConfirm(name: string, firstQuestion: string, opts: { color: number | null; itemId?: string; switchTo: boolean; run: RunSettings }): void;
+  onConfirm(name: string, firstQuestion: string, opts: { color: number | null; images?: PromptImage[]; itemId?: string; switchTo: boolean; run: RunSettings }): void;
 }
 
 const SWITCH_KEY = "bw.fork.switch";
@@ -43,7 +44,7 @@ const remembered = () => {
  */
 export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens, waiting, claudeOptions, onCancel, onConfirm }: Props) {
   const [name, setName] = useState("");
-  const [question, setQuestion] = useState("");
+  const question = useDraft();
   const [color, setColor] = useState<number | null>(null);
   const [picked, setPicked] = useState<QueueItem | null>(null);
   const [switchTo, setSwitchTo] = useState(remembered);
@@ -66,13 +67,15 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
     } catch {
       // 记不住也没关系
     }
-    onConfirm(name, question, { color, itemId: picked && question.trim() === picked.text ? picked.id : undefined, switchTo, run });
+    if (question.status === "loading" || question.status === "bad") return;
+    const q = question.prompt();
+    onConfirm(name, q.text, { color, images: q.images, itemId: picked && q.text === picked.text ? picked.id : undefined, switchTo, run });
   };
   const submit = (e: FormEvent) => (e.preventDefault(), create());
 
   return (
     // 已经填了东西时，点弹窗外面不关闭，免得误触把填的内容弄丢
-    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && !question && onCancel()}>
+    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && question.status === "empty" && onCancel()}>
       <form className={`${css.dialog} ${own.dialog}`} role="dialog" aria-modal aria-label={`从第 ${stopNumber} 站开新对话`} onSubmit={submit}>
         <header className={own.head}>
           <span className={own.plate} style={{ background: colors.tag }}>
@@ -95,8 +98,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
           <NameRow id="fork-name" autoFocus value={name} onChange={setName} placeholder="不填就用第一个问题起名" color={colors.line} onColor={setColor} />
           <FirstStop
             title={`第 ${stopNumber + 1} 站`}
-            value={question}
-            onChange={setQuestion}
+            draft={question}
             placeholder={`接着第 ${stopNumber} 站往下问点别的。可以先不填，开好再问`}
             onSubmit={create}
             run={run}
@@ -124,7 +126,7 @@ export function ForkDialog({ parent, stop, stopNumber, nextNumber, contextTokens
             取消
           </button>
           <button type="submit" className={own.go} style={{ background: colors.tag }}>
-            {question.trim() ? "发车" : `开出 ${label}`}
+            {question.status !== "empty" ? "发车" : `开出 ${label}`}
             <kbd>{SUBMIT_KEYS}</kbd>
           </button>
         </footer>

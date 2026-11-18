@@ -5,7 +5,10 @@ import { ModelControl } from "../chat/ModelControl";
 import { PermissionModeControl } from "../chat/PermissionModeControl";
 import { currentModel, modeItems, type OptionsState } from "../ui/claude-options";
 import { agoFine } from "../ui/ago";
-import { IconCheck, IconClose, IconWait, IconWarn } from "../ui/icons";
+import { IconCheck, IconClip, IconClose, IconWait, IconWarn } from "../ui/icons";
+import { PromptInput, type PromptInputHandle } from "../chat/PromptInput";
+import type { Draft } from "../chat/use-draft";
+import { draftId, useStore } from "../stores/store";
 import { ROUTE_COLORS } from "../ui/route-color";
 import { useFit } from "../ui/useFit";
 import own from "./NewRoute.module.css";
@@ -53,10 +56,10 @@ export function NameRow({ id, value, onChange, placeholder, color, onColor, auto
 interface Props {
   /** 框左上角的小标题（“第一站”“第 4 站”） */
   title: string;
-  value: string;
-  onChange(text: string): void;
+  /** 第一个问题：能带图（设计稿 9-11），和对话栏的输入框同一个 */
+  draft: Draft;
   placeholder: string;
-  /** Ctrl/⌘ + 回车 */
+  /** 回车 */
   onSubmit(): void;
   /** 这一路按什么跑；不给就不显示左下角的三个选择 */
   run?: RunChoice;
@@ -74,7 +77,9 @@ interface Props {
  * 弹窗里“第一站”的输入框：和对话栏底下的输入框一个样子（设计稿 4-6、3-4）。
  * 左下角是这一路的批准方式、模型、思考强度（就是对话栏那三个按钮），右下角从候车区选
  */
-export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, onRun, options, routeLabel, waiting, picked, onPick }: Props) {
+export function FirstStop({ title, draft, placeholder, onSubmit, run, onRun, options, routeLabel, waiting, picked, onPick }: Props) {
+  const input = useRef<PromptInputHandle>(null);
+  const queuedImages = useStore((s) => s.queuedImages);
   const [picking, setPicking] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const pickWrap = useRef<HTMLDivElement>(null);
@@ -88,24 +93,17 @@ export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, 
     return () => (window.removeEventListener("pointerdown", onDown), window.removeEventListener("keydown", onKey, true));
   }, [picking]);
   const model = run ? currentModel(options, run.model) : null;
-  const fromQueue = picked && value.trim() === picked.text;
+  const fromQueue = picked && draft.prompt().text === picked.text;
   return (
     <>
       <div className={own.box}>
-        <label htmlFor={`fs-${title}`}>{title}</label>
-        <textarea
-          id={`fs-${title}`}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          rows={4}
-          placeholder={placeholder}
-          aria-label="第一个问题"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) (e.preventDefault(), onSubmit());
-          }}
-        />
+        <span className={own.boxTitle}>{title}</span>
+        <PromptInput ref={input} text={draft.text} images={draft.images} onChange={draft.set} onImage={draft.patch} onEnter={onSubmit} newId={draftId} label="第一个问题" placeholder={placeholder} />
         <div className={own.toolbar}>
           <div className={own.controls}>
+            <button type="button" className={own.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" onClick={() => input.current?.pickFiles()}>
+              <IconClip size={16} />
+            </button>
             {run && onRun && model && (
               <>
                 <PermissionModeControl mode={run.permissionMode} routeLabel={routeLabel} options={options} model={model} onChange={(permissionMode) => onRun({ ...run, permissionMode })} />
@@ -124,7 +122,7 @@ export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, 
                   <header>候车区里还没派车的 {waiting.length} 个问题</header>
                   <div role="listbox" aria-label="候车区里没派车的问题">
                     {waiting.map((q) => (
-                      <button key={q.id} type="button" role="option" aria-selected={picked?.id === q.id} title={q.text} onClick={() => (onPick(q), onChange(q.text), setPicking(false))}>
+                      <button key={q.id} type="button" role="option" aria-selected={picked?.id === q.id} title={q.text} onClick={() => (onPick(q), void queuedImages(q).then((imgs) => draft.fill(q.text, imgs)), setPicking(false))}>
                         <span>
                           <span className={own.pickText}>{q.text}</span>
                           <small>放进来 {agoFine(q.createdAt)}</small>
@@ -147,7 +145,7 @@ export function FirstStop({ title, value, onChange, placeholder, onSubmit, run, 
       {fromQueue && (
         <span className={own.from}>
           <IconWait size={13} /> 来自候车区 · 发车后从候车区移走
-          <button type="button" aria-label="改回自己写" onClick={() => (onPick(null), onChange(""))}>
+          <button type="button" aria-label="改回自己写" onClick={() => (onPick(null), draft.clear())}>
             <IconClose size={11} />
           </button>
         </span>

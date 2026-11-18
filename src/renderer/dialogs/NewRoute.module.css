@@ -143,26 +143,29 @@
   border-color: var(--fg-1);
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
-.box > label {
+.boxTitle {
   padding: var(--sp-10) var(--sp-12) 0;
   font-size: var(--fs-12);
   font-weight: 600;
   color: var(--fg-3);
 }
-.box textarea {
-  min-height: 108px;
-  padding: var(--sp-4) var(--sp-12);
-  border: none;
-  background: transparent;
-  resize: none;
-  font-size: var(--fs-14);
-  line-height: var(--lh-22);
+/* 第一个问题的输入框（和对话栏同一个，能带图） */
+.box [role="textbox"] {
+  min-height: 92px;
+  padding-top: var(--sp-4);
 }
-.box textarea:focus {
-  outline: none;
+.attach {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  color: var(--fg-3);
 }
-.box textarea::placeholder {
-  color: var(--fg-4);
+.attach:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
 }
 .toolbar {
   display: flex;

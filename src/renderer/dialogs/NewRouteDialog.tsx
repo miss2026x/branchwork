@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { Effort, PermissionMode, Project, QueueItem } from "../../shared";
+import type { Effort, PermissionMode, Project, PromptImage, QueueItem } from "../../shared";
 import { type OptionsState } from "../ui/claude-options";
 import { IconClose, IconFolder } from "../ui/icons";
 import { SUBMIT_KEYS } from "../ui/keys";
 import { routeColors } from "../ui/route-color";
 import css from "./Dialog.module.css";
+import { useDraft } from "../chat/use-draft";
 import { cliCommand, FirstStop, NameRow, usableRun, type RunChoice } from "./FirstStop";
 import own from "./NewRoute.module.css";
 
@@ -19,7 +20,7 @@ interface Props {
   /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的）；没读过时 onLoadClaudeOptions 去读 */
   claudeOptions(projectId: string): OptionsState;
   onLoadClaudeOptions(projectId: string): void;
-  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; permissionMode: PermissionMode; question: string; itemId?: string }): void;
+  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; permissionMode: PermissionMode; question: string; images?: PromptImage[]; itemId?: string }): void;
   /** 点了发车、正在建工作区：做到哪一步（设计稿 4-8 的做法：按钮马上变样，显示步骤和计时） */
   preparing?: { step: string; since: number } | null;
   onCancel(): void;
@@ -33,7 +34,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
-  const [question, setQuestion] = useState("");
+  const question = useDraft();
   const [from, setFrom] = useState<QueueItem | null>(null);
   // 动手前默认沿用项目上次选的
   const projectMode = projects.find((p) => p.id === projectId)?.permissionMode ?? "ask";
@@ -57,11 +58,15 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, [preparing]);
-  const create = () => !preparing && onCreate({ projectId, name, color, ...run, question, itemId: from && question.trim() === from.text ? from.id : undefined });
+  const create = () => {
+    if (preparing || question.status === "loading" || question.status === "bad") return;
+    const q = question.prompt();
+    onCreate({ projectId, name, color, ...run, question: q.text, images: q.images, itemId: from && q.text === from.text ? from.id : undefined });
+  };
   const submit = (e: FormEvent) => (e.preventDefault(), create());
 
   return (
-    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && !question && onCancel()}>
+    <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && question.status === "empty" && onCancel()}>
       <form className={`${css.dialog} ${own.dialog}`} role="dialog" aria-modal aria-label="开一路新车" onSubmit={submit}>
         <header className={own.head}>
           <span className={own.plate} style={{ background: colors.tag }}>
@@ -91,8 +96,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
           <NameRow id="nr-name" autoFocus value={name} onChange={setName} placeholder="不填就用第一个问题起名" color={colors.line} onColor={setColor} />
           <FirstStop
             title="第一站"
-            value={question}
-            onChange={setQuestion}
+            draft={question}
             placeholder="想让 Claude 做什么？可以先不填，开好再问"
             onSubmit={create}
             run={run}
@@ -127,7 +131,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
               </>
             ) : (
               <>
-                {question.trim() ? "发车" : `开出 ${label}`}
+                {question.status !== "empty" ? "发车" : `开出 ${label}`}
                 <kbd>{SUBMIT_KEYS}</kbd>
               </>
             )}

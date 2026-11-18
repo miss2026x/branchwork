@@ -89,6 +89,25 @@
   line-height: var(--lh-18);
   color: var(--fg-4);
 }
+/* 专车的站：悬停时站号左边出现“从这一站开新对话”（设计稿 9-11） */
+.forkLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-right: var(--sp-8);
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-6);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-1);
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.stop:hover .forkLink,
+.forkLink:focus-visible {
+  opacity: 1;
+}
 .who {
   margin: var(--sp-12) 0 var(--sp-6);
   font-size: var(--fs-12);

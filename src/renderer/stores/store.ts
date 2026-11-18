@@ -177,7 +177,7 @@ interface State {
   importCancel(jobId: string): void;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
-  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; permissionMode?: PermissionMode; question?: string; itemId?: string }): Promise<void>;
+  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; permissionMode?: PermissionMode; question?: string; images?: PromptImage[]; itemId?: string }): Promise<void>;
   /** 看这个项目的同步记录；null 关掉 */
   viewLog(projectId: string | null): void;
   closeDialog(): void;
@@ -188,6 +188,8 @@ interface State {
   /** 重新看一遍 Local 现在的样子 */
   refreshLocal(projectId: string): void;
   loadLocalPresets(projectId: string): void;
+  /** 专车重新开始：清掉对话，Local 里的文件不动 */
+  resetLocal(routeId: string): Promise<void>;
   /** 打开“管理常用提示” */
   openLocalPresets(projectId: string): void;
   /** 存专车的常用提示；null 恢复自带的 */
@@ -236,9 +238,9 @@ interface State {
   loadImages(ownerId: string): void;
   openViewer(images: PromptImage[], index: number, title: string): void;
   closeViewer(): void;
-  fork(routeId: string, stopId: string, name: string, firstQuestion: string, opts?: { color?: number | null; itemId?: string; switchTo?: boolean; run?: RunSettings }): Promise<void>;
+  fork(routeId: string, stopId: string, name: string, firstQuestion: string, opts?: { color?: number | null; images?: PromptImage[]; itemId?: string; switchTo?: boolean; run?: RunSettings }): Promise<void>;
   /** itemId：第一个问题是从候车区挑的，开出后把它从候车区拿掉 */
-  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string, itemId?: string, run?: RunSettings): Promise<void>;
+  createExpress(routeId: string, stopId: string, summary: string, name: string, firstQuestion: string, itemId?: string, run?: RunSettings, images?: PromptImage[]): Promise<void>;
   resolveConflict(routeId: string): Promise<void>;
   resync(routeId: string): Promise<void>;
   archiveRoute(routeId: string): Promise<void>;
@@ -273,6 +275,10 @@ interface State {
   queueStartNew(itemId: string): Promise<void>;
   /** images 不传：文字里没有图时清掉草稿的图片，有图时图片不变 */
   setDraft(routeId: string, text: string, images?: DraftImage[]): void;
+  /** 候车区里一个问题带的图（没有就是空的） */
+  queuedImages(item: QueueItem): Promise<PromptImage[]>;
+  /** 候车的问题“改一改”：连同图片放回那一路的输入框，从候车区拿掉 */
+  editQueued(item: QueueItem, routeId: string): Promise<void>;
   /** 草稿里一张图处理好了（或处理失败） */
   patchDraftImage(routeId: string, id: string, patch: Partial<DraftImage>): void;
   dismissError(): void;
@@ -292,7 +298,9 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).rep
 const UNDO_MS = 7000;
 
 export const useStore = create<State>((set, get) => {
-  let started = false;
+  /** 正在读 Local 现状的项目：同时来的几次只读一次 */
+const localReading = new Set<string>();
+let started = false;
   let toastSeq = 0;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let deleteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -672,7 +680,7 @@ export const useStore = create<State>((set, get) => {
       if (get().projects.length > 0) set({ dialog: { kind: "new-route" } });
     },
 
-    async startRoute({ projectId, name, color, model, effort, permissionMode, question, itemId }) {
+    async startRoute({ projectId, name, color, model, effort, permissionMode, question, images = [], itemId }) {
       if (get().preparing) return; // 已经在开了：别点两下开出两路
       const next = Math.max(0, ...Object.values(get().routes).filter((r) => r.projectId === projectId).map((r) => r.number)) + 1;
       set({ preparing: { label: `开出 ${next}路`, step: "准备", since: Date.now() } });
@@ -683,7 +691,7 @@ export const useStore = create<State>((set, get) => {
         set((s) => ({ dialog: null, routes: { ...s.routes, [route.id]: route } }));
         get().selectRoute(route.id);
         if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
-        if (question?.trim()) void get().ask(route.id, question);
+        if (question?.trim() || images.length) void get().ask(route.id, question ?? "", images);
       } catch (e) {
         set({ error: message(e) });
       } finally {
@@ -724,10 +732,24 @@ export const useStore = create<State>((set, get) => {
     },
 
     refreshLocal(projectId) {
-      void window.bw.localStatus(projectId).then(
-        (status) => set((s) => ({ localStatus: { ...s.localStatus, [projectId]: status } })),
-        () => {},
-      );
+      if (localReading.has(projectId)) return; // 正在读了
+      localReading.add(projectId);
+      void window.bw
+        .localStatus(projectId)
+        .then(
+          (status) => set((s) => ({ localStatus: { ...s.localStatus, [projectId]: status } })),
+          () => {},
+        )
+        .finally(() => localReading.delete(projectId));
+    },
+
+    async resetLocal(routeId) {
+      try {
+        const route = await window.bw.resetLocal(routeId);
+        set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
+      } catch (e) {
+        set({ error: message(e) });
+      }
     },
 
     openLocalPresets(projectId) {
@@ -833,9 +855,11 @@ export const useStore = create<State>((set, get) => {
         route = await applyRun(route, opts.run);
         set((s) => ({ routes: { ...s.routes, [route.id]: route } }));
         if (opts.itemId) void window.bw.queueRemove(opts.itemId).catch(() => {});
-        if (opts.switchTo === false) get().showToast({ title: `已开出 ${route.number}路 ${route.name}`, detail: firstQuestion.trim() ? "第一个问题已发出" : "停在分叉站，等你提问", route, action: { label: "去看看", run: () => get().selectRoute(route.id) } });
+        const images = opts.images ?? [];
+        const asking = !!firstQuestion.trim() || images.length > 0;
+        if (opts.switchTo === false) get().showToast({ title: `已开出 ${route.number}路 ${route.name}`, detail: asking ? "第一个问题已发出" : "停在分叉站，等你提问", route, action: { label: "去看看", run: () => get().selectRoute(route.id) } });
         else get().selectRoute(route.id);
-        if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
+        if (asking) await get().ask(route.id, firstQuestion, images);
       } catch (e) {
         set({ error: message(e) });
       } finally {
@@ -1000,7 +1024,7 @@ export const useStore = create<State>((set, get) => {
       set((s) => ({ notices: s.notices.filter((n) => n.id !== id) }));
     },
 
-    async createExpress(routeId, stopId, summary, name, firstQuestion, itemId, run) {
+    async createExpress(routeId, stopId, summary, name, firstQuestion, itemId, run, images = []) {
       if (get().preparing) return;
       set({ preparing: { label: "开出快线", step: "准备", since: Date.now() } });
       try {
@@ -1012,8 +1036,9 @@ export const useStore = create<State>((set, get) => {
         get().selectRoute(route.id);
         const source = get().routes[routeId];
         const from = source ? `${routeLabel(source)} 照常` : "";
-        get().showToast({ title: `已开出 快${route.express} ${route.name}`, detail: [firstQuestion.trim() ? "第一个问题已发出" : "停在摘要站，等你提问", from].filter(Boolean).join("，"), route });
-        if (firstQuestion.trim()) await get().ask(route.id, firstQuestion);
+        const asking = !!firstQuestion.trim() || images.length > 0;
+        get().showToast({ title: `已开出 快${route.express} ${route.name}`, detail: [asking ? "第一个问题已发出" : "停在摘要站，等你提问", from].filter(Boolean).join("，"), route });
+        if (asking) await get().ask(route.id, firstQuestion, images);
       } catch (e) {
         set({ error: message(e) });
       } finally {
@@ -1195,6 +1220,17 @@ export const useStore = create<State>((set, get) => {
     },
 
     // 候车区的操作：结果都通过 queue.updated 事件回来，这里只管发出和报错
+    async queuedImages(item) {
+      return item.images ? await window.bw.images(item.id).catch(() => []) : [];
+    },
+
+    async editQueued(item, routeId) {
+      const images = await get().queuedImages(item);
+      const back = fromPrompt(item.text, images, draftId);
+      get().setDraft(routeId, back.text, back.images);
+      await get().queueRemove(item.id);
+      get().selectRoute(routeId);
+    },
     async queueAdd(projectId, text, routeId, mode, images) {
       await window.bw.queueAdd(projectId, text, routeId, mode, images && images.length > 0 ? images : undefined).catch((e) => set({ error: message(e) }));
     },

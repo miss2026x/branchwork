@@ -78,6 +78,8 @@ export interface BwApi {
   localPresets(projectId: string): Promise<LocalPreset[] | null>;
   /** 存专车的常用提示；null 恢复自带的 */
   setLocalPresets(projectId: string, presets: LocalPreset[] | null): Promise<void>;
+  /** 专车重新开始：清掉它的对话（Local 里的文件不动） */
+  resetLocal(routeId: string): Promise<Route>;
   /** 一站的提问、或候车区一个问题带的图片 */
   images(ownerId: string): Promise<PromptImage[]>;
   /** 从某一站开一条新的路（新会话、新工作区，带着到这一站为止的历史） */

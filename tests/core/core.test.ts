@@ -1722,3 +1722,25 @@ describe("Local 专车（设计稿 9-10）", () => {
     expect(core.localPresets(project.id)).toBeNull();
   });
 });
+
+describe("Local 专车重新开始（设计稿 9-11）", () => {
+  it("清掉专车的对话和会话，Local 里的文件不动；回答中不能清", async () => {
+    const local = core.localRoute(project.id);
+    claude.script = (t) => write(t.cwd, "kept.txt", "专车写的\n");
+    await core.ask(local.id, "写个文件");
+    const session = routeOf(local.id).sessionId;
+    expect(session).toBeTruthy();
+    const after = await core.resetLocal(local.id);
+    expect(after).toMatchObject({ sessionId: null, status: "idle", contextTokens: null });
+    expect(stopsOf(local.id)).toEqual([]);
+    expect(read(lab.local, "kept.txt")).toBe("专车写的\n");
+    expect(events.some((e) => e.type === "stops.removed" && e.routeId === local.id)).toBe(true);
+    // 普通路不能这样清
+    const one = await core.createRoute(project.id);
+    await expect(core.resetLocal(one.id)).rejects.toMatchObject({ code: "LOCAL_ROUTE" });
+    // 清完接着问：从第 1 站开始，新的会话
+    await core.ask(local.id, "再来");
+    expect(stopsOf(local.id)[0]).toMatchObject({ seq: 1 });
+    expect(claude.asks.at(-1)!.sessionId).toBeUndefined();
+  });
+});

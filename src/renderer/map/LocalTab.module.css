@@ -31,6 +31,32 @@
   border-color: var(--red);
   box-shadow: 0 0 0 1px var(--red-line);
 }
+.tab[data-compact] {
+  position: relative;
+  padding: 0 var(--sp-6);
+}
+/* 挤的时候右上角的点 */
+.dot {
+  position: absolute;
+  right: -3px; /* 例外：压在标签右上角 */
+  top: -3px; /* 例外：同上 */
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-round);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.dot[data-tone="red"] {
+  background: var(--red);
+}
+.dot[data-tone="blue"] {
+  background: var(--info);
+}
+.dot[data-tone="green"] {
+  background: var(--green);
+}
+.dot[data-tone="amber"] {
+  background: var(--amber);
+}
 .l {
   flex: none;
   height: 20px; /* 例外：和路牌一样高 */

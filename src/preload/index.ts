@@ -55,6 +55,7 @@ const api: BwApi = {
   localStatus: call("localStatus"),
   localPresets: call("localPresets"),
   setLocalPresets: call("setLocalPresets"),
+  resetLocal: call("resetLocal"),
   fork: call("fork"),
   distill: call("distill"),
   cancelDistill: call("cancelDistill"),
