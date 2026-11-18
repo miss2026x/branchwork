@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import type { Project, Route, Stop } from "../../shared";
 import type { Notice } from "../stores/notices";
-import { BusMark, IconAlert, IconClose, IconCompress, IconWarn } from "../ui/icons";
+import { IconAlert, LaneGlyph, IconClose, IconCompress, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Notices.module.css";
@@ -154,7 +154,7 @@ function Card({ n, ...p }: Props & { n: Notice }) {
       return frame(
         "plain",
         <i className={css.bus} style={{ background: colors.tint }}>
-          <BusMark size={18} color={colors.line} />
+          <LaneGlyph size={20} color={colors.line} />
         </i>,
         <>
           {who} 答完第 {num} 站

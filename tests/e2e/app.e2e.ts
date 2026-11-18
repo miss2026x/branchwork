@@ -847,7 +847,7 @@ describe("应用", () => {
     await expect.poll(() => page.getByText("已到第 1 站").isVisible(), { timeout: 30000 }).toBe(true);
     // 直接写在 Local 里（不经过工作区和同步）；交给 Claude 的提问后面附着 Local 现状，记下来的还是原话
     expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toContain("站：说说 Local 现在的情况");
-    expect(await page.getByText("Branchwork 附上了 Local 现在的样子").isVisible()).toBe(true);
+    expect(await page.getByText("Lanes 附上了 Local 现在的样子").isVisible()).toBe(true);
     expect(await page.getByText("改动已进 Local").count()).toBe(0);
 
     // 专车的站不在地图上：在对话里从某一站开新对话（设计稿 9-11）
@@ -866,10 +866,10 @@ describe("应用", () => {
     expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toBe(notes);
   });
 
-  it("从 Branchwork 移除项目：先列出没进 Local 的改动，确认后回到欢迎页，Local 文件夹不动", async () => {
+  it("从 Lanes 移除项目：先列出没进 Local 的改动，确认后回到欢迎页，Local 文件夹不动", async () => {
     const before = fs.readdirSync(local).sort();
     await page.getByRole("button", { name: "my-project 的菜单" }).click();
-    await page.getByRole("menuitem", { name: /从 Branchwork 移除/ }).click();
+    await page.getByRole("menuitem", { name: /从 Lanes 移除/ }).click();
     const dialog = page.getByRole("alertdialog", { name: "移除 my-project" });
     expect(await dialog.getByText("Local 文件夹不会动").isVisible()).toBe(true);
     await shot("35-remove-project");

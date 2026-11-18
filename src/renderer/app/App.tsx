@@ -29,7 +29,7 @@ import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
-import { BusMark, IconChat, IconSearch, IconSliders } from "../ui/icons";
+import { IconChat, IconSearch, IconSliders, LanesMark } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./App.module.css";
 import { useTier } from "./use-tier";
@@ -392,8 +392,8 @@ export function App() {
     <div className={css.app}>
       <header className={css.top}>
         <div className={css.brand}>
-          <BusMark />
-          <b>Branchwork</b>
+          <LanesMark size={24} />
+          <b>Lanes</b>
         </div>
         <nav className={css.crumbs} aria-label="位置">
           <button className={css.crumbLink} aria-current={overview ? "page" : undefined} onClick={() => setOverview(true)}>

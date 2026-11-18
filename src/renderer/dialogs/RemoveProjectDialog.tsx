@@ -21,7 +21,7 @@ interface Props {
 
 const KIND: Record<string, string> = { added: "新增", modified: "修改", deleted: "删除" };
 
-/** 从 Branchwork 里移除一个项目。Local 文件夹不动；有没进 Local 的改动时要再确认一次 */
+/** 从 Lanes 里移除一个项目。Local 文件夹不动；有没进 Local 的改动时要再确认一次 */
 export function RemoveProjectDialog({ project, routeCount, archivedCount, queueCount, busy, blocked, error, onCancel, onConfirm }: Props) {
   const [working, setWorking] = useState(false);
   useEffect(() => {
@@ -40,7 +40,7 @@ export function RemoveProjectDialog({ project, routeCount, archivedCount, queueC
     <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
       <div className={css.dialog} role="alertdialog" aria-modal aria-label={`移除 ${project.name}`}>
         <header>
-          <h2 className="ell">从 Branchwork 移除「{project.name}」</h2>
+          <h2 className="ell">从 Lanes 移除「{project.name}」</h2>
           <button type="button" aria-label="关闭" onClick={onCancel}>
             <IconClose />
           </button>

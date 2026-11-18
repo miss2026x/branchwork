@@ -41,17 +41,47 @@ export const IconSliders = (p: P) => <Icon {...p}><path d="M4 8h9M17 8h3M4 16h3M
 export const IconStop = (p: P) => <Icon {...p}><rect x="6" y="6" width="12" height="12" rx="2" /></Icon>;
 
 /** 应用图标里的那辆车 */
-export function BusMark({ size = 28, color = "var(--route-2)" }: { size?: number; color?: string }) {
+/**
+ * Lanes 的图标（设计稿 0-5）：几条车道并排，就是地图上 1–4 路的颜色。
+ * 32px 以下只画三条、去掉末尾的站，线更粗
+ */
+export function LanesMark({ size = 24 }: { size?: number }) {
+  const small = size <= 32;
+  const rows: [number, number, number, string][] = small
+    ? [
+        [42, 18, 8, "var(--route-1)"],
+        [30, 32, 8, "var(--route-2)"],
+        [36, 46, 8, "var(--route-3)"],
+      ]
+    : [
+        [40, 15, 6, "var(--route-1)"],
+        [30, 25, 6, "var(--route-2)"],
+        [34, 35, 6, "var(--route-3)"],
+        [22, 45, 6, "var(--route-4)"],
+      ];
   return (
-    <svg width={size} height={size * 0.72} viewBox="0 0 36 26" aria-hidden>
-      <rect x="1" y="1" width="34" height="19" rx="5" fill={color} />
-      <rect x="5" y="5" width="7" height="6" rx="1.5" fill="var(--surface)" />
-      <rect x="14.5" y="5" width="7" height="6" rx="1.5" fill="var(--surface)" />
-      <rect x="24" y="5" width="7" height="6" rx="1.5" fill="var(--surface)" />
-      <circle cx="10" cy="21" r="4" fill="var(--fg-1)" />
-      <circle cx="26" cy="21" r="4" fill="var(--fg-1)" />
-      <circle cx="10" cy="21" r="1.5" fill="var(--surface)" />
-      <circle cx="26" cy="21" r="1.5" fill="var(--surface)" />
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden>
+      {rows.map(([w, y, h, c]) => (
+        <g key={y}>
+          <rect x="11" y={y} width={w} height={h} rx={h / 2} fill={c} />
+          {!small && (
+            <>
+              <circle cx={11 + w} cy={y + 3} r="4.2" fill={c} />
+              <circle cx={11 + w} cy={y + 3} r="1.8" fill="var(--surface)" />
+            </>
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+/** 一条车道加一个站：通知里代表某一路，用这一路自己的颜色 */
+export function LaneGlyph({ size = 20, color }: { size?: number; color: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden>
+      <rect x="2" y="8.5" width="14" height="5" rx="2.5" fill={color} />
+      <circle cx="16" cy="11" r="4" fill={color} />
+      <circle cx="16" cy="11" r="1.6" fill="var(--surface)" />
     </svg>
   );
 }

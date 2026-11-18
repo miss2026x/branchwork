@@ -18,11 +18,16 @@
 .app:has(.pane[data-pane="map"]:not([aria-hidden])) .top {
   border-bottom-color: transparent;
 }
+/* 左上角的图标和字标（设计稿 0-5） */
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--sp-10);
+  gap: var(--sp-8);
   font-size: var(--fs-16);
+}
+.brand b {
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 .crumbs {
   display: flex;

@@ -1468,7 +1468,7 @@ describe("导入终端里开过的会话", () => {
     claude.terminalSessions = [{ id: "term-1", title: "看一下 session 过期问题", lastModified: 5 }];
   };
 
-  it("列出来：带上问了几次；Branchwork 自己的会话不算", async () => {
+  it("列出来：带上问了几次；Lanes 自己的会话不算", async () => {
     seed();
     const route = await core.createRoute(project.id);
     await core.ask(route.id, "自己问的");

@@ -9,7 +9,8 @@ import { registerIpc } from "./ipc";
 
 // 开发时和命令行工具共用一份数据（~/.branchwork-dev），这样两边看到的是同一批项目和路；
 // 打包后的正式版用系统给应用分配的数据目录
-const home = process.env.BRANCHWORK_HOME ?? (app.isPackaged ? app.getPath("userData") : path.join(os.homedir(), ".branchwork-dev"));
+// 正式版的数据目录固定叫 Branchwork（改名叫 Lanes 之前就在这里），不跟着应用名走，免得改名后找不到原来的项目和对话
+const home = process.env.BRANCHWORK_HOME ?? (app.isPackaged ? path.join(app.getPath("appData"), "Branchwork") : path.join(os.homedir(), ".branchwork-dev"));
 fs.mkdirSync(home, { recursive: true });
 // 指定了数据目录（测试、并排开两份）时，界面记住的东西（栏宽、提示看过没有）也放进去，不和别的实例混在一起
 if (process.env.BRANCHWORK_HOME) app.setPath("userData", path.join(home, "chromium"));
@@ -43,7 +44,7 @@ function createWindow(): void {
     minWidth: 880,
     minHeight: 600,
     backgroundColor: "#EEF1F4",
-    title: demo ? "Branchwork（演示模式）" : "Branchwork",
+    title: demo ? "Lanes（演示模式）" : "Lanes",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(import.meta.dirname, "../preload/index.cjs"),

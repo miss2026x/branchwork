@@ -373,7 +373,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
     deleteSession: (sessionId) => fns.deleteSession(sessionId),
 
     async listSessions(dir, max = 20) {
-      // 只要这个目录自己的：各路的工作区里开的会话是 Branchwork 自己的，不算
+      // 只要这个目录自己的：各路的工作区里开的会话是 Lanes 自己的，不算
       const list = await fns.listSessions({ dir, limit: max, includeWorktrees: false });
       return list.map((s) => ({ id: s.sessionId, title: (s.customTitle || s.firstPrompt || s.summary || "").replace(/\s+/g, " ").trim(), lastModified: s.lastModified }));
     },

@@ -48,7 +48,7 @@ export function localBrief(localDir: string, s: LocalStatus | null, routes: Rout
   };
   const lines = [
     "<branchwork-local>",
-    "（这一段是 Branchwork 自动附上的，不是用户写的。）",
+    "（这一段是 Lanes 自动附上的，不是用户写的。）",
     `你现在直接在用户的项目文件夹（Local）里工作：${localDir}。这里没有单独的工作区，你改的就是用户真正的文件。`,
     "同一个项目里还有别的对话（1路、2路……）在各自的工作区里改代码，每一站结束时它们的改动会自动合进 Local；你回答期间它们先等着，你这一站结束后再合进来。",
   ];

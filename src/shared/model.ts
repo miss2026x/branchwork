@@ -199,7 +199,7 @@ export interface DirectoryInfo {
   projectId: string | null;
 }
 
-/** 在终端里用 claude 命令开过的一个会话（不是 Branchwork 开的） */
+/** 在终端里用 claude 命令开过的一个会话（不是 Lanes 开的） */
 export interface TerminalSession {
   id: string;
   /** 会话的标题，或者它的第一个提问 */
@@ -231,7 +231,7 @@ export interface FileStat {
 }
 
 /**
- * 后台终端：一条由 Branchwork 启动、在某一路的工作区里跑着的命令（开发服务器、监听构建等）。
+ * 后台终端：一条由 Lanes 启动、在某一路的工作区里跑着的命令（开发服务器、监听构建等）。
  * 它不随某一站结束而停：一直跑到你停掉它、这一路归档或删除、或者退出应用。
  */
 export interface Terminal {

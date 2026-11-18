@@ -1,7 +1,8 @@
 # 打包配置。`pnpm dist` 在当前系统上出安装包（Windows 出 .exe 安装程序，macOS 出 .dmg），放在 dist/ 里。
 # 只能在哪个系统上打哪个系统的包：Claude Code 的程序本体是按系统分的，装依赖时只装了当前系统的那一份。
+# 应用叫 Lanes（设计稿 0-5）；appId 保持原样，装新版时能当作同一个应用升级
 appId: app.branchwork.desktop
-productName: Branchwork
+productName: Lanes
 directories:
   output: dist
 files:

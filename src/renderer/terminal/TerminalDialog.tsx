@@ -55,7 +55,7 @@ export function TerminalDialog({ terminal: t, route, output, stopLabel, onStop, 
         </header>
         <p className={css.note}>
           <IconWarn size={14} />
-          这里跑的是 {label} 工作区里的代码，不是 Local。{stopLabel ? `Claude 在${stopLabel}开的；` : ""}这一站结束后它还会继续跑，直到你停掉、这一路归档或删除，或者退出 Branchwork。
+          这里跑的是 {label} 工作区里的代码，不是 Local。{stopLabel ? `Claude 在${stopLabel}开的；` : ""}这一站结束后它还会继续跑，直到你停掉、这一路归档或删除，或者退出 Lanes。
         </p>
         <pre
           ref={box}

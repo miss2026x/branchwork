@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Environment } from "../../shared";
+import { LanesMark } from "../ui/icons";
 import css from "./Welcome.module.css";
 
 interface Props {
@@ -28,7 +29,7 @@ export function EnvironmentChecks({ env }: { env: Environment | null }) {
               找到 claude 命令 <code>{env.claudeVersion}</code>
             </>,
           )
-        : row("bad", "没有找到 claude 命令。重新安装 Branchwork 试试")}
+        : row("bad", "没有找到 claude 命令。重新安装 Lanes 试试")}
       {env.loggedIn === true &&
         row(
           "ok",
@@ -53,7 +54,7 @@ export function EnvironmentChecks({ env }: { env: Environment | null }) {
       {env.loggedIn === null && row("unknown", env.auth?.account ? `上次登录的是 ${env.auth.account}，但在这里确认不了凭据还在不在，第一次提问时就知道了` : "登录状态在这里确认不了（凭据存在系统钥匙串里），第一次提问时就知道了")}
       {env.gitVersion
         ? row("ok", "git 可用，用来给每一路建独立工作区")
-        : row("bad", "没有找到 git。Branchwork 靠 git 给每一路建独立工作区，先装好 git")}
+        : row("bad", "没有找到 git。Lanes 靠 git 给每一路建独立工作区，先装好 git")}
     </ul>
   );
 }
@@ -77,6 +78,15 @@ export function Welcome({ onPick, onDrop, loadEnvironment }: Props) {
   return (
     <div className={css.page}>
       <div className={css.inner}>
+        <div className={css.brand}>
+          <span className={css.appIcon}>
+            <LanesMark size={56} />
+          </span>
+          <span className={css.brandText}>
+            <b>Lanes</b>
+            <small>一份代码，几路对话同时开工</small>
+          </span>
+        </div>
         <h1>先加一个项目</h1>
         <p>选一个代码文件夹。之后在里面每开一个对话就是一路车，每问一个问题就是一站。</p>
         <button

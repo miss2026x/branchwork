@@ -108,7 +108,7 @@ export interface BwApi {
   /** 删除一路。有没进 Local 的改动时不删并返回这些文件；force 才连它们一起删 */
   /** keepWorktree：只删对话，工作区的文件夹留着（记在“留下的工作区”里） */
   deleteRoute(routeId: string, force?: boolean, keepWorktree?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
-  /** 从 Branchwork 里移除一个项目：Local 文件夹不动，这个项目的路、工作区、对话记录一起删。force 才连没进 Local 的改动一起删 */
+  /** 从 Lanes 里移除一个项目：Local 文件夹不动，这个项目的路、工作区、对话记录一起删。force 才连没进 Local 的改动一起删 */
   removeProject(projectId: string, force?: boolean): Promise<RemoveProjectResult>;
   /** 这个项目留下的工作区 */
   keptWorktrees(projectId: string): Promise<KeptWorktree[]>;

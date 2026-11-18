@@ -190,7 +190,7 @@ export function ProjectRail({
                       </button>
                       <hr />
                       <button role="menuitem" className={css.danger} onClick={() => (setProjectMenu(null), openRemoveProject(p.id))}>
-                        从 Branchwork 移除…
+                        从 Lanes 移除…
                       </button>
                     </div>
                   </>

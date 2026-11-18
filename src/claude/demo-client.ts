@@ -54,7 +54,7 @@ export function createDemoClaudeClient(): ClaudeClient {
         }
       }
       if (!stopped()) {
-        await say(`这是演示模式，没有真的调用 Claude。这是这一路的第 ${n} 个问题：\n\n> ${asked}\n\n${brief !== undefined ? "（Branchwork 附上了 Local 现在的样子。）\n\n" : ""}${opts.images?.length ? `看到了 ${opts.images.length} 张图。\n\n` : ""}我会在工作区里往 \`demo-notes.md\` 追加一行。\n\n`);
+        await say(`这是演示模式，没有真的调用 Claude。这是这一路的第 ${n} 个问题：\n\n> ${asked}\n\n${brief !== undefined ? "（Lanes 附上了 Local 现在的样子。）\n\n" : ""}${opts.images?.length ? `看到了 ${opts.images.length} 张图。\n\n` : ""}我会在工作区里往 \`demo-notes.md\` 追加一行。\n\n`);
       }
       if (!stopped()) {
         const file = path.join(opts.cwd, "demo-notes.md");

@@ -152,7 +152,7 @@ export function AddProjectDialog({ dir: initial, onPick, onInspect, loadSessions
         <ul className={own.checks} aria-live="polite">
           {!info && <li data-ok="wait">正在看这个文件夹…</li>}
           {info && !info.exists && check(false, "找不到这个文件夹")}
-          {info?.exists && !info.isRepo && check(false, "这不是一个有提交记录的 git 仓库。Branchwork 靠 git 给每一路建独立的工作区，先在这个文件夹里提交一次再来。")}
+          {info?.exists && !info.isRepo && check(false, "这不是一个有提交记录的 git 仓库。Lanes 靠 git 给每一路建独立的工作区，先在这个文件夹里提交一次再来。")}
           {info?.isRepo &&
             check(
               true,

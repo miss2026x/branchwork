@@ -87,7 +87,7 @@ export interface Core {
   inspectDirectory(dir: string): Promise<DirectoryInfo>;
   /** 运行环境：Claude 的版本、有没有登录、git 能不能用 */
   environment(): Promise<Environment>;
-  /** 这个文件夹下在终端里用 claude 命令开过的会话（Branchwork 自己开的不算） */
+  /** 这个文件夹下在终端里用 claude 命令开过的会话（Lanes 自己开的不算） */
   terminalSessions(dir: string): Promise<TerminalSession[]>;
   /**
    * 把终端里开过的会话导进来，每个会话画成一路：会话复制一份（原来的不动），里面每个提问是一站；
@@ -178,7 +178,7 @@ export interface Core {
   /** keepWorktree：只删对话，工作区的文件夹留着 */
   deleteRoute(routeId: string, force?: boolean, keepWorktree?: boolean): Promise<{ status: "deleted" } | { status: "has-unsynced"; files: SyncFile[] }>;
   /**
-   * 从 Branchwork 里移除一个项目。Local 文件夹一个字节都不动；这个项目的路、工作区、对话记录、候车、同步记录一起删。
+   * 从 Lanes 里移除一个项目。Local 文件夹一个字节都不动；这个项目的路、工作区、对话记录、候车、同步记录一起删。
    * 有路在回答时不能移除；有没进 Local 的改动或留下的工作区时先不删、列出来，force 为 true 才一起删。
    */
   removeProject(projectId: string, force?: boolean): Promise<RemoveProjectResult>;
@@ -882,7 +882,7 @@ export function createCore(opts: CoreOptions): Core {
           item.step = name;
           report();
         };
-        // 复制一份：之后在 Branchwork 里接着问，终端里原来那个会话不受影响
+        // 复制一份：之后在 Lanes 里接着问，终端里原来那个会话不受影响
         step("复制会话");
         const sessionId = await claude.fork(source);
         step("读出每一站");
@@ -935,7 +935,7 @@ export function createCore(opts: CoreOptions): Core {
         emit({ type: "route.updated", route });
         let seq = 0;
         for (const { at, end, text } of asks) {
-          // 和直接在 Branchwork 里问一样：“继续”“好的”画成小点，斜杠命令用命令名当站名
+          // 和直接在 Lanes 里问一样：“继续”“好的”画成小点，斜杠命令用命令名当站名
           const minor = seq > 0 && isShortConfirm(text);
           const stop: Stop = {
             id: id("s"),
@@ -1809,7 +1809,7 @@ function distillPrompt(keep?: string): string {
     "约定、踩过的坑、用户的偏好。",
     "",
     "写具体：文件路径、函数名、命令、数字都照原样写。不要复述对话的经过。",
-    "只写这段对话里用户和你实际讨论过、决定过、做过的事。下面这些不要写，新的对话自己就有：系统提示里的规则和约定（比如提交信息怎么写、怎么用工具）、运行环境的信息（操作系统、shell、当前分支、git 状态）、Branchwork 工作区的机制。",
+    "只写这段对话里用户和你实际讨论过、决定过、做过的事。下面这些不要写，新的对话自己就有：系统提示里的规则和约定（比如提交信息怎么写、怎么用工具）、运行环境的信息（操作系统、shell、当前分支、git 状态）、Lanes 工作区的机制。",
     "这条“请写摘要”的请求本身不是对话的一部分：不要把它写进目标，也不要写“本次只输出摘要、没有调用工具”这类关于你此刻在做什么的话。",
     "不要把 git status 里看到的未提交改动、未跟踪文件当成待办，除非用户在对话里提到过要处理它们。",
     "篇幅和对话的分量相称：对话简单就只写几行，不要为了填满小节而凑内容。",

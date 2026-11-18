@@ -5,7 +5,7 @@ export type PermissionDecision = "allow" | "allow-always" | "deny";
 /** 主进程推给界面的事件 */
 export type BwEvent =
   | { type: "project.updated"; project: Project }
-  /** 项目从 Branchwork 里移除了（Local 文件夹不动） */
+  /** 项目从 Lanes 里移除了（Local 文件夹不动） */
   | { type: "project.removed"; projectId: string }
   /** 从这台电脑上的 Claude Code 读到了这个项目能选的模型和批准方式；读不到时 options 为 null */
   | { type: "claude-options.updated"; projectId: string; options: ClaudeOptions | null }
