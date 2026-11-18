@@ -3,9 +3,9 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 const [c1, c2, c3, c4] = process.argv.slice(2);
-const rows = [[40, 15, c1], [30, 25, c2], [34, 35, c3], [22, 45, c4]];
+const rows = [[40, 14, c1], [30, 24, c2], [34, 34, c3], [22, 44, c4]];
 // 按 macOS 图标的格子：824 的圆角方块放在 1024 的画布中间，四周留空给阴影
-const lanes = rows.map(([w, y, c]) => `<rect x="11" y="${y}" width="${w}" height="6" rx="3" fill="${c}"/><circle cx="${11 + w}" cy="${y + 3}" r="4.2" fill="${c}"/><circle cx="${11 + w}" cy="${y + 3}" r="1.8" fill="#fff"/>`).join("");
+const lanes = rows.map(([w, y, c]) => `<rect x="10" y="${y}" width="${w}" height="6" rx="3" fill="${c}"/><circle cx="${10 + w}" cy="${y + 3}" r="4.2" fill="${c}"/><circle cx="${10 + w}" cy="${y + 3}" r="1.8" fill="#fff"/>`).join("");
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F3F5F8"/></linearGradient>
 <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#161B22" flood-opacity=".18"/></filter></defs>

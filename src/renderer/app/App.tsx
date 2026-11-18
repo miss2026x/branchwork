@@ -392,7 +392,7 @@ export function App() {
     <div className={css.app}>
       <header className={css.top}>
         <div className={css.brand}>
-          <LanesMark size={24} />
+          <LanesMark size={28} />
           <b>Lanes</b>
         </div>
         <nav className={css.crumbs} aria-label="位置">

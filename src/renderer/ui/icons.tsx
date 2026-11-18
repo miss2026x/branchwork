@@ -47,27 +47,29 @@ export const IconStop = (p: P) => <Icon {...p}><rect x="6" y="6" width="12" heig
  */
 export function LanesMark({ size = 24 }: { size?: number }) {
   const small = size <= 32;
+  // 上下左右都居中在 64×64 里：小号三条占 8–56 × 13–51，大号四条连同末尾的站占 10–54 × 13–51
+  const x = small ? 8 : 10;
   const rows: [number, number, number, string][] = small
     ? [
-        [42, 18, 8, "var(--route-1)"],
-        [30, 32, 8, "var(--route-2)"],
-        [36, 46, 8, "var(--route-3)"],
+        [48, 13, 9, "var(--route-1)"],
+        [34, 27.5, 9, "var(--route-2)"],
+        [40, 42, 9, "var(--route-3)"],
       ]
     : [
-        [40, 15, 6, "var(--route-1)"],
-        [30, 25, 6, "var(--route-2)"],
-        [34, 35, 6, "var(--route-3)"],
-        [22, 45, 6, "var(--route-4)"],
+        [40, 14, 6, "var(--route-1)"],
+        [30, 24, 6, "var(--route-2)"],
+        [34, 34, 6, "var(--route-3)"],
+        [22, 44, 6, "var(--route-4)"],
       ];
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden>
       {rows.map(([w, y, h, c]) => (
         <g key={y}>
-          <rect x="11" y={y} width={w} height={h} rx={h / 2} fill={c} />
+          <rect x={x} y={y} width={w} height={h} rx={h / 2} fill={c} />
           {!small && (
             <>
-              <circle cx={11 + w} cy={y + 3} r="4.2" fill={c} />
-              <circle cx={11 + w} cy={y + 3} r="1.8" fill="var(--surface)" />
+              <circle cx={x + w} cy={y + 3} r="4.2" fill={c} />
+              <circle cx={x + w} cy={y + 3} r="1.8" fill="var(--surface)" />
             </>
           )}
         </g>
