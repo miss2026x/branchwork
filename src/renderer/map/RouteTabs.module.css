@@ -65,8 +65,10 @@
 .tab[aria-current="true"] {
   font-weight: 600;
 }
+/* 名字最多显示四个字左右，再长用省略号，悬停看全名 */
 .name {
   min-width: 0;
+  max-width: 4.5em;
   overflow: hidden;
   text-overflow: ellipsis;
 }

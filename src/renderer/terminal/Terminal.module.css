@@ -226,8 +226,10 @@ li[data-status="exited"] .rowText b {
   font: var(--fs-12) / var(--lh-20) var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  scrollbar-width: thin;
-  scrollbar-color: var(--terminal-scrollbar) transparent;
+}
+/* 深色底上的滑块用终端自己的颜色；其余（无箭头、移进才出现）跟全局一样 */
+.output:hover::-webkit-scrollbar-thumb {
+  background-color: var(--terminal-scrollbar);
 }
 .window footer {
   flex: none;

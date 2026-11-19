@@ -245,10 +245,45 @@ button:disabled {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-/* 滚动条：细的、不带箭头（Windows 默认的很粗） */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-2) transparent;
+/*
+ * 滚动条：细的、不带上下箭头；鼠标移进能滚的区域才出现，移出就隐去。
+ * 不用 scrollbar-width / scrollbar-color：Chromium 121 起只要写了它们，下面这些 ::-webkit-scrollbar 规则就全不生效，Windows 上还会带箭头
+ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent; /* 例外：让滑块看起来只有 4px 宽，又好抓 */
+  border-radius: var(--r-pill);
+  background: transparent;
+  background-clip: padding-box;
+}
+/*
+ * Chromium 只在元素自己的样式因 :hover 变了时才重画它的滚动条；
+ * 所以给悬停中的元素设一个不继承、没有任何作用的变量，逼它重算，滑块才会跟着出现和隐去
+ */
+@property --hovering {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+:hover {
+  --hovering: 1;
+}
+:hover::-webkit-scrollbar-thumb {
+  background-color: var(--line-2);
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--fg-4);
 }
 code,
 pre,
