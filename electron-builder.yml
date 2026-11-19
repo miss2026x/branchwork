@@ -13,6 +13,8 @@ files:
 # Claude Code 的程序本体不能留在压缩包（asar）里，否则启动不了
 asarUnpack:
   - node_modules/@anthropic-ai/claude-agent-sdk-*/**
+  # 内置浏览器的 chrome-devtools-mcp 由每一路的 Claude 用另一个进程跑起来（设计稿 9-12），也不能留在压缩包里
+  - node_modules/chrome-devtools-mcp/**
 win:
   target: nsis
 nsis:

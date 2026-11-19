@@ -4,4 +4,4 @@
  */
 export { BRANCHWORK_BRIEFING } from "./briefing";
 export { createCore, CoreError, NEW_ROUTE_NAME, stopName } from "./core";
-export type { AskReport, Core, CoreErrorCode, CoreOptions } from "./core";
+export type { AskReport, Core, CoreErrorCode, CoreExtras, CoreOptions } from "./core";

@@ -6,7 +6,7 @@ import type { CanUseTool, Options } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
 import { z } from "zod";
 import { detectAuth, explainAuthError, type AuthInfo } from "./auth";
-import { splitPrompt, type ClaudeOptions, type Effort, type PermissionMode, type PromptImage } from "../shared";
+import { splitMcpTool, splitPrompt, type ClaudeOptions, type Effort, type McpServerState, type McpTransport, type PermissionMode, type PromptImage, type ToolResult } from "../shared";
 import type { AskOptions, AskResult, ClaudeClient, ClaudeTool, HistoryMessage, RunSettings } from "./types";
 
 /** 应用自己的工具挂在这个名字的服务下；Claude 看到的工具名是 mcp__branchwork__<name> */
@@ -40,6 +40,15 @@ export interface SdkFunctions {
    * 这样启动的 Claude 能选哪些模型，以及 modes 里哪些批准方式它肯切换过去（只启动、不提问）
    */
   probe(options: Options, modes: SdkMode[]): Promise<{ models: RawModel[]; modes: SdkMode[] }>;
+  /** 这样启动的 Claude 连 MCP 服务的结果（只启动、不提问；等到都不是“正在连”或超时） */
+  mcpStatus(options: Options, timeoutMs: number): Promise<RawMcpStatus[]>;
+}
+
+interface RawMcpStatus {
+  name: string;
+  status: string;
+  error?: string;
+  tools?: { name: string; description?: string; annotations?: { readOnly?: boolean } }[];
 }
 
 type SdkMode = NonNullable<Options["permissionMode"]>;
@@ -94,7 +103,31 @@ const realSdk: SdkFunctions = {
       q.close();
     }
   },
+  async mcpStatus(options, timeoutMs) {
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    async function* idle(): AsyncGenerator<never> {
+      await hold;
+    }
+    const q = sdk.query({ prompt: idle(), options });
+    try {
+      const end = Date.now() + timeoutMs;
+      for (;;) {
+        const list = (await q.mcpServerStatus()) as RawMcpStatus[];
+        if (Date.now() > end || !list.some((s) => s.status === "pending")) return list;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    } finally {
+      release();
+      q.close();
+    }
+  },
 };
+
+/** 我们的 MCP 服务写法 → SDK 的 */
+function sdkMcp(t: McpTransport): NonNullable<Options["mcpServers"]>[string] {
+  return t.type === "stdio" ? { type: "stdio", command: t.command, ...(t.args ? { args: t.args } : {}), ...(t.env ? { env: t.env } : {}) } : { type: t.type, url: t.url, ...(t.headers ? { headers: t.headers } : {}) };
+}
 
 export interface ClaudeClientOptions {
   /** 最多同时留几个提前启动好的 Claude 进程（每个占一份内存）。默认 3，设 0 关闭 */
@@ -125,10 +158,17 @@ function processOptions(cwd: string, sessionId: string | undefined, run: RunSett
   const permissionMode = SDK_MODE[run.permissionMode ?? "ask"];
   const append = client.appendSystemPrompt;
   const own = new Map(tools.map((t) => [TOOL_PREFIX + t.name, t]));
+  const mcp = run.mcp;
   const canUseTool: CanUseTool = async (toolName, input, extra) => {
     const suggestions = extra.suggestions ?? [];
     const mine = own.get(toolName);
     if (mine?.readonly) return { behavior: "allow", updatedInput: input };
+    // 外部 MCP 服务的工具：设了“直接放行”的、内置浏览器的（除了上传本机文件这类）不问
+    const ext = mcp ? splitMcpTool(toolName) : null;
+    if (ext && mcp) {
+      const policy = mcp.policy[toolName];
+      if (policy === "allow" || (policy !== "ask" && mcp.autoAllow.includes(ext[0]) && !mcp.askTools.includes(toolName))) return { behavior: "allow", updatedInput: input };
+    }
     if (mine) toolName = mine.title;
     const decision = turn.onPermission ? await turn.onPermission({ tool: toolName, input, canRemember: suggestions.length > 0 }) : "deny";
     if (typeof decision === "object") return { behavior: "deny", message: `用户没有批准这个操作，并且说：${decision.deny}` };
@@ -146,7 +186,10 @@ function processOptions(cwd: string, sessionId: string | undefined, run: RunSett
     ...(client.claudeExecutable ? { pathToClaudeCodeExecutable: client.claudeExecutable } : {}),
     ...(model ? { model } : {}),
     ...(effort ? { effort } : {}),
-    ...(tools.length > 0 ? { mcpServers: { [TOOL_SERVER]: toolServer(tools, cwd) } } : {}),
+    // MCP 服务只用这里给的（Lanes 按项目算好的，见 src/mcp）：不让 Claude Code 再按工作区的目录去读一遍配置
+    strictMcpConfig: true,
+    mcpServers: { ...Object.fromEntries(Object.entries(mcp?.servers ?? {}).map(([n, t]) => [n, sdkMcp(t)])), ...(tools.length > 0 ? { [TOOL_SERVER]: toolServer(tools, cwd) } : {}) },
+    ...(mcp && Object.values(mcp.policy).includes("deny") ? { disallowedTools: Object.entries(mcp.policy).filter(([, p]) => p === "deny").map(([n]) => n) } : {}),
     ...(sessionId ? { resume: sessionId } : {}),
   };
 }
@@ -173,7 +216,7 @@ function toolServer(tools: ClaudeTool[], cwd: string) {
 }
 
 /** 两次的启动设置一样不一样（一样才能用提前启动好的进程） */
-const sameRun = (a: RunSettings, b: RunSettings) => a.model === b.model && a.effort === b.effort && SDK_MODE[a.permissionMode ?? "ask"] === SDK_MODE[b.permissionMode ?? "ask"];
+const sameRun = (a: RunSettings, b: RunSettings) => a.model === b.model && a.effort === b.effort && SDK_MODE[a.permissionMode ?? "ask"] === SDK_MODE[b.permissionMode ?? "ask"] && (a.mcp?.key ?? "") === (b.mcp?.key ?? "");
 
 interface Warm {
   cwd: string;
@@ -284,9 +327,12 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
       try {
         stream ??= fns.query({ prompt: promptInput(opts.prompt, opts.images), options: processOptions(opts.cwd, opts.sessionId, opts, abort, turn, clientOpts, tools) });
         const title = titles();
+        const own = title;
         if (prewarmed) markStarted(); // 进程早就启动好了
         /** 正在生成参数的那次工具调用：参数一段段来，记下字数，从里面认出文件名或命令 */
         let toolInput: { tool: string; json: string; sent: number } | null = null;
+        /** 这一站里 MCP 工具的调用编号（它们的结果要带回界面：截图、报错列表） */
+        const mcpCalls = new Set<string>();
         for await (const raw of stream) {
           const m = raw as SdkMessage;
           if (m.session_id) sessionId = m.session_id;
@@ -311,8 +357,10 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
             } else if (ev?.type === "content_block_stop") toolInput = null;
           } else if (m.type === "user" && !m.parent_tool_use_id) {
             // 工具的结果回来了：它跑完了
-            const results = asBlocks(m.message?.content).filter((b) => b.type === "tool_result");
-            if (results.length > 0) opts.onEvent?.({ type: "tool-result", error: results.some((b) => b.is_error === true) });
+            for (const b of asBlocks(m.message?.content).filter((b) => b.type === "tool_result")) {
+              const id = typeof b.tool_use_id === "string" ? b.tool_use_id : undefined;
+              opts.onEvent?.({ type: "tool-result", error: b.is_error === true, ...(id ? { id } : {}), ...(id && mcpCalls.has(id) ? { result: toolResult(b) } : {}) });
+            }
           } else if (m.type === "assistant" && !m.parent_tool_use_id) {
             const u = (m.message as { usage?: Record<string, unknown> } | undefined)?.usage;
             if (u) {
@@ -322,7 +370,9 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
             for (const block of asBlocks(m.message?.content)) {
               if (block.type === "text" && typeof block.text === "string") text += block.text;
               if (block.type === "tool_use" && typeof block.name === "string") {
-                opts.onEvent?.({ type: "tool", tool: title.get(block.name) ?? block.name, input: (block.input as Record<string, unknown>) ?? {} });
+                const id = typeof block.id === "string" ? block.id : undefined;
+                if (id && block.name.startsWith("mcp__") && !own.has(block.name)) mcpCalls.add(id);
+                opts.onEvent?.({ type: "tool", tool: title.get(block.name) ?? block.name, input: (block.input as Record<string, unknown>) ?? {}, ...(id ? { id } : {}) });
               }
             }
           } else if (m.type === "result") {
@@ -407,6 +457,35 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
     },
 
     environment: (projectDirs) => readEnvironment(projectDirs),
+
+    async mcpStatus(cwd, servers) {
+      const names = Object.keys(servers);
+      if (names.length === 0) return {};
+      const list = await fns.mcpStatus(
+        {
+          cwd,
+          persistSession: false,
+          tools: [],
+          strictMcpConfig: true,
+          mcpServers: Object.fromEntries(Object.entries(servers).map(([n, t]) => [n, sdkMcp(t)])),
+          ...(clientOpts.claudeExecutable ? { pathToClaudeCodeExecutable: clientOpts.claudeExecutable } : {}),
+        },
+        30_000,
+      );
+      const now = Date.now();
+      const out: Record<string, McpServerState> = {};
+      for (const s of list) {
+        if (!names.includes(s.name)) continue;
+        const status = (["connected", "failed", "needs-auth", "pending", "disabled"] as const).find((x) => x === s.status) ?? "failed";
+        out[s.name] = {
+          status,
+          ...(s.error ? { error: s.error } : {}),
+          ...(s.tools ? { tools: s.tools.map((t) => ({ name: t.name, ...(t.description ? { description: t.description } : {}), ...(t.annotations?.readOnly ? { readOnly: true } : {}) })) } : {}),
+          checkedAt: now,
+        };
+      }
+      return out;
+    },
   };
 }
 
@@ -564,7 +643,22 @@ async function stopMessageIds(fns: SdkFunctions, sessionId: string, afterMessage
   }
 }
 
-function asBlocks(content: unknown): { type?: string; text?: unknown; name?: unknown; input?: unknown; is_error?: unknown }[] {
+/** 一个 tool_result 块 → 界面要的结果：文字（太长截断）和图片 */
+export function toolResult(b: { content?: unknown; is_error?: unknown }): ToolResult {
+  const parts = typeof b.content === "string" ? [{ type: "text", text: b.content }] : asBlocks(b.content);
+  const text = parts
+    .filter((p) => p.type === "text" && typeof p.text === "string")
+    .map((p) => p.text as string)
+    .join("\n");
+  const images: PromptImage[] = [];
+  for (const p of parts) {
+    const src = (p as { source?: { type?: string; media_type?: string; data?: string } }).source;
+    if (p.type === "image" && src?.type === "base64" && typeof src.data === "string" && images.length < 3) images.push({ type: (src.media_type ?? "image/png") as PromptImage["type"], data: src.data, name: "截图", width: 0, height: 0 });
+  }
+  return { error: b.is_error === true, text: text.length > 6000 ? text.slice(0, 6000) + "\n…" : text, images };
+}
+
+function asBlocks(content: unknown): { type?: string; text?: unknown; name?: unknown; input?: unknown; is_error?: unknown; id?: unknown; tool_use_id?: unknown; content?: unknown }[] {
   return Array.isArray(content) ? (content as { type?: string }[]) : [];
 }
 

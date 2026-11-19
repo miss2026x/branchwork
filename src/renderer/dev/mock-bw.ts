@@ -1,10 +1,11 @@
-import type { BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, LocalPreset, Project, PromptImage, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BrowserSettings, BrowserState, BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, LocalPreset, McpOverview, McpServerEntry, McpServerState, Project, PromptImage, ToolResult, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
  * 数据都在内存里，回答是编出来的。用来调界面和截图，不参与正式运行。
  *
- * 地址栏参数：?empty 从空白开始；?live 打开后自动问一站；?slow 把各阶段拖长（看状态显示）
+ * 地址栏参数：?empty 从空白开始；?live 打开后自动问一站；?slow 把各阶段拖长（看状态显示）；
+ * ?browser 第一路开着浏览器、对话里有浏览器操作（设计稿 9-12）
  */
 export function installMockBw(): void {
   const q = new URLSearchParams(location.search);
@@ -213,7 +214,165 @@ export function installMockBw(): void {
     );
   }
 
+  // ── 浏览器、MCP 的假数据（设计稿 9-12、9-13） ──
+  /** 一张画出来的“登录页”截图 */
+  const fakeShot = (): PromptImage => {
+    const c = document.createElement("canvas");
+    c.width = 760;
+    c.height = 470;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#F6F8FA";
+    g.fillRect(0, 0, 760, 470);
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, 760, 52);
+    g.fillStyle = "#E06C1F";
+    g.fillRect(24, 19, 14, 14);
+    g.fillStyle = "#161B22";
+    g.font = "bold 15px sans-serif";
+    g.fillText("auth-service", 46, 31);
+    g.fillStyle = "#fff";
+    g.fillRect(210, 92, 340, 300);
+    g.fillStyle = "#161B22";
+    g.font = "bold 20px sans-serif";
+    g.fillText("登录", 230, 135);
+    g.strokeStyle = "#DDE2E8";
+    g.strokeRect(230, 154, 300, 40);
+    g.strokeRect(230, 208, 300, 40);
+    g.fillStyle = "#2563C9";
+    g.fillRect(230, 266, 300, 44);
+    g.fillStyle = "#fff";
+    g.font = "bold 14px sans-serif";
+    g.fillText("登录", 366, 293);
+    return { type: "image/png", data: c.toDataURL("image/png").split(",")[1]!, name: "截图", width: 760, height: 470 };
+  };
+  const browserStates = new Map<string, BrowserState>();
+  const closedBrowser = (routeId: string): BrowserState => ({ routeId, open: false, url: "", title: "", pages: [], issues: [], picking: false, lastUrl: null, error: null });
+  const openBrowser = (routeId: string, url = "http://localhost:5174/login"): BrowserState => {
+    const st: BrowserState = { ...closedBrowser(routeId), open: true, url, title: "登录 · auth-service", pages: [{ url, title: "登录 · auth-service", active: true }] };
+    browserStates.set(routeId, st);
+    emit({ type: "browser.state", state: st });
+    return st;
+  };
+  let browserSettings: BrowserSettings = { enabled: true, chromePath: "", localOnly: false, attachState: true, stopShots: true };
+  const mcpServers: McpServerEntry[] = [
+    { name: "postgres", scope: "project", where: ".mcp.json", config: { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-postgres", "postgres://localhost/auth"] }, enabled: true },
+    { name: "linear", scope: "user", where: "~/.claude.json（全局）", config: { type: "http", url: "https://mcp.linear.app/mcp" }, enabled: true },
+    { name: "sentry", scope: "lanes", where: "Lanes（全部项目）", config: { type: "http", url: "https://mcp.sentry.dev/mcp" }, enabled: true },
+    { name: "docs", scope: "project", where: ".mcp.json", config: { type: "http", url: "https://docs.example.com/mcp" }, enabled: true, untrusted: true },
+    { name: "chrome-devtools", scope: "user", where: "~/.claude.json（全局）", config: { type: "stdio", command: "npx", args: ["chrome-devtools-mcp@latest"] }, enabled: true, replacedByBrowser: true },
+  ];
+  const mcpStates: Record<string, McpServerState> = {
+    postgres: { status: "connected", tools: [{ name: "query", description: "运行一条只读 SQL", readOnly: true }, { name: "list_tables", description: "列出所有表", readOnly: true }, { name: "describe_table", description: "看一张表的结构", readOnly: true }], checkedAt: Date.now() },
+    linear: { status: "needs-auth", checkedAt: Date.now() },
+    sentry: { status: "failed", error: "HTTP 401 Unauthorized", checkedAt: Date.now() },
+  };
+  const mcpPolicies: McpOverview["policies"] = {};
+  const overview = (projectId: string): McpOverview => ({ projectId, servers: mcpServers.map((x) => ({ ...x })), states: { ...mcpStates }, policies: mcpPolicies, browser: { ...browserSettings, found: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" } });
+  const routeOff = new Map<string, string[]>();
+  if (q.has("browser")) {
+    const r1 = [...routes.values()][0];
+    if (r1) {
+      const st = openBrowser(r1.id);
+      st.issues = [
+        { id: "i1", kind: "error", text: "TypeError: Cannot read properties of undefined (reading 'token')", source: "auth.ts:88", at: Date.now() },
+        { id: "i2", kind: "error", text: "Uncaught (in promise) 401 Unauthorized", source: "api.ts:21", at: Date.now() },
+        { id: "i3", kind: "request", text: "POST /api/session → 401", source: "POST 401", at: Date.now() },
+      ];
+      const last = [...stops.values()].filter((x) => x.routeId === r1.id).at(-1);
+      if (last) {
+        const shot = fakeShot();
+        const step = (tool: string, input: Record<string, unknown>, detail: string, result?: ToolResult): ChatItem => ({ kind: "tool", tool: `mcp__browser__${tool}`, detail, id: id("t"), input, ...(result ? { result } : {}) });
+        content.set(last.id, [
+          ...(content.get(last.id) ?? []),
+          step("navigate_page", { pageId: 1, type: "url", url: "http://localhost:5174/login" }, "http://localhost:5174/login"),
+          step("fill", { pageId: 1, uid: "1_4", value: "test@lanes.dev" }, ""),
+          step("fill", { pageId: 1, uid: "1_6", value: "••••••" }, ""),
+          step("click", { pageId: 1, uid: "1_8" }, ""),
+          step("take_screenshot", { pageId: 1 }, "", { error: false, text: "Took a screenshot of the current page's viewport.", images: [shot] }),
+          step("list_console_messages", { pageId: 1 }, "", { error: false, text: "## Console messages\nmsgid=1 [error] TypeError: Cannot read properties of undefined (reading 'token') (auth.ts:88)\nmsgid=2 [error] Uncaught (in promise) 401 Unauthorized (api.ts:21)", images: [] }),
+          { kind: "tool", tool: "mcp__postgres__query", detail: "SELECT id, email FROM users LIMIT 3", id: id("t"), input: { sql: "SELECT id, email FROM users LIMIT 3" }, result: { error: false, text: "id | email\n1  | ada@lanes.dev\n2  | bob@lanes.dev", images: [] } },
+          { kind: "text", text: "登录接口返回 401：session 里少了 token 字段，已经在 `auth.ts` 补上。" },
+        ]);
+      }
+    }
+  }
+
   const api: BwApi = {
+    mcpOverview: async (projectId) => overview(projectId),
+    async mcpCheck(projectId, names) {
+      const list = names ?? mcpServers.filter((x) => x.enabled && !x.untrusted && !x.replacedByBrowser).map((x) => x.name);
+      emit({ type: "mcp.states", projectId, states: { ...mcpStates, ...Object.fromEntries(list.map((n) => [n, { status: "checking" as const, checkedAt: Date.now() }])) } });
+      await wait(1200);
+      for (const n of list) mcpStates[n] ??= { status: "connected", tools: [{ name: "search", description: "搜索" }], checkedAt: Date.now() };
+      emit({ type: "mcp.states", projectId, states: { ...mcpStates } });
+      return { ...mcpStates };
+    },
+    async mcpTest() {
+      await wait(800);
+      return { status: "connected", tools: [{ name: "query", readOnly: true }, { name: "list_tables", readOnly: true }], checkedAt: Date.now() };
+    },
+    async mcpSave(projectId, input, previous) {
+      const i = mcpServers.findIndex((x) => x.name === (previous?.name ?? input.name) && x.scope === (previous?.scope ?? input.scope));
+      const where = { local: "~/.claude.json（这个项目）", project: ".mcp.json", user: "~/.claude.json（全局）", lanes: "Lanes（全部项目）", "lanes-project": "Lanes（这个项目）" }[input.scope];
+      const entry: McpServerEntry = { name: input.name, scope: input.scope, where, config: input.config, enabled: true };
+      if (i >= 0) mcpServers[i] = entry;
+      else mcpServers.unshift(entry);
+      return overview(projectId);
+    },
+    async mcpRemove(projectId, name, scope) {
+      const i = mcpServers.findIndex((x) => x.name === name && x.scope === scope);
+      if (i >= 0) mcpServers.splice(i, 1);
+      return overview(projectId);
+    },
+    async mcpSetEnabled(projectId, name, enabled) {
+      for (const x of mcpServers) if (x.name === name) x.enabled = enabled;
+      return overview(projectId);
+    },
+    async mcpTrust(projectId, names, trusted) {
+      for (const x of mcpServers) if (names.includes(x.name)) x.untrusted = !trusted;
+      return overview(projectId);
+    },
+    async mcpSetPolicy(server, tool, policy) {
+      const p = (mcpPolicies[server] ??= {});
+      if (policy) p[tool] = policy;
+      else delete p[tool];
+    },
+    routeMcp: async (routeId) => routeOff.get(routeId) ?? [],
+    setRouteMcp: async (routeId, off) => void routeOff.set(routeId, off),
+    browserSettings: async () => ({ ...browserSettings, found: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" }),
+    async setBrowserSettings(patch) {
+      browserSettings = { ...browserSettings, ...patch };
+      return { ...browserSettings, found: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" };
+    },
+    browserState: async (routeId) => browserStates.get(routeId) ?? closedBrowser(routeId),
+    async browserOpen(routeId, url) {
+      await wait(500);
+      openBrowser(routeId, url);
+    },
+    browserShow: async () => {},
+    async browserScreenshot() {
+      return fakeShot();
+    },
+    async browserPick(routeId) {
+      const st = browserStates.get(routeId) ?? openBrowser(routeId);
+      browserStates.set(routeId, { ...st, picking: true });
+      emit({ type: "browser.state", state: browserStates.get(routeId)! });
+      await wait(1500);
+      const done = { ...browserStates.get(routeId)!, picking: false };
+      browserStates.set(routeId, done);
+      emit({ type: "browser.state", state: done });
+      return { label: "button「登录」", selector: "form.login > button.primary", width: 340, height: 44, x: 210, y: 270, styles: "display: block;\nmargin: 0px 0px 0px 40px;\nwidth: 100%;\nfont-size: 14px;", text: "登录", html: '<button class="primary">登录</button>', image: fakeShot(), url: st.url };
+    },
+    async browserCancelPick(routeId) {
+      const st = browserStates.get(routeId);
+      if (st) emit({ type: "browser.state", state: { ...st, picking: false } });
+    },
+    async browserClose(routeId) {
+      const st = browserStates.get(routeId);
+      const closed = { ...closedBrowser(routeId), lastUrl: st?.url ?? null };
+      browserStates.set(routeId, closed);
+      emit({ type: "browser.state", state: closed });
+    },
     listProjects: async () => projects,
     pickDirectory: async () => `D:/work/demo-${projects.length + 1}`,
     async addProject(localDir) {

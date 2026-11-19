@@ -145,6 +145,12 @@ await sync.pushAfterStop("route-1");     // 只在这一站正常结束后
 
 不要在 Local 里来回切分支。每个需求用 `git worktree add` 切一个自己的目录，每个目录在 Lanes 里是一个独立的项目（各建一个引擎，`localDir` 指向各自的目录）。它们的同步状态互不干扰。同一个仓库下所有项目的路 id 不能重复。
 
+## MCP 服务和内置浏览器
+
+- **MCP 服务**（`src/mcp`）：直接读写 Claude Code 的配置——`~/.claude.json` 的全局和“这个项目”两节、项目根目录的 `.mcp.json`——另外 Lanes 自己也能存。同名时和 Claude Code 一样：本地 > 项目 > 全局。项目 `.mcp.json` 里的服务第一次用要你确认。每个 Claude 进程用 `strictMcpConfig` 启动，只用 Lanes 算好的这一套（不让它按工作区目录再读一遍）。设置在右上角“设置 › MCP 服务…”，每一路单独开关在路的菜单里。
+- **内置浏览器**（`src/browser`）：Lanes 管一个专用的 Chrome（资料在数据目录的 `browser-profile`，和你平时的 Chrome 分开），每一路一个窗口。每个 Claude 进程跑一个 [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)，连到 Lanes 的 DevTools 协议代理上；代理按“页面在哪个窗口、窗口归哪一路”过滤，所以各路共用一个 Chrome，却只看得到、动得了自己的页面。找 Chrome 的顺序：设置里写的位置、环境变量 `LANES_CHROME`、系统里装的 Chrome / Edge / Chromium。
+- 远程服务要 OAuth 登录时，Agent SDK 自己走不了浏览器登录：先在终端里运行 `claude mcp login 名字`。
+
 ## 已知的行为和限制
 
 - Claude 在工作区里自己做的 git 提交不会带回 Local，只带文件内容（在 Local 里显示为未提交的改动）。

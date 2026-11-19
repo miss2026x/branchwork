@@ -1,4 +1,5 @@
 /** 数据模型。主进程和界面共用，只有普通对象。 */
+import type { PromptImage } from "./images";
 
 export type RouteStatus =
   | "idle" // 停在站上，可以问下一站
@@ -253,7 +254,29 @@ export interface Terminal {
 }
 
 /** 一站回答里的一段：一段文字，或一次工具调用 */
-export type ChatItem = { kind: "text"; text: string } | { kind: "tool"; tool: string; detail: string; /** 改文件的工具：这一次增、删了多少行 */ added?: number; removed?: number };
+export type ChatItem =
+  | { kind: "text"; text: string }
+  | {
+      kind: "tool";
+      tool: string;
+      detail: string;
+      /** 改文件的工具：这一次增、删了多少行 */
+      added?: number;
+      removed?: number;
+      /** 这次调用的编号（对上它的结果） */
+      id?: string;
+      /** MCP 工具：完整的参数 */
+      input?: Record<string, unknown>;
+      /** MCP 工具的结果：文字（太长截断）和图片（浏览器截图） */
+      result?: ToolResult;
+    };
+
+/** 一次工具调用的结果（只留 MCP 工具的：界面要显示截图、报错列表） */
+export interface ToolResult {
+  error: boolean;
+  text: string;
+  images: PromptImage[];
+}
 
 export interface StopContent {
   stopId: string;
@@ -311,4 +334,125 @@ export interface ImportProgress {
   items: { sessionId: string; title: string; prompts: number | null; state: "waiting" | "running" | "done" | "failed" | "skipped"; step?: string; error?: string }[];
   /** 全部结束了（导完、出错或被停止） */
   finished: boolean;
+}
+
+// ───────────── MCP 服务（设计稿 9-13） ─────────────
+
+/**
+ * 一个 MCP 服务存在哪：前三种和 Claude Code 一样（claude mcp add --scope），存在它的文件里，命令行里也用得到；
+ * 后两种只存在 Lanes 里
+ */
+export type McpScope = "local" | "project" | "user" | "lanes" | "lanes-project";
+
+/** 怎么连：本机命令，或远程网址 */
+export type McpTransport = { type: "stdio"; command: string; args?: string[]; env?: Record<string, string> } | { type: "http" | "sse"; url: string; headers?: Record<string, string> };
+
+/** 设置里列出的一个 MCP 服务 */
+export interface McpServerEntry {
+  name: string;
+  scope: McpScope;
+  /** 存在哪个文件（给人看的：~/.claude.json、.mcp.json、Lanes） */
+  where: string;
+  config: McpTransport;
+  /** Lanes 里的开关（只记在 Lanes 里，不动原文件） */
+  enabled: boolean;
+  /** 同名的服务有更优先的一份：这一份不生效。值是盖住它的那份的范围 */
+  shadowedBy?: McpScope;
+  /** 认出是 chrome-devtools-mcp：由内置的浏览器代替，不生效 */
+  replacedByBrowser?: boolean;
+  /** 项目 .mcp.json 里的服务：你还没确认过要不要用（设计稿 9-13“项目里的服务先确认”） */
+  untrusted?: boolean;
+}
+
+export type McpToolPolicy = "allow" | "ask" | "deny";
+
+/** 检查一个服务连不连得上的结果 */
+export interface McpServerState {
+  status: "connected" | "failed" | "needs-auth" | "pending" | "disabled" | "checking";
+  error?: string;
+  tools?: { name: string; description?: string; readOnly?: boolean }[];
+  checkedAt: number;
+}
+
+/** 内置浏览器的设置（设计稿 9-12） */
+export interface BrowserSettings {
+  enabled: boolean;
+  /** Chrome 程序的位置；空的话自动找 */
+  chromePath: string;
+  /** 只给 Local 专车开浏览器（内存不够时） */
+  localOnly: boolean;
+  /** 发车时附上浏览器现状 */
+  attachState: boolean;
+  /** 每一站结束时截一张图 */
+  stopShots: boolean;
+}
+
+/** MCP 设置页一次拿到的全部东西 */
+export interface McpOverview {
+  projectId: string;
+  servers: McpServerEntry[];
+  /** 按名字：最近一次检查的结果 */
+  states: Record<string, McpServerState>;
+  /** 按服务名、工具名：工具的批准方式；没写的按默认（只读的直接放行，其余跟这一路） */
+  policies: Record<string, Record<string, McpToolPolicy>>;
+  browser: BrowserSettings & { /** 自动找到的 Chrome；找不到为空 */ found: string | null };
+}
+
+/** 新加或改一个服务时交给主进程的东西 */
+export interface McpServerInput {
+  name: string;
+  scope: McpScope;
+  config: McpTransport;
+}
+
+// ───────────── 内置浏览器（设计稿 9-12） ─────────────
+
+/** 浏览器里的一条问题：报错，或失败的请求 */
+export interface BrowserIssue {
+  id: string;
+  kind: "error" | "warning" | "request";
+  text: string;
+  /** 报错的位置（auth.ts:88），请求的方法和状态（POST 401） */
+  source: string;
+  at: number;
+}
+
+/** 一路的浏览器窗口现在的样子 */
+export interface BrowserState {
+  routeId: string;
+  /** 这一路有没有开着的窗口 */
+  open: boolean;
+  /** 现在的页面 */
+  url: string;
+  title: string;
+  /** 这一路窗口里的全部页面 */
+  pages: { url: string; title: string; active: boolean }[];
+  /** 上一站以来的问题（新的在后） */
+  issues: BrowserIssue[];
+  /** 正在点选元素 */
+  picking: boolean;
+  /** 窗口关了：上次在的网址 */
+  lastUrl: string | null;
+  /** 找不到 Chrome、启动失败 */
+  error: string | null;
+}
+
+/** 点选的元素（设计稿 9-12“点选元素”） */
+export interface PickedElement {
+  /** button「登录」 */
+  label: string;
+  /** form.login > button.primary */
+  selector: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  /** 主要的样式，一行一条 */
+  styles: string;
+  text: string;
+  /** 元素的 HTML（太长截断） */
+  html: string;
+  /** 局部截图 */
+  image: PromptImage | null;
+  url: string;
 }

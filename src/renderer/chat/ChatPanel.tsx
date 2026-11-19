@@ -19,6 +19,8 @@ import css from "./ChatPanel.module.css";
 import { LocalIntro, LocalMenu, LocalNow, LocalPresetBar, LocalResetConfirm, LocalWaiting, runningDev } from "./LocalCar";
 import type { PresetChip } from "./local-presets";
 import { Md, StreamingMd } from "./Md";
+import { BrowserBar, BrowserGroup, BrowserOpenButton, BrowserRefs, BrowserStateChip, devUrl, McpCall } from "./Browser";
+import { isBrowserTool, isOtherMcpTool } from "./browser-steps";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
 interface Props {
@@ -107,6 +109,20 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const [localMenu, setLocalMenu] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const resetLocal = useStore((s) => s.resetLocal);
+  // 内置浏览器（设计稿 9-12）
+  const browser = useStore((s) => s.browser[route.id]);
+  const browserRefs = useStore((s) => s.browserRefs[route.id]);
+  const briefOff = useStore((s) => !!s.browserBriefOff[route.id]);
+  const setBriefOff = useStore((s) => s.setBrowserBriefOff);
+  const removeRef = useStore((s) => s.removeBrowserRef);
+  const loadBrowser = useStore((s) => s.loadBrowser);
+  const openMcp = useStore((s) => s.openMcp);
+  useEffect(() => loadBrowser(route.id), [route.id, loadBrowser]);
+  /** 截图放进输入框：和粘贴的图片一样 */
+  const insertImage = (img: PromptImage) => {
+    const bytes = Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0));
+    input.current?.insertFiles([new File([bytes], `${img.name || "截图"}.${img.type.split("/")[1]}`, { type: img.type })]);
+  };
   const exportRoute = useStore((s) => s.exportRoute);
 
   const colors = routeColors(route);
@@ -181,7 +197,10 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permission?.requestId, route.id]);
 
-  const status = draftStatus(draft, draftImages);
+  const hasRefs = (browserRefs?.length ?? 0) > 0;
+  const draftOk = draftStatus(draft, draftImages);
+  // 只引用了浏览器里的东西、没写字也能发
+  const status = draftOk === "empty" && hasRefs ? "ok" : draftOk;
   const send = () => {
     if (blocked || status !== "ok") return;
     const q = toPrompt(draft, draftImages);
@@ -399,7 +418,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           <section className={css.permission} role="alertdialog" aria-label="等你批准" aria-describedby={permission.reason ? "perm-reason" : undefined}>
             <header>
               <span>{/bash|终端|command/i.test(permission.tool) ? <IconTerminal size={16} /> : /write|edit/i.test(permission.tool) ? <IconEdit size={16} /> : <IconWarn size={16} />}</span>
-              <h3>Claude 想{/bash|终端|command/i.test(permission.tool) ? "运行一条命令" : /write|edit/i.test(permission.tool) ? "改一个文件" : `用 ${permission.tool}`}</h3>
+              <h3>Claude 想{permissionTitle(permission.tool)}</h3>
             </header>
             <code>{permission.detail}</code>
             {permission.reason && <p id="perm-reason">{permission.reason}</p>}
@@ -537,8 +556,12 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         )}
         {route.local && <LocalWaiting projectId={route.projectId} />}
         {route.local && !blocked && !busy && <LocalPresetBar route={route} status={localStatus} dev={dev} activeId={pickedNow} onPick={pickPreset} onManage={() => openLocalPresets(route.projectId)} />}
+        {!blocked && <BrowserBar routeId={route.id} state={browser} activity={activity} onScreenshot={insertImage} onSettings={() => openMcp(route.projectId, "browser")} />}
         {/* 设计稿 4-6：输入框、这一路的三个选择、发车按钮在同一个框里 */}
         <div className={css.box} data-disabled={blocked}>
+          <BrowserRefs refs={browserRefs ?? []} onRemove={(i) => removeRef(route.id, i)}>
+            {browser?.open && <BrowserStateChip state={browser} off={briefOff} onToggle={(off) => setBriefOff(route.id, off)} />}
+          </BrowserRefs>
           <PromptInput
             ref={input}
             text={draft}
@@ -553,9 +576,13 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
           />
           <div className={css.toolbar}>
             <div className={css.controls}>
-              <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
-                <IconClip size={16} />
-              </button>
+              {/* 回形针和“浏览器”算一格：后面几个选择按位置定谁先缩（见 .controls） */}
+              <span className={css.attachGroup}>
+                <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
+                  <IconClip size={16} />
+                </button>
+                {!browser?.open && !browser?.lastUrl && !browser?.error && <BrowserOpenButton routeId={route.id} dev={devUrl(terminals)} disabled={blocked} />}
+              </span>
               <PermissionModeControl mode={permissionMode} routeLabel={routeLabel(route)} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
               <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={routeLabel(route)} onChange={onModel} />
               <EffortControl effort={route.effort} model={currentModel(claudeOptions, route.model)} routeLabel={routeLabel(route)} onChange={(effort) => onModel(route.model, effort)} />
@@ -568,6 +595,16 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
       </footer>
     </aside>
   );
+}
+
+/** 批准卡片的标题：“Claude 想……”（MCP 工具写成“用 linear 的 create_issue”，设计稿 9-13） */
+function permissionTitle(tool: string): string {
+  if (/^mcp__browser__upload_file$/.test(tool)) return "把本机文件传进网页";
+  const mcp = /^mcp__(.+?)__(.+)$/.exec(tool);
+  if (mcp) return `用 ${mcp[1] === "browser" ? "浏览器" : mcp[1]} 的 ${mcp[2]}`;
+  if (/bash|终端|command/i.test(tool)) return "运行一条命令";
+  if (/write|edit/i.test(tool)) return "改一个文件";
+  return `用 ${tool}`;
 }
 
 function StatusLine({ route, n, phase }: { route: Route; n: number; phase?: LiveStop["phase"] | "syncing" }) {
@@ -646,14 +683,21 @@ function Activity({ activity, thought, now, empty, phase }: { activity?: RouteAc
 }
 
 function Items({ items, streaming, activity, now = 0 }: { items: ChatItem[]; streaming?: boolean; activity?: RouteActivity; now?: number }) {
-  // 连着的工具调用收成一组
-  const blocks: ({ kind: "text"; text: string; last: boolean } | { kind: "tools"; tools: Extract<ChatItem, { kind: "tool" }>[] })[] = [];
+  const openViewer = useStore((s) => s.openViewer);
+  // 连着的工具调用收成一组；浏览器的连着几步合成一块，别的 MCP 服务的调用各占一块（设计稿 9-12、9-13）
+  type ToolItem = Extract<ChatItem, { kind: "tool" }>;
+  const blocks: ({ kind: "text"; text: string; last: boolean } | { kind: "tools" | "browser"; tools: ToolItem[] } | { kind: "mcp"; tool: ToolItem })[] = [];
   items.forEach((it, i) => {
     const prev = blocks.at(-1);
     if (it.kind === "text") blocks.push({ kind: "text", text: it.text, last: i === items.length - 1 });
-    else if (prev?.kind === "tools") prev.tools.push(it);
-    else blocks.push({ kind: "tools", tools: [it] });
+    else if (isOtherMcpTool(it.tool)) blocks.push({ kind: "mcp", tool: it });
+    else {
+      const kind = isBrowserTool(it.tool) ? "browser" : "tools";
+      if (prev?.kind === kind) prev.tools.push(it);
+      else blocks.push({ kind, tools: [it] });
+    }
   });
+  const runningLast = (i: number) => !!streaming && i === blocks.length - 1 && activity?.kind === "running";
   return (
     <>
       {blocks.map((b, i) =>
@@ -661,6 +705,10 @@ function Items({ items, streaming, activity, now = 0 }: { items: ChatItem[]; str
           <div key={i} className={css.md} data-streaming={streaming && b.last}>
             {streaming ? <StreamingMd>{b.text}</StreamingMd> : <Md>{b.text}</Md>}
           </div>
+        ) : b.kind === "browser" ? (
+          <BrowserGroup key={i} tools={b.tools} running={runningLast(i)} onOpenImages={(images, index) => openViewer(images, index, "浏览器截图")} />
+        ) : b.kind === "mcp" ? (
+          <McpCall key={i} tool={b.tool} running={runningLast(i)} />
         ) : (
           <Tools key={i} tools={b.tools} running={!!streaming && i === blocks.length - 1 && activity?.kind === "running" ? activity : undefined} now={now} />
         ),

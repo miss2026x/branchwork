@@ -9,9 +9,11 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
   db: { modules: ["shared"], packages: [] },
   claude: { modules: ["shared"], packages: ["@anthropic-ai/claude-agent-sdk", "zod"] },
   terminal: { modules: [], packages: [] },
+  mcp: { modules: ["shared"], packages: [] },
+  browser: { modules: ["shared"], packages: ["ws"] },
   core: { modules: ["shared", "sync", "db", "claude", "terminal"], packages: [] },
   // Electron 只进这两个模块
-  main: { modules: ["shared", "core", "db", "claude"], packages: ["electron"] },
+  main: { modules: ["shared", "core", "db", "claude", "mcp", "browser"], packages: ["electron"] },
   preload: { modules: ["shared"], packages: ["electron"] },
   // 界面只认识 shared 里的类型；数据只能经 window.bw 来
   renderer: { modules: ["shared"], packages: ["react", "react-dom/client", "zustand", "react-markdown", "remark-gfm", "@fontsource-variable/schibsted-grotesk", "@fontsource-variable/noto-sans-sc", "@fontsource-variable/jetbrains-mono", "shiki/core", "shiki/engine/javascript"] },

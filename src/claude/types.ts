@@ -1,11 +1,24 @@
 import type { AuthInfo } from "./auth";
-import type { ClaudeOptions, Effort, PermissionDecision, PermissionMode, PromptImage } from "../shared";
+import type { ClaudeOptions, Effort, McpServerState, McpTransport, PermissionDecision, PermissionMode, PromptImage, ToolResult } from "../shared";
 
 /** 一个 Claude 进程按什么设置启动：启动后就改不了，变了就得换一个进程 */
 export interface RunSettings {
   model?: string;
   effort?: Effort;
   permissionMode?: PermissionMode;
+  /** 交给这个 Claude 进程的外部 MCP 服务（设计稿 9-13；不含 Lanes 自己的工具）和工具的批准规则 */
+  mcp?: McpRun;
+}
+
+export interface McpRun {
+  servers: Record<string, McpTransport>;
+  /** 这套服务的指纹：一样才能用提前启动好的进程 */
+  key: string;
+  /** 完整工具名（mcp__服务__工具）→ 批准方式。deny 的不给 Claude 看 */
+  policy: Record<string, "allow" | "ask" | "deny">;
+  /** 这些服务的工具都直接放行（内置的浏览器），除了 askTools 里的 */
+  autoAllow: string[];
+  askTools: string[];
 }
 
 /** 回答过程中的事件 */
@@ -15,7 +28,7 @@ export type ClaudeEvent =
   /** Claude 给出了这一站的结果；之后它的进程还要收尾退出，可能再花几秒 */
   | { type: "answered" }
   | { type: "text"; text: string }
-  | { type: "tool"; tool: string; input: Record<string, unknown> }
+  | { type: "tool"; tool: string; input: Record<string, unknown>; /** 这次调用的编号 */ id?: string }
   /** 它在想（设计稿 4-8）：text 是想的内容（有的模型不给内容，只有空的开始） */
   | { type: "thinking"; text: string }
   /**
@@ -24,7 +37,7 @@ export type ClaudeEvent =
    */
   | { type: "tool-input"; tool: string; chars: number; lines: number; target?: string }
   /** 工具跑完了（结果回来了）；error：跑出错了 */
-  | { type: "tool-result"; error: boolean };
+  | { type: "tool-result"; error: boolean; /** 对上是哪次调用；MCP 工具还带结果（文字、截图） */ id?: string; result?: ToolResult };
 
 export interface PermissionRequest {
   tool: string;
@@ -49,6 +62,8 @@ export interface AskOptions {
   effort?: Effort;
   /** 批准方式；不传是每次都问 */
   permissionMode?: PermissionMode;
+  /** 外部 MCP 服务（设计稿 9-13） */
+  mcp?: McpRun;
   /** 停车：abort 之后这一站算没答完 */
   signal?: AbortSignal;
   onEvent?: (e: ClaudeEvent) => void;
@@ -116,6 +131,11 @@ export interface ClaudeClient {
    * 尽力而为：起不出来返回 null，调用方继续用自己的临时名字。
    */
   name(prompt: string): Promise<string | null>;
+  /**
+   * 检查这些 MCP 服务连不连得上、有哪些工具（设计稿 9-13）：启动一个不提问的 Claude 进程，让它去连，等它们都有了结果。
+   * 结果和 Claude 真正用的时候一致（包括要不要登录）
+   */
+  mcpStatus(cwd: string, servers: Record<string, McpTransport>): Promise<Record<string, McpServerState>>;
   /** 关掉为这个目录提前启动好的 Claude（这一路归档或删除时调，否则它会占着目录和内存） */
   cool(cwd: string): void;
   /** 关掉所有提前启动好的 Claude（应用退出时调） */

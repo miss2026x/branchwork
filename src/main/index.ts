@@ -5,6 +5,7 @@ import path from "node:path";
 import { createClaudeClient, createDemoClaudeClient } from "../claude";
 import { BRANCHWORK_BRIEFING, createCore } from "../core";
 import { openDb } from "../db";
+import { createExtras } from "./extras";
 import { registerIpc } from "./ipc";
 
 // 开发时和命令行工具共用一份数据（~/.branchwork-dev），这样两边看到的是同一批项目和路；
@@ -31,10 +32,14 @@ function packagedClaude(): string | undefined {
   return names.map((n) => path.join(base, n, exe)).find((p) => fs.existsSync(p));
 }
 
+const claude = demo ? createDemoClaudeClient() : createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING, claudeExecutable: packagedClaude() });
+// MCP 服务和内置浏览器（设计稿 9-12、9-13）
+const extras = createExtras(db, claude, home);
 const core = createCore({
   db,
-  claude: demo ? createDemoClaudeClient() : createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING, claudeExecutable: packagedClaude() }),
+  claude,
   worktreesRoot: path.join(home, "worktrees"),
+  extras: extras.coreExtras,
 });
 
 function createWindow(): void {
@@ -62,8 +67,10 @@ function createWindow(): void {
   else void win.loadFile(path.join(import.meta.dirname, "../renderer/index.html"));
 }
 
-void app.whenReady().then(() => {
-  registerIpc(core);
+void app.whenReady().then(async () => {
+  // 先把浏览器代理开好：各路的 Claude 启动时要知道连到哪里（Chrome 本身等第一次要用时才启动）
+  await extras.hub.start().catch((e: unknown) => console.error("[browser] 代理没开起来：", e));
+  registerIpc(core, extras);
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -76,5 +83,6 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   core.dispose(); // 关掉提前启动好的 Claude
+  void extras.hub.dispose(); // 关掉专用的 Chrome
   db.close();
 });

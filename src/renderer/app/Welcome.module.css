@@ -161,6 +161,22 @@
   margin: 0 0 var(--sp-10);
   font-size: var(--fs-13);
 }
+.settingsLinks {
+  display: flex;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
+}
+.settingsLinks button {
+  height: var(--h-32);
+  padding: 0 var(--sp-12);
+  border-radius: var(--r-8);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.settingsLinks button:hover {
+  background: var(--surface-2);
+}
 .settings p {
   margin: var(--sp-12) 0 0;
   font-size: var(--fs-12);

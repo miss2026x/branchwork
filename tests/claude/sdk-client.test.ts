@@ -37,6 +37,7 @@ function fakeSdk(messages: Msg[], extra: Partial<SdkFunctions> & { onQuery?: (p:
       { sessionId: "s-old", summary: "旧的", lastModified: 1, customTitle: "自己起的名" },
     ],
     probe: async () => ({ models: [], modes: [] }),
+    mcpStatus: async () => [],
     ...extra,
   };
   return fns;
@@ -522,8 +523,8 @@ describe("模型、应用自己的工具、起名", () => {
     expect(answers[0]).toEqual({ behavior: "allow", updatedInput: { id: "t1" } });
     expect(asked).toEqual([{ tool: "后台终端", input: { command: "npm run dev" }, canRemember: false }]);
     expect(events).toContainEqual({ type: "tool", tool: "后台终端", input: { command: "npm run dev" } });
-    // 没有工具时不挂这个服务
-    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).not.toHaveProperty("mcpServers");
+    // 没有工具时不挂这个服务；也不让 Claude Code 自己按工作区目录再去读 MCP 配置
+    expect(await options((c) => c.ask({ cwd: "/wt", prompt: "x" }))).toMatchObject({ mcpServers: {}, strictMcpConfig: true });
   });
 
   it("起名：一个进程反复用，一问一答；名字去掉引号和句号；起不出来返回 null", async () => {
@@ -594,5 +595,49 @@ describe("终端里开过的会话、运行环境", () => {
       if (before === undefined) delete process.env.ANTHROPIC_API_KEY;
       else process.env.ANTHROPIC_API_KEY = before;
     }
+  });
+});
+
+describe("MCP 服务（设计稿 9-12、9-13）", () => {
+  const mcp = {
+    servers: { browser: { type: "stdio" as const, command: "node", args: ["cdm.js"] }, db: { type: "http" as const, url: "https://db/mcp" } },
+    key: "k1",
+    policy: { mcp__db__drop: "deny" as const, mcp__db__query: "allow" as const },
+    autoAllow: ["browser"],
+    askTools: ["mcp__browser__upload_file"],
+  };
+  it("只用 Lanes 给的服务（strictMcpConfig）；不给的工具不让 Claude 看到；浏览器工具和设了放行的直接放行，上传文件还要问", async () => {
+    let options: Record<string, unknown> = {};
+    const client = createClaudeClient(fakeSdk([init, success], { onQuery: (p) => (options = p.options ?? {}) }));
+    const asked: string[] = [];
+    await client.ask({ cwd: "/wt", prompt: "看页面", mcp, onPermission: async (r) => (asked.push(r.tool), "allow") });
+    expect(options.strictMcpConfig).toBe(true);
+    expect(Object.keys(options.mcpServers as object)).toEqual(["browser", "db"]);
+    expect((options.mcpServers as Record<string, unknown>).db).toEqual({ type: "http", url: "https://db/mcp" });
+    expect(options.disallowedTools).toEqual(["mcp__db__drop"]);
+    const can = options.canUseTool as (n: string, i: object, x: object) => Promise<{ behavior: string }>;
+    expect((await can("mcp__browser__click", {}, {})).behavior).toBe("allow");
+    expect((await can("mcp__db__query", {}, {})).behavior).toBe("allow");
+    expect(asked).toEqual([]);
+  });
+
+  it("MCP 工具的结果带回来：文字和截图", async () => {
+    const events: ClaudeEvent[] = [];
+    const client = createClaudeClient(
+      fakeSdk([
+        init,
+        assistant({ type: "tool_use", id: "t1", name: "mcp__browser__take_screenshot", input: { pageId: 1 } }),
+        { type: "user", parent_tool_use_id: null, message: { content: [{ type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: "截好了" }, { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "QUJD" } }] }] } },
+        success,
+      ]),
+    );
+    await client.ask({ cwd: "/wt", prompt: "截图", mcp, onEvent: (e) => events.push(e) });
+    expect(events.find((e) => e.type === "tool")).toMatchObject({ tool: "mcp__browser__take_screenshot", id: "t1" });
+    expect(events.find((e) => e.type === "tool-result")).toEqual({
+      type: "tool-result",
+      error: false,
+      id: "t1",
+      result: { error: false, text: "截好了", images: [{ type: "image/jpeg", data: "QUJD", name: "截图", width: 0, height: 0 }] },
+    });
   });
 });

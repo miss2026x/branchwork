@@ -94,3 +94,12 @@ export const IconDown = (p: P) => <Icon {...p}><path d="M6 9l6 6 6-6" /></Icon>;
 export const IconEyeOff = (p: P) => <Icon {...p}><path d="M3 3l18 18M10.6 5.1A10 10 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.3 4.2M6.6 6.6A17 17 0 002 12s3.5 7 10 7a9.6 9.6 0 005.4-1.6" /></Icon>;
 export const IconClip = (p: P) => <Icon {...p}><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 7" /></Icon>;
 export const IconImage = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-9 9" /></Icon>;
+// 内置浏览器、MCP（设计稿 9-12、9-13）
+export const IconGlobe = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" /></Icon>;
+export const IconPick = (p: P) => <Icon {...p}><path d="M4 4l7 17 2.5-7 7-2.5z" /><path d="M14 14l6 6" /></Icon>;
+export const IconCamera = (p: P) => <Icon {...p}><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></Icon>;
+export const IconWindowUp = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8h18M10 14l2-2 2 2M12 12v5" /></Icon>;
+export const IconPlug = (p: P) => <Icon {...p}><path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 01-12 0zM12 18v3" /></Icon>;
+export const IconNet = (p: P) => <Icon {...p}><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" /></Icon>;
+export const IconErr = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></Icon>;
+export const IconReload = (p: P) => <Icon {...p}><path d="M20 12a8 8 0 11-2.3-5.6M20 4v5h-5" /></Icon>;

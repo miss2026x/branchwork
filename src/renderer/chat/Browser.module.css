@@ -1,0 +1,611 @@
+/* 浏览器条、浏览器的引用、对话里的浏览器操作（设计稿 9-12）和 MCP 调用（9-13） */
+
+.wrap {
+  position: relative;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  height: var(--h-40);
+  margin-bottom: var(--sp-8);
+  padding: 0 var(--sp-6) 0 var(--sp-10);
+  border-radius: var(--r-10);
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-12);
+  color: var(--fg-2);
+}
+.bar > svg {
+  flex: none;
+  color: var(--fg-3);
+}
+.bar[data-tone="blue"] {
+  background: var(--info-bg);
+  box-shadow: none;
+  color: var(--info-text);
+}
+.bar[data-tone="dark"] {
+  background: var(--fg-1);
+  box-shadow: none;
+  color: var(--fg-on-color);
+}
+.bar[data-tone="dark"] > svg {
+  color: var(--fg-on-color);
+}
+.bar[data-tone="red"] {
+  background: var(--red-bg);
+  box-shadow: none;
+  color: var(--red-text);
+}
+.bar[data-tone="red"] > svg {
+  color: var(--red);
+}
+.bar code {
+  min-width: 0;
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-4);
+}
+.page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-6);
+}
+.page b {
+  flex: 0 1 auto;
+  min-width: 2em; /* 例外：标题至少露出两个字 */
+  font-weight: 600;
+  color: var(--fg-1);
+}
+.page code {
+  flex: 1 1 0;
+}
+.fill {
+  flex: 1;
+}
+.dim {
+  font-size: var(--fs-11);
+  color: var(--fg-4);
+  white-space: nowrap;
+}
+.bar[data-tone="dark"] .dim {
+  color: var(--on-dark-2);
+}
+.pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 20px; /* 例外：设计稿里的小数字牌 */
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-11);
+  font-weight: 700;
+}
+.pill[data-tone="red"] {
+  background: var(--red-bg);
+  color: var(--red-text);
+}
+.pill[data-tone="amber"] {
+  background: var(--amber-bg);
+  color: var(--amber-text);
+}
+.pill[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.btns {
+  flex: none;
+  display: flex;
+  gap: var(--sp-2);
+}
+.btns button {
+  width: var(--h-28);
+  height: var(--h-28);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-6);
+  color: var(--fg-2);
+}
+.btns button:hover:not(:disabled) {
+  background: var(--press);
+  color: var(--fg-1);
+}
+.btns button:disabled {
+  color: var(--fg-4);
+}
+.bar[data-tone="blue"] .btns button {
+  color: var(--info-text);
+}
+.text {
+  flex: none;
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-6);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--fg-1);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  white-space: nowrap;
+}
+.text:hover {
+  background: var(--surface-2);
+}
+.bar[data-tone="dark"] .text {
+  background: var(--on-dark-hover);
+  box-shadow: none;
+  color: var(--fg-on-color);
+}
+.spin {
+  flex: none;
+  width: 12px; /* 例外：转圈的小圆 */
+  height: 12px; /* 例外：同上 */
+  border-radius: var(--r-round);
+  border: 2px solid var(--info-bg);
+  border-top-color: var(--info);
+  animation: spin var(--t-spin) linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 弹出层：报错和请求、更多 */
+.pop,
+.menu {
+  position: absolute;
+  bottom: calc(100% + var(--sp-4));
+  z-index: 20;
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.pop {
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+.popTabs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-8) var(--sp-10) var(--sp-6);
+}
+.popTabs button {
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-6);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+.popTabs button[aria-pressed="true"] {
+  background: var(--surface-2);
+  font-weight: 600;
+  color: var(--fg-1);
+}
+.issues {
+  max-height: 240px; /* 例外：列表最多这么高，再多滚动 */
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.issues li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--h-36);
+  padding: 0 var(--sp-10);
+  border-top: 1px solid var(--divider);
+  font-size: var(--fs-12);
+}
+.issues li > svg {
+  flex: none;
+  color: var(--red);
+}
+.issues li > span {
+  flex: 1;
+  min-width: 0;
+}
+.issues li code {
+  flex: none;
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-4);
+}
+.cite {
+  flex: none;
+  height: 22px; /* 例外：列表行里的小按钮 */
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-6);
+  background: var(--fg-1);
+  color: var(--fg-on-color);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  opacity: 0;
+}
+.issues li:hover .cite,
+.cite:focus-visible {
+  opacity: 1;
+}
+.popFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-8) var(--sp-10);
+  border-top: 1px solid var(--divider);
+}
+.menu {
+  right: 0;
+  width: 270px; /* 例外：菜单宽度 */
+  padding: var(--sp-6);
+}
+.menu[data-up] {
+  left: 0;
+  right: auto;
+}
+.menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--h-32);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-8);
+  font-size: var(--fs-13);
+  color: var(--fg-1);
+  text-align: left;
+}
+.menu button:hover {
+  background: var(--surface-2);
+}
+.menu button svg {
+  flex: none;
+  color: var(--fg-3);
+}
+.menu button code {
+  margin-left: auto;
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-4);
+  white-space: nowrap;
+}
+.menu hr {
+  margin: var(--sp-4) var(--sp-8);
+  border: 0;
+  border-top: 1px solid var(--divider);
+}
+.menu p {
+  margin: 0;
+  padding: var(--sp-4) var(--sp-10) var(--sp-6);
+  font-size: var(--fs-11);
+  color: var(--fg-4);
+}
+.goto {
+  padding: var(--sp-4);
+}
+.goto input {
+  width: 100%;
+  height: var(--h-32);
+  padding: 0 var(--sp-10);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-8);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
+}
+.goto input:focus {
+  outline: none;
+  border-color: var(--fg-1);
+}
+
+/* 输入框工具栏里的“浏览器”、“附上浏览器现状” */
+.openWrap {
+  position: relative;
+}
+.openBtn {
+  width: 30px; /* 例外：和回形针一样大 */
+  height: 30px; /* 例外：同上 */
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  color: var(--fg-3);
+}
+.openBtn:hover:not(:disabled),
+.openBtn[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.stateChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 26px; /* 例外：设计稿里的小标签 */
+  padding: 0 var(--sp-4) 0 var(--sp-8);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-11);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.stateChip b {
+  font-weight: 700;
+  color: var(--red);
+}
+.stateChip button {
+  width: 18px; /* 例外：标签上的小叉 */
+  height: 18px; /* 例外：同上 */
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-round);
+  color: var(--fg-4);
+}
+.stateChip button:hover {
+  background: var(--surface-2);
+  color: var(--fg-1);
+}
+.stateChip[data-off] {
+  padding-right: var(--sp-8);
+  box-shadow: inset 0 0 0 1px var(--divider);
+  color: var(--fg-4);
+}
+
+/* 输入框里引用的元素、报错 */
+.refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  padding: var(--sp-10) var(--sp-10) 0;
+}
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  max-width: 230px; /* 例外：设计稿 */
+  min-height: var(--h-36);
+  padding: var(--sp-2) var(--sp-6) var(--sp-2) var(--sp-4);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-12);
+}
+.chip[data-tone="red"] {
+  padding-left: var(--sp-8);
+  background: var(--red-bg);
+  box-shadow: none;
+}
+.chip[data-tone="red"] > svg {
+  flex: none;
+  color: var(--red);
+}
+.chip[data-tone="amber"] {
+  padding-left: var(--sp-8);
+  background: var(--amber-bg);
+  box-shadow: none;
+}
+.chip[data-tone="amber"] > svg {
+  flex: none;
+  color: var(--amber-text);
+}
+.chip > button {
+  flex: none;
+  width: 18px; /* 例外：小叉 */
+  height: 18px; /* 例外：同上 */
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-round);
+  color: var(--fg-4);
+}
+.chip > button:hover {
+  color: var(--fg-1);
+}
+.thumb {
+  flex: none;
+  width: 40px; /* 例外：缩略图 */
+  height: var(--h-28);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-4);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-3);
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.chipText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chipText b {
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+}
+.chipText code {
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-3);
+}
+.detail {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--sp-6));
+  z-index: 20;
+  width: 300px; /* 例外：悬停卡片宽度 */
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-12) var(--sp-12);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.detail dl {
+  display: grid;
+  grid-template-columns: 40px 1fr; /* 例外：标签一列 */
+  gap: var(--sp-4) var(--sp-8);
+  margin: 0;
+  font-size: var(--fs-12);
+}
+.detail dt {
+  color: var(--fg-3);
+}
+.detail dd {
+  margin: 0;
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 对话里：一组浏览器操作、一次 MCP 调用 */
+.group {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-10);
+  background: var(--surface);
+}
+.groupHead,
+.mcpHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  height: var(--h-36);
+  padding: 0 var(--sp-12);
+  font-size: var(--fs-12);
+  text-align: left;
+}
+.groupHead > svg {
+  flex: none;
+  color: var(--info);
+}
+.mcpHead > svg {
+  flex: none;
+  color: var(--fg-3);
+}
+.groupHead code,
+.mcpHead code {
+  min-width: 0;
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-3);
+}
+.mcpHead b {
+  font: 700 var(--fs-12) / var(--lh-16) var(--mono);
+}
+.mcpHead code {
+  flex: 1;
+  color: var(--fg-1);
+}
+.groupHead:hover,
+.mcpHead:hover {
+  background: var(--surface-1);
+}
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4) var(--sp-12);
+  min-height: var(--h-32);
+  padding: var(--sp-4) var(--sp-12);
+  border-top: 1px solid var(--divider);
+  font: var(--fs-12) / var(--lh-18) var(--mono);
+}
+.step > span {
+  flex: none;
+  min-width: 44px; /* 例外：动词一列和工具行对齐 */
+  color: var(--fg-3);
+}
+.step > code {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--fg-1);
+}
+.step[data-error] > span {
+  color: var(--red);
+}
+.step .text,
+.group .result .text {
+  height: 22px; /* 例外：行里的小按钮 */
+  padding: 0 var(--sp-6);
+  font-family: var(--font);
+  font-size: var(--fs-11);
+}
+.result {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-8) var(--sp-12) var(--sp-10);
+  border-top: 1px dashed var(--divider);
+}
+.step .result {
+  padding: var(--sp-6) 0 var(--sp-4);
+}
+.result pre {
+  max-height: 240px; /* 例外：结果最多这么高，再多滚动 */
+  overflow: auto;
+  margin: 0;
+  padding: var(--sp-8) var(--sp-10);
+  border-radius: var(--r-8);
+  background: var(--surface-2);
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.result img {
+  max-width: 100%;
+  border-radius: var(--r-6);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.result > .text {
+  align-self: flex-start;
+}
+.shot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-10) var(--sp-12) var(--sp-10);
+  border-top: 1px solid var(--divider);
+}
+.shot > button {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--r-8);
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: zoom-in;
+}
+.shot img {
+  display: block;
+  width: 100%;
+  max-height: 220px; /* 例外：截图缩略的最高 */
+  object-fit: cover;
+  object-position: top;
+}
+.shot > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-11);
+  color: var(--fg-3);
+}
+.callError {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-top: 1px solid var(--divider);
+  background: var(--red-bg);
+  font-size: var(--fs-12);
+  color: var(--red-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

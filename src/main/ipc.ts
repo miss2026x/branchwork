@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { Core } from "../core";
+import type { Extras } from "./extras";
 import type { BwApi } from "../shared";
 
 /** 界面能调用的操作，除了 onEvent（事件走单独的通道） */
@@ -23,8 +24,9 @@ async function fire(running: Promise<unknown>): Promise<void> {
   running.catch((e: unknown) => console.error("[bw] 后台操作出错：", e));
 }
 
-export function registerIpc(core: Core): void {
+export function registerIpc(core: Core, extras: Extras): void {
   const calls: Calls = {
+    ...extras.api(core),
     listProjects: async () => core.listProjects(),
     snapshot: async (projectId) => core.snapshot(projectId),
     setRoutePermissionMode: async (routeId, mode) => core.setRoutePermissionMode(routeId, mode),
@@ -111,7 +113,7 @@ export function registerIpc(core: Core): void {
       return r.canceled ? null : (r.filePaths[0] ?? null);
     },
 
-    ask: (routeId, text, images) => fire(core.ask(routeId, text, images)),
+    ask: (routeId, text, images, options) => fire(core.ask(routeId, text, images, options)),
     localRoute: async (projectId) => core.localRoute(projectId),
     localStatus: (projectId) => core.localStatus(projectId),
     localPresets: async (projectId) => core.localPresets(projectId),
@@ -129,4 +131,5 @@ export function registerIpc(core: Core): void {
     for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send(EVENT, event);
   });
   core.on(send);
+  extras.on(send);
 }

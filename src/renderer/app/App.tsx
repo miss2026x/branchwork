@@ -19,6 +19,7 @@ import { StopImages } from "../chat/StopImages";
 import { ImportPill, ImportProgressDialog, PreparingPill } from "../dialogs/ImportProgress";
 import { Notices } from "../notices/Notices";
 import { Settings } from "./Settings";
+import { McpDialog } from "../dialogs/McpDialog";
 import { Welcome } from "./Welcome";
 import { OverviewQueue } from "../overview/OverviewQueue";
 import { CommandPalette } from "../palette/CommandPalette";
@@ -423,7 +424,7 @@ export function App() {
           <IconSliders size={18} />
         </button>
       </header>
-      {settings && <Settings load={environment} onClose={() => setSettings(false)} />}
+      {settings && <Settings load={environment} onClose={() => setSettings(false)} onMcp={projectId ? (tab) => useStore.getState().openMcp(projectId, tab) : undefined} />}
 
       <div ref={bodyRef} className={css.body} data-tier={tier} data-overview={overview} style={layout.width.rail ? ({ "--rail-w": `${layout.width.rail}px` } as React.CSSProperties) : undefined}>
         {overview && (
@@ -708,6 +709,7 @@ export function App() {
           onCancel={closeDialog}
         />
       )}
+      {dialog?.kind === "mcp" && <McpDialog projectId={dialog.projectId} projectName={projects.find((p) => p.id === dialog.projectId)?.name ?? ""} tab={dialog.tab} onClose={closeDialog} />}
       {dialog?.kind === "local-presets" && (
         <LocalPresetsDialog projectName={projects.find((p) => p.id === dialog.projectId)?.name ?? ""} saved={localPresets[dialog.projectId]} onSave={(list) => saveLocalPresets(dialog.projectId, list)} onClose={closeDialog} />
       )}

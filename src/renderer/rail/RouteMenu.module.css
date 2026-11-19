@@ -165,3 +165,44 @@
     translate: var(--fx, 0px) calc(var(--fy, 0px) + 6px);
   }
 }
+
+/* 这一路用的 MCP 服务（设计稿 9-13） */
+.label small {
+  font-weight: 400;
+  color: var(--fg-4);
+}
+.mcpRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--h-36);
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-8);
+  font-size: var(--fs-13);
+}
+.mcpRow:hover {
+  background: var(--surface-2);
+}
+.mcpRow > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: var(--lh-18);
+}
+.mcpRow small {
+  font-size: var(--fs-11);
+  color: var(--fg-4);
+}
+.mcpRow input {
+  flex: none;
+  accent-color: var(--info);
+}
+.mcpManage {
+  height: var(--h-32);
+  padding: 0 var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--info-text);
+  text-align: left;
+}

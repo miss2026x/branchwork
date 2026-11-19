@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AskOptions, AskResult, ClaudeClient, ClaudeEvent, ClaudeTool, HistoryMessage, RunSettings } from "../../src/claude";
-import type { ClaudeOptions, PermissionDecision } from "../../src/shared";
+import type { ClaudeOptions, McpServerState, McpTransport, PermissionDecision } from "../../src/shared";
 
 export interface FakeTurn {
   cwd: string;
@@ -137,6 +137,12 @@ export class FakeClaude implements ClaudeClient {
     this.optionCalls.push(cwd);
     if (this.optionList instanceof Error) throw this.optionList;
     return this.optionList;
+  }
+  readonly mcpCalls: { cwd: string; servers: Record<string, McpTransport> }[] = [];
+  mcpStates: Record<string, McpServerState> = {};
+  async mcpStatus(cwd: string, servers: Record<string, McpTransport>): Promise<Record<string, McpServerState>> {
+    this.mcpCalls.push({ cwd, servers });
+    return Object.fromEntries(Object.keys(servers).map((n) => [n, this.mcpStates[n] ?? { status: "connected" as const, tools: [], checkedAt: 1 }]));
   }
   async environment(): Promise<{ version: string | null; loggedIn: boolean | null }> {
     return { version: "9.9.9", loggedIn: true };

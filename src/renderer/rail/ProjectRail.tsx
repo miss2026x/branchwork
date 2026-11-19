@@ -22,6 +22,24 @@ export function ProjectRail({
   const renameRoute = useStore((s) => s.renameRoute);
   const setRouteColor = useStore((s) => s.setRouteColor);
   const stops = useStore((s) => s.stops);
+  // 菜单里这一路用的 MCP 服务（设计稿 9-13）
+  const mcp = useStore((s) => s.mcp);
+  const loadMcp = useStore((s) => s.loadMcp);
+  const openMcp = useStore((s) => s.openMcp);
+  const getRouteMcp = useStore((s) => s.routeMcp);
+  const setRouteMcp = useStore((s) => s.setRouteMcp);
+  const [routeMcp, setRouteMcpState] = useState<{ routeId: string; off: string[] } | null>(null);
+  const routeMcpList = (projectId: string, off: string[]) => {
+    if (!mcp || mcp.projectId !== projectId) return null;
+    const servers: { name: string; note: string }[] = [];
+    if (mcp.browser.enabled) servers.push({ name: "browser", note: "内置 · Chrome DevTools" });
+    for (const s of mcp.servers) {
+      if (!s.enabled || s.shadowedBy || s.replacedByBrowser || s.untrusted) continue;
+      const st = mcp.states[s.name];
+      servers.push({ name: s.name, note: st?.status === "connected" ? `${st.tools?.length ?? 0} 个工具` : st?.status === "needs-auth" ? "要登录" : st?.status === "failed" ? "连不上" : "" });
+    }
+    return { servers, off };
+  };
   const unarchiveRoute = useStore((s) => s.unarchiveRoute);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [menuAt, setMenuAt] = useState({ top: 0, left: 0 });
@@ -240,6 +258,10 @@ export function ProjectRail({
                           const box = e.currentTarget.getBoundingClientRect();
                           setMenuAt({ top: box.bottom + 4, left: Math.max(8, box.right - 240) });
                           setMenuFor(menuFor === r.id ? null : r.id);
+                          if (menuFor !== r.id) {
+                            void loadMcp(r.projectId);
+                            void getRouteMcp(r.id).then((off) => setRouteMcpState({ routeId: r.id, off }), () => {});
+                          }
                         }}
                       >
                         <IconMore />
@@ -263,6 +285,9 @@ export function ProjectRail({
                           onFold={(folded) => void setRouteFlags(r.id, { folded })}
                           onClose={() => setMenuFor(null)}
                           at={menuAt}
+                          mcp={routeMcp?.routeId === r.id ? routeMcpList(r.projectId, routeMcp.off) : null}
+                          onMcpOff={(off) => (setRouteMcpState({ routeId: r.id, off }), void setRouteMcp(r.id, off))}
+                          onManageMcp={() => openMcp(r.projectId)}
                         />
                       )}
                     </div>

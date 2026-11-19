@@ -19,6 +19,10 @@ export function createDemoClaudeClient(): ClaudeClient {
     });
 
   return {
+    // 演示模式：不真的去连，说都连上了、没有工具
+    async mcpStatus(_cwd, servers) {
+      return Object.fromEntries(Object.keys(servers).map((n) => [n, { status: "connected" as const, tools: [], checkedAt: Date.now() }]));
+    },
     async ask(opts: AskOptions): Promise<AskResult> {
       const sessionId = opts.sessionId ?? randomUUID();
       const history = sessions.get(sessionId) ?? [];

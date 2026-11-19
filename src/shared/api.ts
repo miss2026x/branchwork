@@ -1,6 +1,6 @@
 import type { BwListener, PermissionDecision } from "./events";
 import type { PromptImage } from "./images";
-import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, LocalPreset, LocalStatus, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal } from "./model";
+import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, LocalPreset, LocalStatus, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -69,7 +69,7 @@ export interface BwApi {
    * 问一站。发出即返回；站的出现、回答、到站、同步都走事件。不能问时（正在回答、有冲突）抛错。
    * images：带的图片；text 里用“[图 N]”标出第 N 张图的位置
    */
-  ask(routeId: string, text: string, images?: PromptImage[]): Promise<void>;
+  ask(routeId: string, text: string, images?: PromptImage[], options?: { /** false：这一站不附浏览器现状 */ browserState?: boolean }): Promise<void>;
   /** 这个项目的 Local 专车（设计稿 9-10）；还没有就开一辆 */
   localRoute(projectId: string): Promise<Route>;
   /** Local 现在的样子；之后有变化走 local.status 事件 */
@@ -125,6 +125,42 @@ export interface BwApi {
   syncLog(routeId: string): Promise<SyncLogEntry[]>;
   /** 用户点开了这一路：提前把 Claude 启动好 */
   warm(routeId: string): Promise<void>;
+  // ── MCP 服务（设计稿 9-13） ──
+  /** 这个项目能看到的全部 MCP 服务、上次检查的结果、工具的批准方式、浏览器设置 */
+  mcpOverview(projectId: string): Promise<McpOverview>;
+  /** 检查服务连不连得上（不给 names 就查全部在用的）。要等一会儿；中间状态走 mcp.states 事件 */
+  mcpCheck(projectId: string, names?: string[]): Promise<Record<string, McpServerState>>;
+  /** 测试连接：还没存的服务也能试（添加对话框里的“测试连接”） */
+  mcpTest(projectId: string, input: McpServerInput): Promise<McpServerState>;
+  /** 新加或改一个服务；previous：改的是哪一条（换名字、换位置时原来那条删掉） */
+  mcpSave(projectId: string, input: McpServerInput, previous?: { name: string; scope: McpScope }): Promise<McpOverview>;
+  mcpRemove(projectId: string, name: string, scope: McpScope): Promise<McpOverview>;
+  /** Lanes 里的开关：只记在 Lanes 里，不动 Claude Code 的文件 */
+  mcpSetEnabled(projectId: string, name: string, enabled: boolean): Promise<McpOverview>;
+  /** 项目 .mcp.json 里的服务：确认要用 / 不用 */
+  mcpTrust(projectId: string, names: string[], trusted: boolean): Promise<McpOverview>;
+  /** 一个工具的批准方式；null 回到默认 */
+  mcpSetPolicy(server: string, tool: string, policy: McpToolPolicy | null): Promise<void>;
+  /** 这一路关掉了哪些服务（内置浏览器的名字是 browser） */
+  routeMcp(routeId: string): Promise<string[]>;
+  setRouteMcp(routeId: string, off: string[]): Promise<void>;
+
+  // ── 内置浏览器（设计稿 9-12） ──
+  browserSettings(): Promise<BrowserSettings & { found: string | null }>;
+  setBrowserSettings(patch: Partial<BrowserSettings>): Promise<BrowserSettings & { found: string | null }>;
+  browserState(routeId: string): Promise<BrowserState>;
+  /** 打开这一路的窗口（没开就开，开着就拉到前面）；给了 url 就打开它 */
+  browserOpen(routeId: string, url?: string): Promise<void>;
+  /** 把这一路的窗口拉到前面 */
+  browserShow(routeId: string): Promise<void>;
+  /** 截这一路窗口当前的页面 */
+  browserScreenshot(routeId: string): Promise<PromptImage>;
+  /** 点选元素：Chrome 窗口跳到前面等你点；取消返回 null */
+  browserPick(routeId: string): Promise<PickedElement | null>;
+  browserCancelPick(routeId: string): Promise<void>;
+  /** 关掉这一路的窗口 */
+  browserClose(routeId: string): Promise<void>;
+
   /** 订阅事件，返回取消订阅的函数 */
   onEvent(listener: BwListener): () => void;
 }

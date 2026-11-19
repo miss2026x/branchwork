@@ -23,12 +23,16 @@ interface Props {
   onClose(): void;
   /** 菜单左上角在窗口里的位置（左栏会裁掉超出去的部分，所以菜单浮在窗口这一层） */
   at: { top: number; left: number };
+  /** 这一路能用的 MCP 服务（设计稿 9-13：每一路单独开关）；还没读到为空 */
+  mcp?: { servers: { name: string; note: string }[]; off: string[] } | null;
+  onMcpOff?(off: string[]): void;
+  onManageMcp?(): void;
 }
 
 export const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** 路的菜单：改名、换颜色、看会话信息、归档、删除。只收数据、发事件 */
-export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onColor, onArchive, onCompressAll, onExport, onDelete, onPin, onFold, onClose, at }: Props) {
+export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onColor, onArchive, onCompressAll, onExport, onDelete, onPin, onFold, onClose, at, mcp, onMcpOff, onManageMcp }: Props) {
   const [name, setName] = useState(route.name);
   const [copied, setCopied] = useState(false);
   const commit = () => {
@@ -44,7 +48,7 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
   useLayoutEffect(() => {
     const h = box.current?.offsetHeight ?? 0;
     setTop(Math.max(8, Math.min(at.top, window.innerHeight - h - 8)));
-  }, [at.top]);
+  }, [at.top, mcp?.servers.length]);
   return (
     <>
       <div className={css.backdrop} onClick={() => (commit(), onClose())} />
@@ -83,6 +87,29 @@ export function RouteMenu({ route, stopCount, syncNote, syncTone, onRename, onCo
           </>
         )}
 
+        {mcp && mcp.servers.length > 0 && (
+          <>
+            <hr />
+            <span className={css.label}>
+              这一路用的 MCP 服务 <small>· 下一站生效</small>
+            </span>
+            {mcp.servers.map((s) => {
+              const on = !mcp.off.includes(s.name);
+              return (
+                <label key={s.name} className={css.mcpRow}>
+                  <span>
+                    {s.name === "browser" ? "浏览器" : s.name}
+                    <small>{s.note}</small>
+                  </span>
+                  <input type="checkbox" role="switch" checked={on} onChange={() => onMcpOff?.(on ? [...mcp.off, s.name] : mcp.off.filter((x) => x !== s.name))} />
+                </label>
+              );
+            })}
+            <button className={css.mcpManage} onClick={() => (onClose(), onManageMcp?.())}>
+              管理 MCP 服务…
+            </button>
+          </>
+        )}
         <hr />
         <button role="menuitem" className={css.item} onClick={() => (onClose(), onPin(!route.pinned))}>
           <IconPin />

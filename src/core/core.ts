@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AskResult, ClaudeClient, ClaudeTool, RunSettings } from "../claude";
+import type { AskResult, ClaudeClient, ClaudeTool, McpRun, RunSettings } from "../claude";
+import { toolResult } from "../claude";
 import type { Db } from "../db";
 import type {
   BwEvent,
@@ -69,6 +70,19 @@ export interface CoreOptions {
   /** 测试里换成假的：读 Local 的 git 状态、去远端看新提交。默认用真的 git */
   localGit?: (localDir: string) => Promise<LocalGit>;
   fetchUpstream?: (localDir: string) => Promise<boolean>;
+  /** MCP 服务、内置浏览器（设计稿 9-12、9-13）：由主进程接上，core 不知道它们怎么实现 */
+  extras?: CoreExtras;
+}
+
+export interface CoreExtras {
+  /** 交给这一路的 Claude 的外部 MCP 服务和工具规则（含内置浏览器） */
+  mcpFor?(route: Route, project: Project): McpRun | undefined;
+  /** 发车时附上的浏览器现状（几行字）；这一路没开浏览器时返回空 */
+  browserBrief?(route: Route): string | null;
+  /** 一站结束（浏览器的报错从这里重新数） */
+  stopEnded?(route: Route, stopId: string): void;
+  /** 一路被删掉了（关掉它的浏览器窗口） */
+  routeDeleted?(routeId: string): void;
 }
 
 export type AskReport =
@@ -134,7 +148,7 @@ export interface Core {
   /** 还在跑的停掉；已经退出的从列表里拿掉 */
   terminalStop(terminalId: string): Promise<void>;
   /** 在这一路上问一站：站前同步 → Claude 回答 → 正常结束才站后同步。images：带的图片，text 里的“[图 N]”标出位置 */
-  ask(routeId: string, text: string, images?: PromptImage[]): Promise<AskReport>;
+  ask(routeId: string, text: string, images?: PromptImage[], options?: { browserState?: boolean }): Promise<AskReport>;
   /** 这个项目的 Local 专车（设计稿 9-10）；还没有就开一辆 */
   localRoute(projectId: string): Route;
   /** Local 现在的样子：分支、和远端差多少、没提交的文件各是哪一路带进来的。顺便在后台 fetch 一下，有变化再推 local.status */
@@ -248,6 +262,9 @@ export function typedPrompt(raw: string): string | null {
 
 export function createCore(opts: CoreOptions): Core {
   const { db, claude } = opts;
+  const extras: CoreExtras = opts.extras ?? {};
+  /** 这一站不附浏览器现状（输入框里点掉了） */
+  const skipBrowserBrief = new Set<string>();
   const makeEngine = opts.createEngine ?? ((localDir, worktreesDir, hooks) => createSyncEngine({ localDir, worktreesDir, hooks }));
   /** 各项目里刚发现的“你直接在 Local 里改了这些文件”，等下一次同步时记进同步记录 */
   const localEdits = new Map<string, SyncFile[]>();
@@ -497,7 +514,8 @@ export function createCore(opts: CoreOptions): Core {
       const model = savedOptions(route.projectId)?.models.find((m) => m.value === (route.model ?? "default"));
       if (model && !model.autoMode) permissionMode = "ask";
     }
-    return { model: route.model ?? undefined, effort: route.effort ?? undefined, permissionMode };
+    const mcp = extras.mcpFor?.(route, mustProject(route.projectId));
+    return { model: route.model ?? undefined, effort: route.effort ?? undefined, permissionMode, ...(mcp ? { mcp } : {}) };
   };
   const warmRoute = (route: Route) => {
     if (prewarm && route.status !== "archived") claude.warm(route.worktreePath, route.sessionId ?? undefined, runFor(route));
@@ -655,7 +673,12 @@ export function createCore(opts: CoreOptions): Core {
         const status = await readLocal(project).catch(() => null);
         const mine = terminals.list({ routeId }).filter((t) => t.status === "running");
         brief = localBrief(project.localDir, status, db.routes.listByProject(project.id), db.stops.listByProject(project.id), mine);
-      } else {
+      }
+      if (!skipBrowserBrief.delete(routeId)) {
+        const b = extras.browserBrief?.(route);
+        if (b) brief = brief ? `${brief}\n\n${b}` : b;
+      }
+      if (!route.local) {
         try {
           engine = await engineFor(mustProject(route.projectId));
         } catch (e) {
@@ -741,11 +764,12 @@ export function createCore(opts: CoreOptions): Core {
               setActivity(routeId, { kind: "writing", tool: e.tool, ...(target ? { target } : {}), chars: e.chars, lines: e.lines, since: cur?.kind === "writing" ? cur.since : now });
             } else if (e.type === "tool") {
               const detail = toolDetail(e.input, route.worktreePath);
-              emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail, ...toolStat(e.input) });
+              emit({ type: "stop.tool", routeId, stopId, tool: e.tool, input: e.input, detail, ...toolStat(e.input), ...(e.id ? { id: e.id } : {}) });
               setActivity(routeId, { kind: "running", tool: e.tool, detail, since: now });
             } else if (e.type === "tool-result") {
               // 工具的结果交回去了：它在看结果、想下一步
               setActivity(routeId, { kind: "thinking", since: now });
+              if (e.id && e.result) emit({ type: "stop.toolResult", routeId, stopId, id: e.id, result: e.result });
             }
           },
           onPermission: (req) =>
@@ -763,6 +787,11 @@ export function createCore(opts: CoreOptions): Core {
       runningStop.delete(routeId);
       dropPermissions(routeId);
       route = mustRoute(routeId); // 回答期间名字、模型可能被改过
+      try {
+        extras.stopEnded?.(route, stopId);
+      } catch {
+        // 浏览器那边出了问题不影响这一站
+      }
       if (typeof result.contextTokens === "number") route = setRoute(routeId, { contextTokens: result.contextTokens });
 
       if (result.sessionId && result.sessionId !== route.sessionId) route = setRoute(routeId, { sessionId: result.sessionId });
@@ -1221,7 +1250,11 @@ export function createCore(opts: CoreOptions): Core {
       else await terminals.remove(terminalId);
     },
 
-    ask: async (routeId, text, images) => runStop(routeId, text, undefined, checkImages(images)),
+    ask: async (routeId, text, images, options) => {
+      if (options?.browserState === false) skipBrowserBrief.add(routeId);
+      else skipBrowserBrief.delete(routeId);
+      return runStop(routeId, text, undefined, checkImages(images));
+    },
 
     localRoute(projectId) {
       const project = mustProject(projectId);
@@ -1395,6 +1428,7 @@ export function createCore(opts: CoreOptions): Core {
       if (route.status === "answering" || route.status === "awaiting_permission") throw new CoreError("ROUTE_BUSY", "这一路正在回答，到站或停车后才能删除");
       const engine = await engineFor(mustProject(route.projectId));
       claude.cool(route.worktreePath); // 提前启动好的 Claude 占着这个目录，先关掉才删得了
+      extras.routeDeleted?.(routeId);
       if (force || (await engine.status(routeId).then((s) => s.unsynced.length === 0, () => false))) await terminals.removeAll({ routeId }); // 后台终端也占着目录
       if (keepWorktree) await terminals.removeAll({ routeId });
       const removed = await engine.removeWorktree(routeId, { force: force || keepWorktree, keep: keepWorktree });
@@ -1671,15 +1705,33 @@ export function createCore(opts: CoreOptions): Core {
         const to = stop.lastMessageId ? at.get(stop.lastMessageId) : undefined;
         if (from === undefined || to === undefined) return { stopId: stop.id, items: [] };
         const items: ChatItem[] = [];
+        /** MCP 工具的调用：编号 → 那一项（结果在后面的用户消息里，找到了填进去） */
+        const calls = new Map<string, Extract<ChatItem, { kind: "tool" }>>();
         for (const m of messages.slice(from, to + 1)) {
+          if (m.role === "user" && Array.isArray(m.content)) {
+            for (const b of m.content as { type?: string; tool_use_id?: unknown; content?: unknown; is_error?: unknown }[]) {
+              const item = b.type === "tool_result" && typeof b.tool_use_id === "string" ? calls.get(b.tool_use_id) : undefined;
+              if (item) item.result = toolResult(b);
+            }
+            continue;
+          }
           if (m.role !== "assistant") continue;
           if (typeof m.content === "string") {
             if (m.content) pushText(items, m.content);
             continue;
           }
-          for (const b of Array.isArray(m.content) ? (m.content as { type?: string; text?: unknown; name?: unknown; input?: unknown }[]) : []) {
+          for (const b of Array.isArray(m.content) ? (m.content as { type?: string; text?: unknown; name?: unknown; input?: unknown; id?: unknown }[]) : []) {
             if (b.type === "text" && typeof b.text === "string" && b.text) pushText(items, b.text);
-            if (b.type === "tool_use" && typeof b.name === "string") items.push({ kind: "tool", tool: b.name, ...toolStat((b.input as Record<string, unknown>) ?? {}), detail: toolDetail((b.input as Record<string, unknown>) ?? {}, route.worktreePath) });
+            if (b.type === "tool_use" && typeof b.name === "string") {
+              const input = (b.input as Record<string, unknown>) ?? {};
+              const item: Extract<ChatItem, { kind: "tool" }> = { kind: "tool", tool: b.name, ...toolStat(input), detail: toolDetail(input, route.worktreePath) };
+              if (b.name.startsWith("mcp__") && !b.name.startsWith("mcp__branchwork__") && typeof b.id === "string") {
+                item.id = b.id;
+                item.input = input;
+                calls.set(b.id, item);
+              }
+              items.push(item);
+            }
           }
         }
         return { stopId: stop.id, items };

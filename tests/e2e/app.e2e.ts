@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { _electron as electron, type ElectronApplication, type Page } from "playwright";
+import { _electron as electron, chromium, type ElectronApplication, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const root = path.resolve(__dirname, "../..");
@@ -34,7 +34,8 @@ beforeAll(async () => {
 
   app = await electron.launch({
     args: [root, ...(process.getuid?.() === 0 ? ["--no-sandbox"] : [])],
-    env: { ...(process.env as Record<string, string>), BRANCHWORK_HOME: path.join(tmp, "home"), BRANCHWORK_DEMO: "1" },
+    // 内置浏览器用 Playwright 带的 Chromium（这台机器上不一定装了 Chrome）
+    env: { ...(process.env as Record<string, string>), BRANCHWORK_HOME: path.join(tmp, "home"), BRANCHWORK_DEMO: "1", LANES_CHROME: process.env.LANES_CHROME || chromium.executablePath() },
   });
   page = await app.firstWindow();
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -54,7 +55,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "localPresets", "localRoute", "localStatus", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resetLocal", "resolveConflict", "resync", "setLocalPresets", "setRouteColor", "setRouteFlags", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "browserCancelPick", "browserClose", "browserOpen", "browserPick", "browserScreenshot", "browserSettings", "browserShow", "browserState", "cancelDistill", "changes", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "localPresets", "localRoute", "localStatus", "mcpCheck", "mcpOverview", "mcpRemove", "mcpSave", "mcpSetEnabled", "mcpSetPolicy", "mcpTest", "mcpTrust", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resetLocal", "resolveConflict", "resync", "routeMcp", "setBrowserSettings", "setLocalPresets", "setRouteColor", "setRouteFlags", "setRouteMcp", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -152,7 +153,8 @@ describe("应用", () => {
     await app.close();
     app = await electron.launch({
       args: [root, ...(process.getuid?.() === 0 ? ["--no-sandbox"] : [])],
-      env: { ...(process.env as Record<string, string>), BRANCHWORK_HOME: path.join(tmp, "home"), BRANCHWORK_DEMO: "1" },
+      // 内置浏览器用 Playwright 带的 Chromium（这台机器上不一定装了 Chrome）
+    env: { ...(process.env as Record<string, string>), BRANCHWORK_HOME: path.join(tmp, "home"), BRANCHWORK_DEMO: "1", LANES_CHROME: process.env.LANES_CHROME || chromium.executablePath() },
     });
     page = await app.firstWindow();
     await expect.poll(() => page.getByText("第 3 站没答完").isVisible(), { timeout: 30000 }).toBe(true);
@@ -503,7 +505,8 @@ describe("应用", () => {
     await composer().fill("写完拖一会儿");
     await page.keyboard.press("Enter");
     // 等它把文件写了（工具那一行出现），在它说完之前停车
-    await expect.poll(() => page.getByRole("log").locator("section").last().getByText("demo-notes.md").count(), { timeout: 60000 }).toBeGreaterThan(1);
+    // 工具那一行（不是“正在写”那一行）：文件已经写进工作区了
+    await expect.poll(() => page.getByRole("log").locator("section").last().locator('[class*="_tool_"]:not([data-active])', { hasText: "demo-notes.md" }).count(), { timeout: 60000 }).toBeGreaterThan(0);
     await page.getByRole("button", { name: "停车" }).click();
     await page.getByRole("button", { name: "看改了什么" }).click({ timeout: 60000 });
     const dialog = page.getByRole("dialog", { name: /改了什么/ });
@@ -864,6 +867,46 @@ describe("应用", () => {
     await page.getByRole("button", { name: "清掉，重新开始" }).click();
     await expect.poll(() => page.getByText("这辆车直接在 Local 里干活").isVisible(), { timeout: 10000 }).toBe(true);
     expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).toBe(notes);
+  });
+
+  it("内置浏览器（设计稿 9-12）：开这一路的窗口，浏览器条显示页面和报错；引用报错、截图都进输入框；MCP 设置里加一个服务（9-13）", async () => {
+    await page.getByRole("button", { name: "浏览器", exact: true }).click();
+    await page.getByRole("menuitem", { name: /打开(一个|别的)网址/ }).click();
+    await page.getByLabel("网址").fill("data:text/html;charset=utf-8,<title>测试页</title><h1>hi</h1><script>setTimeout(()=>{throw new Error('boom')},500)</script>");
+    await page.getByLabel("网址").press("Enter");
+    // 真的开了一个 Chrome 窗口：浏览器条显示这一页，报错数出来
+    await expect.poll(() => page.getByText("测试页").first().isVisible(), { timeout: 30000 }).toBe(true);
+    const errors = page.locator('button[title*="上一站以来的报错"]');
+    await expect.poll(() => errors.isVisible(), { timeout: 15000 }).toBe(true);
+    await shot("27-browser-bar");
+    await errors.click();
+    await page.getByRole("button", { name: "全部引用" }).click();
+    await expect.poll(() => page.getByText(/Error: boom/).first().isVisible()).toBe(true);
+    // 截图：和粘贴的图片一样进输入框
+    await page.getByRole("button", { name: "截图", exact: true }).click();
+    await expect.poll(() => composer().getByRole("img", { name: /^图 1/ }).count(), { timeout: 15000 }).toBe(1);
+    await shot("27b-browser-refs");
+    // 关掉窗口：条上写“窗口关了”，能重新打开
+    await page.getByRole("button", { name: "更多", exact: true }).click();
+    await page.getByRole("menuitem", { name: "关掉这一路的窗口" }).click();
+    await expect.poll(() => page.getByText("窗口关了").isVisible(), { timeout: 15000 }).toBe(true);
+
+    // MCP 设置：加一个只在 Lanes 里的服务，列表里出现，删掉
+    await page.getByRole("button", { name: "设置", exact: true }).click();
+    await page.getByRole("button", { name: "MCP 服务…" }).click();
+    const dlg = page.getByRole("dialog", { name: "MCP 服务和浏览器" });
+    await expect.poll(() => dlg.getByText("Chrome DevTools · Lanes 专用的 Chrome").isVisible()).toBe(true);
+    await dlg.getByRole("button", { name: "＋ 添加" }).click();
+    await dlg.getByRole("textbox", { name: "名字" }).fill("demo");
+    await dlg.getByRole("textbox", { name: /^命令/ }).fill("node demo-mcp.js");
+    await dlg.getByLabel("只在 Lanes").check();
+    await dlg.getByRole("button", { name: "添加", exact: true }).click();
+    await expect.poll(() => dlg.getByRole("button", { name: /^demo/ }).isVisible()).toBe(true);
+    await shot("27c-mcp");
+    await dlg.getByRole("button", { name: /^demo/ }).click();
+    await dlg.getByRole("button", { name: "删除" }).click();
+    await expect.poll(() => dlg.getByRole("button", { name: /^demo/ }).count()).toBe(0);
+    await dlg.getByRole("button", { name: "关闭" }).click();
   });
 
   it("从 Lanes 移除项目：先列出没进 Local 的改动，确认后回到欢迎页，Local 文件夹不动", async () => {

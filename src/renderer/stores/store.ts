@@ -1,8 +1,30 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
-import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus } from "../../shared";
+import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus, BrowserIssue, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement } from "../../shared";
 import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
 import { routeLabel } from "../ui/route-color";
+
+/** 输入框里引用的浏览器里的东西（设计稿 9-12）：点选的元素、报错或失败的请求。发车时写成文字附在提问后面 */
+export type BrowserRef = { kind: "element"; el: PickedElement } | { kind: "issue"; issue: BrowserIssue };
+
+/** 引用写成交给 Claude 的文字；元素的局部截图按顺序接在已有的图后面（first：第一张的编号） */
+export function browserRefsText(refs: BrowserRef[], first: number): { text: string; images: PromptImage[] } {
+  const images: PromptImage[] = [];
+  const parts = refs.map((r) => {
+    if (r.kind === "issue") return `—— 浏览器里的${r.issue.kind === "request" ? "失败请求" : "报错"} ——\n${r.issue.text}${r.issue.source && r.issue.kind !== "request" ? `（${r.issue.source}）` : ""}`;
+    const e = r.el;
+    const lines = [`—— 浏览器里点选的元素：${e.label} ——`, `位置：${e.selector}（${e.width} × ${e.height}，在页面 ${e.url}）`];
+    if (e.text) lines.push(`文字：${e.text}`);
+    if (e.styles) lines.push(`主要样式：\n${e.styles}`);
+    lines.push(`HTML：\n${e.html}`);
+    if (e.image) {
+      images.push(e.image);
+      lines.push(`局部截图：[图 ${first + images.length - 1}]`);
+    }
+    return lines.join("\n");
+  });
+  return { text: parts.join("\n\n"), images };
+}
 
 /** 正在回答的一站：还没写进会话文件的实时内容 */
 export interface LiveStop {
@@ -118,6 +140,8 @@ interface State {
     | { kind: "log"; projectId: string; entries: SyncLogEntry[] | null; kept: KeptWorktree[] }
     /** 管理专车的常用提示 */
     | { kind: "local-presets"; projectId: string }
+    /** MCP 服务和内置浏览器的设置（设计稿 9-12、9-13） */
+    | { kind: "mcp"; projectId: string; tab: "servers" | "browser" }
     /** 移除项目；blocked 是第一次确认后发现的没进 Local 的改动和留下的工作区 */
     | { kind: "remove-project"; projectId: string; blocked: Extract<RemoveProjectResult, { status: "has-unsynced" }> | null; error: string | null };
   /** 正在问“这一路还在回答，怎么归档”的那一路 */
@@ -136,6 +160,14 @@ interface State {
   terminals: Record<string, Terminal>;
   /** 各项目 Local 现在的样子（设计稿 9-10 Local 标签、专车面板） */
   localStatus: Record<string, LocalStatus>;
+  /** 各路的浏览器窗口（设计稿 9-12） */
+  browser: Record<string, BrowserState>;
+  /** 各路输入框里引用的浏览器里的东西 */
+  browserRefs: Record<string, BrowserRef[]>;
+  /** 这一站不附浏览器现状（输入框里点掉了） */
+  browserBriefOff: Record<string, boolean>;
+  /** MCP 设置页的数据 */
+  mcp: McpOverview | null;
   /** 各项目专车的常用提示；null 是没改过（用自带的）；没有这一项是还没读 */
   localPresets: Record<string, LocalPreset[] | null>;
   /** 正在看的那个后台终端和它到现在为止的输出 */
@@ -192,6 +224,32 @@ interface State {
   resetLocal(routeId: string): Promise<void>;
   /** 打开“管理常用提示” */
   openLocalPresets(projectId: string): void;
+  // ── 内置浏览器（设计稿 9-12） ──
+  loadBrowser(routeId: string): void;
+  browserOpen(routeId: string, url?: string): Promise<void>;
+  browserShow(routeId: string): void;
+  browserClose(routeId: string): void;
+  /** 点选元素：选到了就进输入框 */
+  browserPick(routeId: string): Promise<void>;
+  browserCancelPick(routeId: string): void;
+  /** 截这一路窗口的页面；失败返回 null（错误显示在提示里） */
+  browserShot(routeId: string): Promise<PromptImage | null>;
+  addBrowserRef(routeId: string, ref: BrowserRef): void;
+  removeBrowserRef(routeId: string, index: number): void;
+  setBrowserBriefOff(routeId: string, off: boolean): void;
+  // ── MCP 服务（设计稿 9-13） ──
+  openMcp(projectId: string, tab?: "servers" | "browser"): void;
+  loadMcp(projectId: string): Promise<void>;
+  mcpCheck(projectId: string, names?: string[]): Promise<void>;
+  mcpTest(projectId: string, input: McpServerInput): Promise<McpServerState>;
+  mcpSave(projectId: string, input: McpServerInput, previous?: { name: string; scope: McpScope }): Promise<string | null>;
+  mcpRemove(projectId: string, name: string, scope: McpScope): Promise<void>;
+  mcpSetEnabled(projectId: string, name: string, enabled: boolean): Promise<void>;
+  mcpTrust(projectId: string, names: string[], trusted: boolean): Promise<void>;
+  mcpSetPolicy(server: string, tool: string, policy: McpToolPolicy | null): Promise<void>;
+  setBrowserSettings(patch: Partial<BrowserSettings>): Promise<void>;
+  routeMcp(routeId: string): Promise<string[]>;
+  setRouteMcp(routeId: string, off: string[]): Promise<void>;
   /** 存专车的常用提示；null 恢复自带的 */
   saveLocalPresets(projectId: string, presets: LocalPreset[] | null): void;
   openSystemTerminal(terminalId: string): Promise<void>;
@@ -404,6 +462,19 @@ let started = false;
       case "local.status":
         set((s) => ({ localStatus: { ...s.localStatus, [e.status.projectId]: e.status } }));
         break;
+      case "browser.state":
+        set((s) => ({ browser: { ...s.browser, [e.state.routeId]: e.state } }));
+        break;
+      case "mcp.states":
+        set((s) => (s.mcp?.projectId === e.projectId ? { mcp: { ...s.mcp, states: e.states } } : {}));
+        break;
+      case "stop.toolResult":
+        set((s) => {
+          const cur = s.live[e.stopId];
+          if (!cur) return {};
+          return { live: { ...s.live, [e.stopId]: { ...cur, items: cur.items.map((it) => (it.kind === "tool" && it.id === e.id ? { ...it, result: e.result } : it)) } } };
+        });
+        break;
       case "route.activity":
         set((s) => {
           const activity = { ...s.activity };
@@ -440,7 +511,8 @@ let started = false;
       case "stop.tool":
         set((s) => {
           const cur = s.live[e.stopId] ?? { phase: "answering" as const, items: [] };
-          return { live: { ...s.live, [e.stopId]: { ...cur, items: [...cur.items, { kind: "tool", tool: e.tool, detail: e.detail, added: e.added, removed: e.removed }] } } };
+          const mcp = e.id && e.tool.startsWith("mcp__") ? { id: e.id, input: e.input } : {};
+          return { live: { ...s.live, [e.stopId]: { ...cur, items: [...cur.items, { kind: "tool", tool: e.tool, detail: e.detail, added: e.added, removed: e.removed, ...mcp }] } } };
         });
         break;
       case "stop.updated":
@@ -553,6 +625,10 @@ let started = false;
     viewing: null,
     terminals: {},
     localStatus: {},
+    browser: {},
+    browserRefs: {},
+    browserBriefOff: {},
+    mcp: null,
     localPresets: {},
     terminalView: null,
     changesView: null,
@@ -752,6 +828,111 @@ let started = false;
       }
     },
 
+    loadBrowser(routeId) {
+      window.bw.browserState(routeId).then(
+        (st) => set((s) => ({ browser: { ...s.browser, [routeId]: st } })),
+        () => {},
+      );
+    },
+    async browserOpen(routeId, url) {
+      try {
+        await window.bw.browserOpen(routeId, url);
+        get().loadBrowser(routeId);
+      } catch (e) {
+        set({ error: message(e) });
+        get().loadBrowser(routeId);
+      }
+    },
+    browserShow(routeId) {
+      window.bw.browserShow(routeId).catch((e: unknown) => set({ error: message(e) }));
+    },
+    browserClose(routeId) {
+      window.bw.browserClose(routeId).catch((e: unknown) => set({ error: message(e) }));
+    },
+    async browserPick(routeId) {
+      try {
+        const el = await window.bw.browserPick(routeId);
+        if (el) get().addBrowserRef(routeId, { kind: "element", el });
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+    browserCancelPick(routeId) {
+      void window.bw.browserCancelPick(routeId);
+    },
+    async browserShot(routeId) {
+      try {
+        return await window.bw.browserScreenshot(routeId);
+      } catch (e) {
+        set({ error: message(e) });
+        return null;
+      }
+    },
+    addBrowserRef: (routeId, ref) => set((s) => ({ browserRefs: { ...s.browserRefs, [routeId]: [...(s.browserRefs[routeId] ?? []), ref] } })),
+    removeBrowserRef: (routeId, index) => set((s) => ({ browserRefs: { ...s.browserRefs, [routeId]: (s.browserRefs[routeId] ?? []).filter((_, i) => i !== index) } })),
+    setBrowserBriefOff: (routeId, off) => set((s) => ({ browserBriefOff: { ...s.browserBriefOff, [routeId]: off } })),
+
+    openMcp(projectId, tab = "servers") {
+      set({ dialog: { kind: "mcp", projectId, tab } });
+      void get().loadMcp(projectId);
+    },
+    async loadMcp(projectId) {
+      try {
+        const mcp = await window.bw.mcpOverview(projectId);
+        set({ mcp });
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+    async mcpCheck(projectId, names) {
+      try {
+        await window.bw.mcpCheck(projectId, names);
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+    async mcpTest(projectId, input) {
+      return window.bw.mcpTest(projectId, input);
+    },
+    async mcpSave(projectId, input, previous) {
+      try {
+        set({ mcp: await window.bw.mcpSave(projectId, input, previous) });
+        return null;
+      } catch (e) {
+        return message(e);
+      }
+    },
+    async mcpRemove(projectId, name, scope) {
+      try {
+        set({ mcp: await window.bw.mcpRemove(projectId, name, scope) });
+      } catch (e) {
+        set({ error: message(e) });
+      }
+    },
+    async mcpSetEnabled(projectId, name, enabled) {
+      set({ mcp: await window.bw.mcpSetEnabled(projectId, name, enabled) });
+    },
+    async mcpTrust(projectId, names, trusted) {
+      set({ mcp: await window.bw.mcpTrust(projectId, names, trusted) });
+      if (trusted) void get().mcpCheck(projectId, names);
+    },
+    async mcpSetPolicy(server, tool, policy) {
+      await window.bw.mcpSetPolicy(server, tool, policy);
+      set((s) => {
+        if (!s.mcp) return {};
+        const p = { ...(s.mcp.policies[server] ?? {}) };
+        if (policy) p[tool] = policy;
+        else delete p[tool];
+        return { mcp: { ...s.mcp, policies: { ...s.mcp.policies, [server]: p } } };
+      });
+    },
+    async setBrowserSettings(patch) {
+      const b = await window.bw.setBrowserSettings(patch);
+      set((s) => (s.mcp ? { mcp: { ...s.mcp, browser: b } } : {}));
+    },
+    routeMcp: (routeId) => window.bw.routeMcp(routeId),
+    setRouteMcp: (routeId, off) => window.bw.setRouteMcp(routeId, off),
+
     openLocalPresets(projectId) {
       get().loadLocalPresets(projectId);
       set({ dialog: { kind: "local-presets", projectId } });
@@ -814,11 +995,19 @@ let started = false;
     },
 
     async ask(routeId, text, images = []) {
-      const q = text.trim();
+      let q = text.trim();
+      // 输入框里引用的浏览器元素、报错：写成文字接在提问后面，元素的截图接在图片后面
+      const refs = get().browserRefs[routeId] ?? [];
+      if (refs.length > 0) {
+        const extra = browserRefsText(refs, images.length + 1);
+        q = q ? `${q}\n\n${extra.text}` : extra.text;
+        images = [...images, ...extra.images];
+      }
       if (!q && images.length === 0) return;
-      set((s) => ({ pendingAsk: { ...s.pendingAsk, [routeId]: q }, pendingImages: { ...s.pendingImages, [routeId]: images }, drafts: { ...s.drafts, [routeId]: "" }, draftImages: { ...s.draftImages, [routeId]: [] } }));
+      const browserState = !get().browserBriefOff[routeId];
+      set((s) => ({ pendingAsk: { ...s.pendingAsk, [routeId]: q }, pendingImages: { ...s.pendingImages, [routeId]: images }, drafts: { ...s.drafts, [routeId]: "" }, draftImages: { ...s.draftImages, [routeId]: [] }, browserRefs: { ...s.browserRefs, [routeId]: [] }, browserBriefOff: { ...s.browserBriefOff, [routeId]: false } }));
       try {
-        await window.bw.ask(routeId, q, images.length > 0 ? images : undefined);
+        await window.bw.ask(routeId, q, images.length > 0 ? images : undefined, { browserState });
       } catch (e) {
         set((s) => {
           const pendingAsk = { ...s.pendingAsk };

@@ -1,4 +1,4 @@
-import type { ClaudeOptions, ImportProgress, LocalStatus, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal } from "./model";
+import type { BrowserState, ClaudeOptions, ImportProgress, LocalStatus, McpServerState, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal, ToolResult } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -30,7 +30,13 @@ export type BwEvent =
   /** 导入终端会话的进度（设计稿 4-8） */
   | { type: "import.progress"; progress: ImportProgress }
   /** Claude 用了一个工具 */
-  | { type: "stop.tool"; routeId: string; stopId: string; tool: string; input: Record<string, unknown>; /** 一行说明：文件名、命令等 */ detail: string; added?: number; removed?: number }
+  | { type: "stop.tool"; routeId: string; stopId: string; tool: string; input: Record<string, unknown>; /** 一行说明：文件名、命令等 */ detail: string; added?: number; removed?: number; /** 这次调用的编号 */ id?: string }
+  /** MCP 工具的结果回来了（截图、报错列表） */
+  | { type: "stop.toolResult"; routeId: string; stopId: string; id: string; result: ToolResult }
+  /** 一路的浏览器窗口变了（开了、关了、跳了页面、多了报错） */
+  | { type: "browser.state"; state: BrowserState }
+  /** MCP 服务检查完了（设计稿 9-13） */
+  | { type: "mcp.states"; projectId: string; states: Record<string, McpServerState> }
   /** 等你批准；用 answerPermission(requestId, …) 回答 */
   | {
       type: "permission.request";

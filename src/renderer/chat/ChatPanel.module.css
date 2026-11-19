@@ -450,6 +450,11 @@
 .box textarea::placeholder {
   color: var(--fg-4);
 }
+.attachGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
 .attach {
   flex: none;
   width: 30px;
