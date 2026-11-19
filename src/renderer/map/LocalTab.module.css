@@ -41,6 +41,9 @@
 .dot[data-tone="red"] {
   background: var(--red);
 }
+.dot[data-tone="green"] {
+  background: var(--green);
+}
 .dot[data-tone="amber"] {
   background: var(--amber);
 }

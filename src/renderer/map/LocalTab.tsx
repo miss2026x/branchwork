@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../stores/store";
+import { useUnread } from "../stores/useUnread";
 import { LocalNow, runningDev } from "../chat/LocalCar";
 import css from "./LocalTab.module.css";
 
@@ -15,6 +16,7 @@ export function LocalTab({ projectId, selected }: { projectId: string; selected:
   const open = useStore((s) => s.openLocalRoute);
   const dir = useStore((s) => s.projects.find((p) => p.id === projectId)?.localDir ?? "");
   const [hover, setHover] = useState(false);
+  const unread = useUnread();
 
   // 换了项目、回到窗口时重新看一遍（你可能在终端里提交过、切过分支）
   useEffect(() => {
@@ -26,12 +28,13 @@ export function LocalTab({ projectId, selected }: { projectId: string; selected:
 
   const dev = route ? runningDev(Object.values(terminals).filter((t) => t.routeId === route.id)) : undefined;
   const conflicts = status?.files.filter((f) => f.state === "conflict").length ?? 0;
-  // 标签上只写“L Local”；要你注意的事用右上角一个点，和各路标签一样：红=冲突或找不到文件夹、黄=等你批准、蓝=回答中。细节悬停看
-  const dot = status?.missing || conflicts ? "red" : route?.status === "awaiting_permission" ? "amber" : route?.status === "answering" ? "blue" : undefined;
+  // 标签上只写“L Local”；要你注意的事用右上角一个点，和各路标签一样：红=冲突或找不到文件夹、黄=等你批准、蓝=回答中、绿=答完了还没看（设计稿 9-14）。细节悬停看
+  const fresh = !!route && !selected && unread.has(route.id);
+  const dot = status?.missing || conflicts ? "red" : route?.status === "awaiting_permission" ? "amber" : route?.status === "answering" ? "blue" : fresh ? "green" : undefined;
 
   return (
     <span className={css.wrap} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}>
-      <button className={css.tab} aria-current={selected} onClick={() => (setHover(false), void open(projectId))} aria-label="Local 专车：直接在 Local 里干活">
+      <button className={css.tab} aria-current={selected} onClick={() => (setHover(false), void open(projectId))} aria-label={`Local 专车：直接在 Local 里干活${fresh ? "（答完了，还没看）" : ""}`}>
         <b className={css.l}>L</b>
         <span className={css.name}>Local</span>
         {dot && <i className={css.dot} data-tone={dot} aria-hidden />}

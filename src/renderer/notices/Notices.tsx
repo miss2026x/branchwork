@@ -68,6 +68,8 @@ function Card({ n, ...p }: Props & { n: Notice }) {
     <>
       {project && <span>{project} </span>}
       <Plate route={route} />
+      {/* Local 专车的牌子只有一个 L，写上名字才认得出 */}
+      {route.local && <span> Local</span>}
     </>
   );
   const frame = (tone: "plain" | "amber" | "red" | "dark", icon: ReactNode, title: ReactNode, body: ReactNode, actions: ReactNode) => (
