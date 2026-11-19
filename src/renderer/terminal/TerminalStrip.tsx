@@ -4,6 +4,7 @@ import { Plate } from "../ui/Plate";
 import { IconChevron, IconClose, IconStop, IconTerminal } from "../ui/icons";
 import css from "./Terminal.module.css";
 import { routeLabel } from "../ui/route-color";
+import { portsOf } from "../ui/ports";
 
 interface Props {
   route: Route;
@@ -52,7 +53,7 @@ export function TerminalStrip({ route, terminals, stopLabel, onOpen, onStop }: P
                       <code>{t.command}</code> · {route.local ? "在 Local 里" : `${routeLabel(route)} 的工作区`}{from && <>，{from}开的</>}
                     </small>
                   </span>
-                  {t.port !== null && t.status === "running" && <em>{`:${t.port}`}</em>}
+                  {t.status === "running" && portsOf(t).length > 0 && <em>{portsOf(t).map((p) => `:${p}`).join(" ")}</em>}
                   {t.status !== "running" && <span className={css.state}>{t.exitCode === 0 ? "已结束" : `已退出${t.exitCode !== null ? `（${t.exitCode}）` : ""}`}</span>}
                 </button>
                 <button className={css.rowStop} onClick={() => onStop(t.id)} aria-label={t.status === "running" ? `停止 ${t.name}` : `清掉 ${t.name}`} title={t.status === "running" ? "停止" : "从列表里清掉"}>

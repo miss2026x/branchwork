@@ -4,11 +4,12 @@ import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./RouteTabs.module.css";
 
-/** 一路此刻的状态点：等你批准、冲突、回答中 */
-function tone(r: Route): "amber" | "red" | "blue" | undefined {
+/** 一路此刻的状态点：等你批准、冲突、回答中；都不是的话，答完了还没看的是绿点 */
+function tone(r: Route, unread: boolean): "amber" | "red" | "blue" | "green" | undefined {
   if (r.status === "awaiting_permission") return "amber";
   if (r.status === "conflict") return "red";
   if (r.status === "answering") return "blue";
+  if (unread) return "green";
   return undefined;
 }
 
@@ -18,6 +19,8 @@ interface Props {
   onSelectRoute(routeId: string): void;
   /** 最左、固定不滚的那一格（Local 专车） */
   leading?: ReactNode;
+  /** 答完了还没看的那几路（设计稿 9-14） */
+  unread?: Set<string>;
 }
 
 /**
@@ -25,7 +28,7 @@ interface Props {
  * 两边渐隐、出现“‹ ›”；滚轮、触控板都能横着滚；选中的那一路自动滚到看得见的地方；
  * 看不见的那一边有路在等你批准或有冲突，箭头上出一个点
  */
-export function RouteTabs({ routes, selectedRouteId, onSelectRoute, leading }: Props) {
+export function RouteTabs({ routes, selectedRouteId, onSelectRoute, leading, unread }: Props) {
   const strip = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ left: false, right: false });
   /** 看不见的标签里要你处理的：在左边还是右边 */
@@ -96,7 +99,7 @@ export function RouteTabs({ routes, selectedRouteId, onSelectRoute, leading }: P
         >
           {routes.map((r) => {
             const on = r.id === selectedRouteId;
-            const t = tone(r);
+            const t = tone(r, r.id !== selectedRouteId && !!unread?.has(r.id));
             return (
               <button
                 key={r.id}
@@ -104,7 +107,7 @@ export function RouteTabs({ routes, selectedRouteId, onSelectRoute, leading }: P
                 data-urgent={t === "amber" || t === "red" ? t : undefined}
                 className={css.tab}
                 aria-current={on}
-                title={`${routeLabel(r)} ${r.name}`}
+                title={`${routeLabel(r)} ${r.name}${t === "green" ? "（答完了，还没看）" : ""}`}
                 style={on ? { borderColor: routeColors(r).line, boxShadow: `0 0 0 1px ${routeColors(r).line}` } : undefined}
                 onClick={() => onSelectRoute(r.id)}
               >

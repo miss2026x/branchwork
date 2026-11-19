@@ -39,7 +39,7 @@ const STATE: Record<LocalStatus["files"][number]["state"], string> = { modified:
  * 它在哪、其他路是怎么回事、Local 现在的分支和没提交的文件各是哪一路改的。
  * 只交给 Claude，界面上那一站的提问还是你写的原话
  */
-export function localBrief(localDir: string, s: LocalStatus | null, routes: Route[], stops: Stop[], terminals: { command: string; port: number | null }[]): string {
+export function localBrief(localDir: string, s: LocalStatus | null, routes: Route[], stops: Stop[], terminals: { command: string; port: number | null; ports?: number[] }[]): string {
   const name = (routeId: string, stopId: string | null) => {
     const r = routes.find((x) => x.id === routeId);
     if (!r) return "一条已经删掉的对话";
@@ -66,7 +66,7 @@ export function localBrief(localDir: string, s: LocalStatus | null, routes: Rout
       if (files.length > 40) lines.push(`- ……还有 ${files.length - 40} 个`);
     }
   }
-  if (terminals.length) lines.push("", `这辆车开着的后台终端：${terminals.map((t) => `${t.command}${t.port ? `（端口 ${t.port}）` : ""}`).join("、")}。`);
+  if (terminals.length) lines.push("", `这辆车开着的后台终端：${terminals.map((t) => `${t.command}${t.ports?.length ? `（端口 ${t.ports.join("、")}）` : t.port ? `（端口 ${t.port}）` : ""}`).join("、")}。`);
   lines.push("</branchwork-local>");
   return lines.join("\n");
 }

@@ -10,9 +10,11 @@ type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 const imgSrc = (i: PromptImage) => `data:${i.type};base64,${i.data}`;
 
 /** 这一路正在跑的开发服务器的网址（“浏览器”菜单第一项直接打开它） */
-export function devUrl(terminals: Terminal[]): { url: string; command: string } | null {
-  const t = terminals.find((x) => x.status === "running" && x.port);
-  return t ? { url: `http://localhost:${t.port}`, command: t.command } : null;
+export function devUrls(terminals: Terminal[]): { url: string; command: string }[] {
+  return terminals
+    .filter((x) => x.status === "running")
+    .flatMap((t) => (t.ports?.length ? t.ports : t.port ? [t.port] : []).map((p) => ({ url: `http://localhost:${p}`, command: t.command })))
+    .slice(0, 4);
 }
 
 /**
@@ -208,7 +210,8 @@ function Buttons({ dim, onPick, onShot, onShow, onMore }: { dim?: boolean; onPic
 }
 
 /** 输入框工具栏里的“浏览器”（这一路还没开窗口时）：认出开发服务器就直接打开它 */
-export function BrowserOpenButton({ routeId, dev, lastUrl, disabled }: { routeId: string; dev: { url: string; command: string } | null; /** 窗口关之前在的页面 */ lastUrl?: string | null; disabled?: boolean }) {
+export function BrowserOpenButton({ routeId, devs, lastUrl, disabled }: { routeId: string; /** 这一路在跑的开发服务器的地址（一个终端可能有好几个端口） */ devs: { url: string; command: string }[]; /** 窗口关之前在的页面 */ lastUrl?: string | null; disabled?: boolean }) {
+  const dev = devs[0] ?? null;
   const open = useStore((s) => s.browserOpen);
   const pick = useStore((s) => s.browserPick);
   const [menu, setMenu] = useState(false);
@@ -240,13 +243,15 @@ export function BrowserOpenButton({ routeId, dev, lastUrl, disabled }: { routeId
               <code>上次的页面</code>
             </button>
           )}
-          {dev && (!lastUrl || hostPath(lastUrl).split("/")[0] !== hostPath(dev.url).split("/")[0]) && (
-            <button role="menuitem" onClick={() => (setMenu(false), void open(routeId, dev.url))}>
-              <IconGlobe size={14} />
-              <span className="ell">打开 {dev.url.replace(/^https?:\/\//, "")}</span>
-              <code>{dev.command}</code>
-            </button>
-          )}
+          {devs
+            .filter((d) => !lastUrl || hostPath(lastUrl).split("/")[0] !== hostPath(d.url).split("/")[0])
+            .map((d) => (
+              <button key={d.url} role="menuitem" onClick={() => (setMenu(false), void open(routeId, d.url))}>
+                <IconGlobe size={14} />
+                <span className="ell">打开 {d.url.replace(/^https?:\/\//, "")}</span>
+                <code>{d.command}</code>
+              </button>
+            ))}
           {goto ? (
             <form
               className={css.goto}

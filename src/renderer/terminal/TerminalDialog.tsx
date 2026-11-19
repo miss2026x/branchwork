@@ -5,6 +5,7 @@ import { Plate } from "../ui/Plate";
 import { since } from "./TerminalStrip";
 import css from "./Terminal.module.css";
 import { routeLabel } from "../ui/route-color";
+import { portsOf } from "../ui/ports";
 
 interface Props {
   terminal: Terminal;
@@ -48,7 +49,11 @@ export function TerminalDialog({ terminal: t, route, output, stopLabel, onStop, 
           <span className={css.badge} data-status={t.status}>
             {running ? `运行中 · ${since(t.startedAt)}` : t.exitCode === 0 ? "已结束" : `已退出${t.exitCode !== null ? ` · 退出码 ${t.exitCode}` : ""}`}
           </span>
-          {t.port !== null && running && <span className={css.port}>localhost:{t.port}</span>}
+          {running && portsOf(t).map((p) => (
+            <span key={p} className={css.port}>
+              localhost:{p}
+            </span>
+          ))}
           <button aria-label="关闭" onClick={onClose}>
             <IconClose />
           </button>

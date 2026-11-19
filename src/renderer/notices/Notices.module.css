@@ -143,3 +143,11 @@
 .card[data-tone="dark"] .close:hover {
   background: var(--on-dark-hover);
 }
+
+/* “答完了”的回答摘头：最多两行 */
+.lead {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

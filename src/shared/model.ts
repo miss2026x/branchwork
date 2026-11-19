@@ -247,8 +247,10 @@ export interface Terminal {
   cwd: string;
   status: "running" | "exited";
   exitCode: number | null;
-  /** 从输出里认出来的端口号；没认出来为空 */
+  /** 从输出里认出来的端口号（最近说出的那个）；没认出来为空 */
   port: number | null;
+  /** 认出来的全部端口：一个命令可能起好几个服务（前端、接口……），按出现的先后 */
+  ports: number[];
   startedAt: number;
   endedAt: number | null;
 }

@@ -1,6 +1,6 @@
 import os from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { createTerminals, detectPort, type TerminalEvent, type Terminals } from "../../src/terminal";
+import { createTerminals, detectPort, detectPorts, type TerminalEvent, type Terminals } from "../../src/terminal";
 
 const owner = { projectId: "p1", routeId: "r1", stopId: "s1" };
 const node = (code: string) => `node -e "${code}"`;
@@ -92,5 +92,13 @@ describe("后台终端", () => {
     expect(detectPort("dev server on port 3000")).toBe(3000);
     expect(detectPort("started server on port 3000")).toBe(3000);
     expect(detectPort("compiled 12 modules in 300 ms")).toBeNull();
+  });
+
+  it("一个命令起了好几个服务：端口全认出来，按出现的先后，去掉重复的", () => {
+    const out = "[0]   ➜  Local:   http://localhost:5176/\n[1] API listening on http://localhost:3000\n[0]   ➜  Local:   http://localhost:5176/\n";
+    expect(detectPorts(out)).toEqual([5176, 3000]);
+    // 被占用的不算
+    expect(detectPorts("Port 5173 is in use, trying another one...\n  ➜  Local:   http://localhost:5174/")).toEqual([5174]);
+    expect(detectPorts("compiled 12 modules")).toEqual([]);
   });
 });

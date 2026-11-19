@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
+import { loadSeen, markSeen, saveSeen, type Seen } from "./seen";
 import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus, BrowserIssue, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement } from "../../shared";
 import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
 import { routeLabel } from "../ui/route-color";
@@ -176,6 +177,12 @@ interface State {
   changesView: { routeId: string; files: FileStat[] | null } | null;
   /** 要你处理的事（右下角的通知） */
   notices: Notice[];
+  /** Lanes 的窗口在不在最前面 */
+  focused: boolean;
+  /** 各路看到哪个时候了（答完没看的绿点，设计稿 9-14） */
+  seen: Seen;
+  /** 答完时、Lanes 不在最前面，发系统通知 */
+  notifyDone: boolean;
   /** 各路刚从候车区自动发出的问题，通知用 */
   boarded: Record<string, string>;
   /** 各站的摘要提炼，按站记 */
@@ -272,6 +279,7 @@ interface State {
   /** 不要这份摘要了 */
   dropDistill(stopId: string): void;
   dismissNotice(id: string): void;
+  setNotifyDone(on: boolean): void;
   setRouteModel(routeId: string, model: string | null, effort?: Effort | null): Promise<void>;
   /** 读这个项目能选的模型和批准方式（每个项目只读一次；先给上次的，新的到了再换） */
   loadClaudeOptions(projectId: string): void;
@@ -352,6 +360,16 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).rep
  * 界面拿数据的唯一通道。启动时取一次快照，之后只按事件更新；界面不自己改主进程的数据。
  * 只有这个文件碰 window.bw。
  */
+const NOTIFY_KEY = "lanes.notifyDone";
+/** 答完时发不发系统通知：默认发 */
+function loadNotifyDone(): boolean {
+  try {
+    return localStorage.getItem(NOTIFY_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
 /** 删除之后留多久可以撤销 */
 const UNDO_MS = 7000;
 
@@ -362,6 +380,33 @@ let started = false;
   let toastSeq = 0;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let deleteTimer: ReturnType<typeof setTimeout> | undefined;
+  /** 这一路看到现在了 */
+  const seeRoute = (routeId: string) => {
+    const seen = markSeen(get().seen, routeId);
+    set({ seen });
+    saveSeen(seen);
+  };
+  /** Lanes 不在最前面时答完了一站：发一条系统通知，任务栏图标闪一下（设计稿 9-14） */
+  const notifyOs = (stop: Stop) => {
+    const s = get();
+    const route = s.routes[stop.routeId];
+    if (!route || typeof Notification === "undefined") return;
+    const project = s.projects.find((p) => p.id === route.projectId);
+    const number = Object.values(s.stops).filter((x) => x.routeId === route.id && x.kind !== "summary" && x.seq <= stop.seq).length;
+    const notice = s.notices.find((n) => n.kind === "done" && n.stopId === stop.id);
+    const body = notice?.kind === "done" ? notice.text : "";
+    try {
+      const n = new Notification(`${project ? `${project.name} · ` : ""}${routeLabel(route)} 第 ${number} 站答完了`, { body, tag: `done:${route.id}` });
+      n.onclick = () => {
+        void window.bw.focusWindow().catch(() => {});
+        get().selectRoute(route.id);
+        get().dismissNotice(`done:${route.id}`);
+      };
+    } catch {
+      // 系统不让发就算了：应用里的提示还在
+    }
+    void window.bw.focusWindow(true).catch(() => {});
+  };
   const apply = (e: BwEvent) => {
     // 通知先按“事件之前的数据”算一遍
     set((s) => {
@@ -377,6 +422,12 @@ let started = false;
       }
       return notices === s.notices && boarded === s.boarded ? {} : { notices, boarded };
     });
+    if (e.type === "stop.updated" && e.stop.status === "done" && e.stop.kind !== "summary") {
+      const s = get();
+      // 正看着这一路答完的：看过了
+      if (s.focused && s.selectedRouteId === e.stop.routeId) seeRoute(e.stop.routeId);
+      else if (!s.focused && s.notifyDone) notifyOs(e.stop);
+    }
     // 说好“答完再归档”的路：一停下来就归档
     if (e.type === "route.updated" && e.route.status !== "answering" && e.route.status !== "awaiting_permission" && e.route.status !== "archived" && get().archiveWhenDone.includes(e.route.id)) {
       set((s) => ({ archiveWhenDone: s.archiveWhenDone.filter((id) => id !== e.route.id) }));
@@ -633,6 +684,9 @@ let started = false;
     terminalView: null,
     changesView: null,
     notices: [],
+    focused: typeof document === "undefined" || document.hasFocus(),
+    seen: { since: Date.now(), at: {} },
+    notifyDone: loadNotifyDone(),
     boarded: {},
     distills: {},
     compressStopId: null,
@@ -645,9 +699,18 @@ let started = false;
     async init() {
       if (started) return; // 开发模式下 React 会把初始化跑两遍，事件只能订阅一次
       started = true;
+      set({ seen: loadSeen() });
       window.bw.onEvent(apply);
       // 关窗口前：还在等撤销的删除现在就做掉
       window.addEventListener("beforeunload", () => void get().flushDelete());
+      // 窗口在不在最前面：答完的提示、看没看过都要用
+      window.addEventListener("focus", () => {
+        const id = get().selectedRouteId;
+        // 回来了：正看着的那一路答完的提示不用再留着
+        set((s) => ({ focused: true, notices: id ? s.notices.filter((n) => n.id !== `done:${id}`) : s.notices }));
+        if (id) seeRoute(id);
+      });
+      window.addEventListener("blur", () => set({ focused: false }));
       try {
         const projects = await window.bw.listProjects();
         set({ projects });
@@ -677,6 +740,7 @@ let started = false;
       const route = get().routes[routeId];
       if (!route) return;
       set((s) => ({ overview: false, viewing: s.viewing && s.stops[s.viewing]?.routeId === routeId ? s.viewing : null, selectedRouteId: routeId, selectedProjectId: route.projectId, notices: noticesAfterSelecting(s.notices, routeId) }));
+      seeRoute(routeId);
       get().loadClaudeOptions(route.projectId);
       void loadHistory(routeId);
       void window.bw.warm(routeId).catch(() => {});
@@ -1207,6 +1271,15 @@ let started = false;
         (files) => set((s) => (s.changesView?.routeId === routeId ? { changesView: { routeId, files } } : {})),
         (e) => set({ error: message(e), changesView: null }),
       );
+    },
+
+    setNotifyDone(on) {
+      set({ notifyDone: on });
+      try {
+        localStorage.setItem(NOTIFY_KEY, on ? "1" : "0");
+      } catch {
+        // 存不下就只管这一次
+      }
     },
 
     dismissNotice(id) {

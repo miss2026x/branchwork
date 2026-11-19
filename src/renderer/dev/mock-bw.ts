@@ -51,7 +51,7 @@ export function installMockBw(): void {
     modes: ["ask", "edits", "auto", "plan", "dontAsk", "all"],
   };
   const addRoute = (projectId: string, name: string, extra: Partial<Route> = {}): Route => {
-    const number = [...routes.values()].filter((r) => r.projectId === projectId).length + 1;
+    const number = [...routes.values()].filter((r) => r.projectId === projectId && !r.local).length + 1;
     const r: Route = { id: id("r"), projectId, number, express: null, name, status: "idle", sessionId: null, worktreePath: `/worktrees/${projectId}/${number}`, parentRouteId: null, forkStopId: null, model: null, effort: null, permissionMode: projects.find((p) => p.id === projectId)?.permissionMode ?? "ask", color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: Date.now(), archivedAt: null, ...extra };
     routes.set(r.id, r);
     return r;
@@ -91,6 +91,21 @@ export function installMockBw(): void {
     if (q.has("many")) for (const [name, status] of [["升级依赖", "awaiting_permission"], ["首页性能", "answering"], ["日志格式", "idle"], ["埋点", "idle"], ["暗色模式", "idle"]] as const) addRoute(p.id, name, { status });
     addStop(r4.id, "看 CI 配置", "CI 的缓存为什么总是不命中？", [{ kind: "text", text: "缓存的 key 里带了提交号，所以每次都" }], { status: "interrupted", syncState: "unsynced", error: "已停车" });
     addRoute("p2", "首页改版");
+    // 最近一次对话的时间（设计稿 9-14）：1路 两小时前，2路 3 分钟前答完（还没看），3路 昨天，4路 更早
+    const ago = (routeId: string, minutes: number) => {
+      const list = [...stops.values()].filter((x) => x.routeId === routeId).sort((x, y) => y.seq - x.seq);
+      list.forEach((x, i) => stops.set(x.id, { ...x, startedAt: Date.now() - (minutes + i * 7 + 2) * 60_000, endedAt: x.endedAt === null ? null : Date.now() - (minutes + i * 7) * 60_000 }));
+    };
+    ago(r1.id, 120);
+    ago(r2.id, 3);
+    ago(r3.id, 26 * 60);
+    ago(r4.id, 9 * 24 * 60);
+    // 演示用：只当 10 分钟前看过一遍，2路 那一站就是“答完了还没看”
+    try {
+      localStorage.setItem("lanes.seen", JSON.stringify({ since: Date.now() - 10 * 60_000, at: {} }));
+    } catch {
+      // 不要紧
+    }
     queue = [
       { id: "w1", projectId: p.id, text: "把错误码映射成用户能看懂的提示", routeId: r2.id, mode: "auto", createdAt: 1 },
       { id: "w2", projectId: p.id, text: "README 补上 GitHub 环境变量说明", routeId: r2.id, mode: "manual", createdAt: 2 },
@@ -204,13 +219,20 @@ export function installMockBw(): void {
   [...routes.values()].forEach((r, i) => stops.size && (r.contextTokens = [6200, 21400, 12800, 3100, 4800][i % 5]!));
   // 后台终端的假数据：GitHub 登录这一路开着一个开发服务器，还有一个已经退出的测试
   const terminals: Terminal[] = [];
+  // Local 专车里开着一个前后端一起起的开发服务器：项目名旁边写出两个端口（设计稿 9-14）
+  if (projects.some((x) => x.id === "p1")) {
+    const p1 = projects.find((x) => x.id === "p1")!;
+    const local: Route = { ...addRoute("p1", "Local 专车"), number: 0, local: true, worktreePath: p1.localDir };
+    routes.set(local.id, local);
+    terminals.push({ id: "t0", projectId: "p1", routeId: local.id, stopId: null, name: "开发服务器", command: "pnpm dev", cwd: p1.localDir, status: "running", exitCode: null, port: 3000, ports: [5176, 3000], startedAt: Date.now() - 50 * 60_000, endedAt: null });
+  }
   const withTerminals = [...routes.values()].find((x) => x.name === "GitHub 登录");
   if (withTerminals) {
     const stopId = [...stops.values()].find((x) => x.routeId === withTerminals.id)?.id ?? null;
     const base = { projectId: withTerminals.projectId, routeId: withTerminals.id, stopId, cwd: withTerminals.worktreePath };
     terminals.push(
-      { ...base, id: "t1", name: "开发服务器", command: "npm run dev", status: "running", exitCode: null, port: 5173, startedAt: Date.now() - 18 * 60_000, endedAt: null },
-      { ...base, id: "t2", name: "测试（监听）", command: "npm test -- --watch", status: "exited", exitCode: 1, port: null, startedAt: Date.now() - 40 * 60_000, endedAt: Date.now() - 31 * 60_000 },
+      { ...base, id: "t1", name: "开发服务器", command: "npm run dev", status: "running", exitCode: null, port: 5173, ports: [5173, 3000], startedAt: Date.now() - 18 * 60_000, endedAt: null },
+      { ...base, id: "t2", name: "测试（监听）", command: "npm test -- --watch", status: "exited", exitCode: 1, port: null, ports: [], startedAt: Date.now() - 40 * 60_000, endedAt: Date.now() - 31 * 60_000 },
     );
   }
 
@@ -439,6 +461,7 @@ export function installMockBw(): void {
     },
     openLocal: async () => {},
     openSystemTerminal: async () => {},
+    focusWindow: async () => {},
     async truncate(routeId, stopId) {
       const target = stops.get(stopId)!;
       const gone = [...stops.values()].filter((s) => s.routeId === routeId && s.seq >= target.seq).map((s) => s.id);
@@ -474,7 +497,9 @@ export function installMockBw(): void {
     ],
     terminals: async (projectId) => terminals.filter((t) => t.projectId === projectId),
     terminalOutput: async (terminalId) =>
-      terminalId === "t1"
+      terminalId === "t0"
+        ? "> auth-service@1.4.0 dev\n> concurrently \"vite --port 5176\" \"node server.js\"\n\n[0]   VITE v7.1.0  ready in 388 ms\n[0]   ➜  Local:   http://localhost:5176/\n[1] API listening on http://localhost:3000\n"
+        : terminalId === "t1"
         ? "> auth-service@1.4.0 dev\n> vite --port 5173\n\n  VITE v7.1.0  ready in 412 ms\n\n  ➜  Local:   http://localhost:5173/\n  ➜  Network: use --host to expose\n\n10:42:07 [vite] hmr update /src/auth/login-flow.ts\n10:44:31 [vite] hmr update /src/auth/session.ts\n"
         : "> auth-service@1.4.0 test\n> vitest --watch\n\n ✓ tests/auth/session.test.ts (12)\n ✗ tests/auth/github.test.ts (3)\n   × exchanges the code for a token\n\n Test Files  1 failed | 1 passed (2)\n",
     async terminalStop(terminalId) {
@@ -674,6 +699,12 @@ export function installMockBw(): void {
       setRoute(r4.id, { status: "interrupted" });
       const home = byName("首页改版");
       addStop(home.id, "换首屏大图", "把首屏大图换成新的。", [{ kind: "text", text: "换好了。" }]);
+      // 答完了一站（设计稿 9-14）
+      const answer = "改好了，按钮现在在窄屏下居中；顺手把 `margin-left` 去掉了。改动已进 Local。";
+      const sd = addStop(home.id, "按钮居中", "按钮在窄屏下居中。", [{ kind: "text", text: answer }], { status: "answering", endedAt: null });
+      emit({ type: "stop.created", stop: sd });
+      emit({ type: "stop.delta", routeId: home.id, stopId: sd.id, text: answer });
+      setStop(sd.id, { status: "done", endedAt: Date.now() });
       queue.push({ id: "w9", projectId: "p2", text: "跑一遍端到端测试", routeId: home.id, mode: "manual", createdAt: 9 });
       emitQueue("p2");
       setRoute(home.id, { status: "answering" });

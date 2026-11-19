@@ -1,4 +1,4 @@
-import type { BwEvent, QueueItem, Route, Stop, SyncFile } from "../../shared";
+import type { BwEvent, ChatItem, QueueItem, Route, Stop, SyncFile } from "../../shared";
 
 /**
  * 通知：只提醒要你处理的事。
@@ -16,6 +16,8 @@ export type Notice =
   | { id: string; kind: "arrived"; routeId: string; stopId: string; nextStopId: string; nextText: string }
   /** 到站了，有一个设成手动登车的问题在等 */
   | { id: string; kind: "board"; routeId: string; itemId: string; text: string }
+  /** 你没在看的那一路答完了一站（设计稿 9-14）；text 是回答的头一两句 */
+  | { id: string; kind: "done"; routeId: string; stopId: string; text: string }
   /** 同步出错（不是冲突） */
   | { id: string; kind: "sync-error"; routeId: string; message: string };
 
@@ -28,6 +30,26 @@ export interface NoticeContext {
   selectedRouteId: string | null;
   /** 各路刚从候车区自动发出的问题（候车区的更新比新站的出现早到） */
   boarded: Record<string, string>;
+  /** 正在回答的各站的实时内容（答完的提示里要摘头一两句） */
+  live?: Record<string, { items: ChatItem[] }>;
+  /** Lanes 在不在最前面：不在的话，正看着的那一路答完也提示 */
+  focused?: boolean;
+}
+
+/** 回答的头一两句：去掉 Markdown 记号，最多 90 个字 */
+export function answerLead(items: ChatItem[] | undefined): string {
+  const text = [...(items ?? [])].reverse().find((i) => i.kind === "text")?.text ?? "";
+  const plain = text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    // 行首的标题、引用、列表记号，表格的竖线：换成空格
+    .replace(/^\s*(#+|>+|[-*+]|\d+\.)\s+/gm, " ")
+    .replace(/\|/g, " ")
+    // 行内的强调、代码记号：直接去掉（中文里换成空格会多出空隙）
+    .replace(/\*+|__|~~|`/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain.length > 90 ? plain.slice(0, 90) + "…" : plain;
 }
 
 const busy = (r: Route | undefined) => r?.status === "answering" || r?.status === "awaiting_permission";
@@ -61,7 +83,8 @@ export function reduceNotices(list: Notice[], e: BwEvent, s: NoticeContext): Not
       const stop = e.stop;
       const route = s.routes[stop.routeId];
       // 新的一站出发了：上一条“已自动发出”的通知就过时了
-      let next = list.filter((n) => !(n.kind === "arrived" && n.routeId === stop.routeId));
+      // 新的一站出发了：上一条“已自动发出”“答完了”的通知就过时了
+      let next = list.filter((n) => !((n.kind === "arrived" || n.kind === "done") && n.routeId === stop.routeId));
       if (stop.status !== "answering" || !route || stop.routeId === s.selectedRouteId) return next;
       const auto = s.boarded[stop.routeId] === stop.prompt || (s.queue[route.projectId] ?? []).some((q) => q.routeId === stop.routeId && q.mode === "auto" && q.text === stop.prompt);
       const prev = Object.values(s.stops)
@@ -75,6 +98,10 @@ export function reduceNotices(list: Notice[], e: BwEvent, s: NoticeContext): Not
       // 自动发出的那一站也结束了
       let next = stop.status === "answering" ? list : list.filter((n) => !(n.kind === "arrived" && n.nextStopId === stop.id));
       const before = s.stops[stop.id];
+      // 正常答完：你没在看这一路，或者 Lanes 不在最前面，就提示一下（中断、冲突各有自己的提示）
+      if (stop.status === "done" && before?.status === "answering" && stop.kind !== "summary" && (stop.routeId !== s.selectedRouteId || s.focused === false)) {
+        next = put(next, { id: `done:${stop.routeId}`, kind: "done", routeId: stop.routeId, stopId: stop.id, text: answerLead(s.live?.[stop.id]?.items) });
+      }
       if (stop.status === "interrupted" && before?.status === "answering" && stop.error !== STOPPED_BY_USER && stop.routeId !== s.selectedRouteId) {
         const route = s.routes[stop.routeId];
         const waiting = route ? (s.queue[route.projectId] ?? []).filter((q) => q.routeId === route.id).length : 0;

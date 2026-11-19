@@ -19,7 +19,7 @@ import css from "./ChatPanel.module.css";
 import { LocalIntro, LocalMenu, LocalNow, LocalPresetBar, LocalResetConfirm, LocalWaiting, runningDev } from "./LocalCar";
 import type { PresetChip } from "./local-presets";
 import { Md, StreamingMd } from "./Md";
-import { BrowserBar, BrowserGroup, BrowserOpenButton, BrowserRefs, BrowserStateChip, devUrl, McpCall } from "./Browser";
+import { BrowserBar, BrowserGroup, BrowserOpenButton, BrowserRefs, BrowserStateChip, devUrls, McpCall } from "./Browser";
 import { isBrowserTool, isOtherMcpTool } from "./browser-steps";
 
 /** 右侧面板：当前这一路的对话、状态、输入框 */
@@ -581,7 +581,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
                   <IconClip size={16} />
                 </button>
-                {!browser?.open && <BrowserOpenButton routeId={route.id} dev={devUrl(terminals)} lastUrl={browser?.lastUrl} disabled={blocked} />}
+                {!browser?.open && <BrowserOpenButton routeId={route.id} devs={devUrls(terminals)} lastUrl={browser?.lastUrl} disabled={blocked} />}
               </span>
               <PermissionModeControl mode={permissionMode} routeLabel={routeLabel(route)} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
               <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={routeLabel(route)} onChange={onModel} />

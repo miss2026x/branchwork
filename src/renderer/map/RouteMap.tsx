@@ -20,6 +20,8 @@ interface Props {
   /** 候车区里的问题：派给某一路的，在那一路的末尾画成虚线的站 */
   queue?: QueueItem[];
   selectedRouteId: string | null;
+  /** 答完了还没看的那几路：标签上一个绿点 */
+  unread?: Set<string>;
   onSelectRoute(routeId: string): void;
   /** 站在界面上显示的序号（分叉出来的路接着父路往下数） */
   stopNumber(stop: Stop): number;
@@ -91,7 +93,7 @@ function dotGrid(view: { k: number; x: number; y: number }): CSSProperties {
   return { backgroundSize: `${g}px ${g}px`, backgroundPosition: `${snap(view.x)}px ${snap(view.y)}px` };
 }
 
-export function RouteMap({ leading, routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages, activityLabel }: Props) {
+export function RouteMap({ leading, unread, routes, stops, queue = [], selectedRouteId, onSelectRoute, stopNumber, onFork, onCompress, onRenameStop, focus: jump, viewingStopId, onViewStop, preview, onHoverStop, onTruncate, onParkAnswer, onQueueMode, onQueueEdit, onQueueRemove, dragging, onDropItem, range, building = [], onOpenBuilding, onJumpStop, conflicts = {}, whoChanged, onResolve, hint, onDismissHint, resizing = false, stopImages, activityLabel }: Props) {
   /** 正在改名的那一站和输入框里的字 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const layout = useMemo(() => layoutMap(routes, stops), [routes, stops]);
@@ -257,7 +259,7 @@ export function RouteMap({ leading, routes, stops, queue = [], selectedRouteId, 
 
   return (
     <div className={css.map}>
-      <RouteTabs routes={routes} selectedRouteId={selectedRouteId} onSelectRoute={onSelectRoute} leading={leading} />
+      <RouteTabs routes={routes} selectedRouteId={selectedRouteId} onSelectRoute={onSelectRoute} leading={leading} unread={unread} />
 
       <div className={css.zoom}>
         <button aria-label="缩小" onClick={() => zoomBy(1 / 1.2)}>

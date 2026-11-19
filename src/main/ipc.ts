@@ -41,6 +41,18 @@ export function registerIpc(core: Core, extras: Extras): void {
       const project = core.listProjects().find((p) => p.id === projectId);
       if (project) await shell.openPath(project.localDir);
     },
+    async focusWindow(attention) {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (!win || win.isDestroyed()) return;
+      if (attention) {
+        if (!win.isFocused()) win.flashFrame(true);
+        return;
+      }
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      win.flashFrame(false);
+    },
     async openSystemTerminal(terminalId) {
       const cwd = core
         .listProjects()

@@ -62,10 +62,15 @@ function createWindow(): void {
   // 界面里的链接不在应用窗口里打开
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (e) => e.preventDefault());
+  // 答完时任务栏图标闪过；回到窗口就停
+  win.on("focus", () => win.flashFrame(false));
 
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL);
   else void win.loadFile(path.join(import.meta.dirname, "../renderer/index.html"));
 }
+
+// Windows 上系统通知要认得出是哪个应用：和安装包的 appId 一样
+if (process.platform === "win32") app.setAppUserModelId("app.branchwork.desktop");
 
 void app.whenReady().then(async () => {
   // 先把浏览器代理开好：各路的 Claude 启动时要知道连到哪里（Chrome 本身等第一次要用时才启动）

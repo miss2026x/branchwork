@@ -9,6 +9,7 @@ import { routeLabel } from "../ui/route-color";
 import { useFit } from "../ui/useFit";
 import { presetChips, type PresetChip } from "./local-presets";
 import css from "./LocalCar.module.css";
+import { portsOf } from "../ui/ports";
 
 /**
  * Local 专车面板里多出来的几块（设计稿 9-10）：“Local 现在”、第一次打开的说明、
@@ -89,7 +90,11 @@ export function LocalNow({ status, dev, compact, dir }: { status: LocalStatus | 
               <span>
                 <code>{dev.command}</code> 在跑
               </span>
-              {dev.port !== null && <span className={css.port}>localhost:{dev.port}</span>}
+              {portsOf(dev).map((p) => (
+                <span key={p} className={css.port}>
+                  localhost:{p}
+                </span>
+              ))}
             </>
           ) : (
             <>

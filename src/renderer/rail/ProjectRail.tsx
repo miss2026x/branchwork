@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFit } from "../ui/useFit";
 import type { Route } from "../../shared";
 import { useStore } from "../stores/store";
@@ -7,7 +7,10 @@ import { RouteMenu } from "./RouteMenu";
 import { Plate } from "../ui/Plate";
 import { routeColors } from "../ui/route-color";
 import css from "./ProjectRail.module.css";
-import { ago } from "../ui/ago";
+import { ago, lastTime } from "../ui/ago";
+import { lastActive } from "../stores/seen";
+import { useUnread } from "../stores/useUnread";
+import { portsOf } from "../ui/ports";
 
 /** 左栏：项目和每个项目里的路 */
 export function ProjectRail({
@@ -72,6 +75,15 @@ export function ProjectRail({
   const addProject = useStore((s) => s.addProject);
   const createRoute = useStore((s) => s.createRoute);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const viewTerminal = useStore((s) => s.viewTerminal);
+  const unread = useUnread();
+  // 时间每分钟走一下（“3 分钟前”）
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const stopList = Object.values(stops);
 
   const strip = compact && (
     <aside className={css.strip} aria-label="项目和线路">
@@ -119,6 +131,8 @@ export function ProjectRail({
                         className={css.pip}
                         style={{ background: routeColors(r).line }}
                       />
+                    ) : unread.has(r.id) && r.id !== routeId ? (
+                      <i className={css.pipGreen} />
                     ) : null}
                   </button>
                 ))}
@@ -165,22 +179,43 @@ export function ProjectRail({
             const list = mine.filter((r) => r.status !== "archived");
             const archived = mine.filter((r) => r.status === "archived");
             const open = !closed[p.id];
+            // Local 专车里在跑、认出了端口的后台终端（设计稿 9-14）
+            const localId = Object.values(routes).find((r) => r.projectId === p.id && r.local)?.id;
+            const running = localId ? Object.values(terminals).filter((t) => t.routeId === localId && t.status === "running" && portsOf(t).length > 0) : [];
+            const ports = [...new Set(running.flatMap(portsOf))];
+            const toggle = () => {
+              if (p.id === projectId) setClosed((c) => ({ ...c, [p.id]: open }));
+              else selectProject(p.id);
+            };
             return (
               <section key={p.id} className={css.projectSection}>
                 <div className={css.projectHead}>
                 <button
                   className={css.project}
+                  data-fit={ports.length > 0}
                   aria-expanded={open}
-                  onClick={() => {
-                    if (p.id === projectId)
-                      setClosed((c) => ({ ...c, [p.id]: open }));
-                    else selectProject(p.id);
-                  }}
+                  onClick={toggle}
                 >
                   <IconChevron size={14} open={open} />
                   <b className="ell">{p.name}</b>
                   {!open && <small>{list.length} 路车</small>}
                 </button>
+                {ports.length > 0 && (
+                  <>
+                    <button
+                      className={css.ports}
+                      title={`Local 里在跑：\n${running.map((t) => `${t.command}  ${portsOf(t).map((x) => `:${x}`).join(" ")}`).join("\n")}\n点开看输出`}
+                      aria-label={`Local 里在跑的终端，端口 ${ports.join("、")}`}
+                      onClick={() => viewTerminal(running[0]!.id)}
+                    >
+                      <IconTerminal size={12} />
+                      {ports.map((x) => (
+                        <code key={x}>:{x}</code>
+                      ))}
+                    </button>
+                    <span className={css.headFill} onClick={toggle} aria-hidden />
+                  </>
+                )}
                 <button className={css.projectMore} aria-label={`${p.name} 的菜单`} aria-expanded={projectMenu === p.id} onClick={() => setProjectMenu(projectMenu === p.id ? null : p.id)}>
                   <IconMore />
                 </button>
@@ -214,10 +249,17 @@ export function ProjectRail({
                   </>
                 )}
                 {open &&
-                  asTree(list).map(({ route: r, depth }) => (
+                  asTree(list).map(({ route: r, depth }) => {
+                    const fresh = unread.has(r.id) && r.id !== routeId;
+                    const at = lastActive(stopList, r.id);
+                    // 回答中、等批准、冲突、没答完、同步中：右边写状态，不写时间
+                    // 有问题在候车的也不写（“可登车”、条数更要紧，左栏窄，挤掉名字就看不出是哪一路了）
+                    const quiet = r.status === "idle" && pendingAsk[r.id] === undefined && !(queue[p.id] ?? []).some((q) => q.routeId === r.id);
+                    return (
                     <div
                       key={r.id}
                       className={css.row}
+                      data-unread={fresh}
                       aria-current={r.id === routeId}
                       style={
                         r.id === routeId
@@ -243,6 +285,7 @@ export function ProjectRail({
                           </span>
                         )}
                         <RouteBadge route={r} syncing={pendingAsk[r.id] !== undefined} />
+                        {fresh && <i className={css.unread} title="答完了，还没看" role="img" aria-label="答完了，还没看" />}
                         {(() => {
                           const mine = (queue[p.id] ?? []).filter((q) => q.routeId === r.id);
                           if (mine.length === 0) return null;
@@ -250,6 +293,12 @@ export function ProjectRail({
                           return boardable ? <em className={css.board}>可登车</em> : <b className={css.count} title={`候车 ${mine.length} 条`}>{mine.length}</b>;
                         })()}
                       </button>
+                      <span className={css.tail} data-time={quiet && at !== null}>
+                      {quiet && at !== null && (
+                        <time className={css.when} dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()}>
+                          {lastTime(at)}
+                        </time>
+                      )}
                       <button
                         className={css.more}
                         aria-label={`${r.name} 的更多操作`}
@@ -266,6 +315,7 @@ export function ProjectRail({
                       >
                         <IconMore />
                       </button>
+                      </span>
                       {menuFor === r.id && (
                         <RouteMenu
                           route={r}
@@ -291,7 +341,8 @@ export function ProjectRail({
                         />
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 {open && list.length === 0 && (
                   <p className={css.none}>还没有路</p>
                 )}

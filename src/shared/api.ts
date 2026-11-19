@@ -31,6 +31,8 @@ export interface BwApi {
   openLocal(projectId: string): Promise<void>;
   /** 在系统自带的终端里打开一个后台终端所在的文件夹（那一路的工作区） */
   openSystemTerminal(terminalId: string): Promise<void>;
+  /** 把 Lanes 的窗口拉到最前面（点了系统通知）；attention：不拉，只让任务栏图标闪一下 */
+  focusWindow(attention?: boolean): Promise<void>;
   snapshot(projectId: string): Promise<ProjectSnapshot>;
   /** 改这个项目的批准方式；立即生效，正在等批准的请求也按新的方式处理 */
   /** 这一路的批准方式；同时记成项目的默认，之后新开的路沿用 */

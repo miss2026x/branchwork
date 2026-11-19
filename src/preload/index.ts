@@ -32,6 +32,7 @@ const api: BwApi = {
   projectLog: call("projectLog"),
   openLocal: call("openLocal"),
   openSystemTerminal: call("openSystemTerminal"),
+  focusWindow: call("focusWindow"),
   createRoute: call("createRoute"),
   truncate: call("truncate"),
   images: call("images"),

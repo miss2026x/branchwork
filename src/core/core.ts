@@ -522,7 +522,7 @@ export function createCore(opts: CoreOptions): Core {
   };
 
   // ── 后台终端 ──
-  const toTerminal = (t: TerminalInfo): Terminal => ({ id: t.id, ...t.owner, name: t.name, command: t.command, cwd: t.cwd, status: t.status, exitCode: t.exitCode, port: t.port, startedAt: t.startedAt, endedAt: t.endedAt });
+  const toTerminal = (t: TerminalInfo): Terminal => ({ id: t.id, ...t.owner, name: t.name, command: t.command, cwd: t.cwd, status: t.status, exitCode: t.exitCode, port: t.port, ports: t.ports, startedAt: t.startedAt, endedAt: t.endedAt });
   const terminals: Terminals = createTerminals({
     onEvent: (e) => {
       if (e.type === "updated") emit({ type: "terminal.updated", terminal: toTerminal(e.terminal) });
@@ -544,7 +544,7 @@ export function createCore(opts: CoreOptions): Core {
     if (!t || t.owner.routeId !== routeAt(cwd).id) throw new CoreError("NOT_FOUND", `这一路没有编号是 ${String(terminalId)} 的后台终端。用 terminal_list 看看现在有哪些。`);
     return t;
   };
-  const describe = (t: TerminalInfo) => `${t.id}  ${t.status === "running" ? "运行中" : `已退出（退出码 ${t.exitCode ?? "未知"}）`}${t.port ? `  端口 ${t.port}` : ""}  ${t.name}：${t.command}`;
+  const describe = (t: TerminalInfo) => `${t.id}  ${t.status === "running" ? "运行中" : `已退出（退出码 ${t.exitCode ?? "未知"}）`}${t.ports.length ? `  端口 ${t.ports.join("、")}` : ""}  ${t.name}：${t.command}`;
   const lastLines = (text: string, n: number) => text.split("\n").slice(-n).join("\n").trim() || "（还没有输出）";
   const tools: ClaudeTool[] = [
     {

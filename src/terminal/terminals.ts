@@ -13,6 +13,8 @@ export interface TerminalInfo {
   exitCode: number | null;
   /** 从输出里认出来的端口号 */
   port: number | null;
+  /** 认出来的全部端口（一个命令可能起好几个服务：前端、接口……），按出现的先后 */
+  ports: number[];
   startedAt: number;
   endedAt: number | null;
 }
@@ -79,6 +81,23 @@ const PORT_PATTERNS = [/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\]
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g;
 
 /** strong：只认写出地址或“listening on”的说法（已经认出过端口之后，只凭这两种改） */
+/**
+ * 输出里写出的全部本机地址的端口（http://localhost:5176、http://127.0.0.1:3000……），按出现的先后、去掉重复；
+ * 没写地址时退回 detectPort 认出的那一个
+ */
+export function detectPorts(text: string): number[] {
+  const out: number[] = [];
+  for (const p of PORT_PATTERNS.slice(0, 2)) {
+    for (const m of text.matchAll(p)) {
+      const n = Number(m[1]);
+      if (n > 0 && n < 65536 && !out.includes(n)) out.push(n);
+    }
+  }
+  if (out.length) return out;
+  const one = detectPort(text);
+  return one ? [one] : [];
+}
+
 export function detectPort(text: string, strong = false): number | null {
   for (const p of strong ? PORT_PATTERNS.slice(0, 2) : PORT_PATTERNS) {
     const n = Number([...text.matchAll(p)].at(-1)?.[1]);
@@ -138,7 +157,7 @@ export function createTerminals(opts: TerminalsOptions = {}): Terminals {
       if (!cmd) throw new TerminalError("EMPTY_COMMAND", "命令是空的");
       if ([...entries.values()].filter((e) => e.info.status === "running").length >= maxRunning) throw new TerminalError("TOO_MANY", `已经开着 ${maxRunning} 个后台终端了，先停掉几个`);
       const child = spawn(cmd, { cwd, shell: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", windowsHide: true, env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" } });
-      const info: TerminalInfo = { id: "t" + randomUUID().replace(/-/g, "").slice(0, 12), owner, name: name?.trim() || [...cmd.split(/\s+/).slice(0, 3).join(" ")].slice(0, 24).join(""), command: cmd, cwd, status: "running", exitCode: null, port: null, startedAt: Date.now(), endedAt: null };
+      const info: TerminalInfo = { id: "t" + randomUUID().replace(/-/g, "").slice(0, 12), owner, name: name?.trim() || [...cmd.split(/\s+/).slice(0, 3).join(" ")].slice(0, 24).join(""), command: cmd, cwd, status: "running", exitCode: null, port: null, ports: [], startedAt: Date.now(), endedAt: null };
       let done!: () => void;
       const entry: Entry = { info, child, output: "", exited: new Promise<void>((r) => (done = r)), waiters: new Set() };
       entries.set(info.id, entry);
@@ -150,9 +169,13 @@ export function createTerminals(opts: TerminalsOptions = {}): Terminals {
         emit({ type: "output", id: info.id, text });
         // 每次有新输出都重新认：后来说出的地址为准（端口被占后换了一个、服务重启换了端口）
         {
-          const port = detectPort(entry.output.slice(-4000), entry.info.port !== null);
-          if (port && port !== entry.info.port) {
-            entry.info = { ...entry.info, port };
+          const recent = entry.output.slice(-4000);
+          const port = detectPort(recent, entry.info.port !== null);
+          // 全部端口：最近的输出里有地址就以它为准，没有（被别的日志挤出去了）就留着原来的
+          const found = detectPorts(recent);
+          const ports = found.length ? found : entry.info.ports;
+          if ((port && port !== entry.info.port) || ports.join() !== entry.info.ports.join()) {
+            entry.info = { ...entry.info, port: port ?? entry.info.port, ports };
             emit({ type: "updated", terminal: entry.info });
           }
         }

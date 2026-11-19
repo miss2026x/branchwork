@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BwEvent, QueueItem, Route, Stop, SyncLogEntry } from "../../src/shared";
-import { noticesAfterSelecting, reduceNotices, type Notice, type NoticeContext } from "../../src/renderer/stores/notices";
+import { answerLead, noticesAfterSelecting, reduceNotices, type Notice, type NoticeContext } from "../../src/renderer/stores/notices";
 
 const route = (id: string, patch: Partial<Route> = {}): Route => ({ id, projectId: "p1", number: 1, express: null, name: id, status: "idle", sessionId: null, worktreePath: "", parentRouteId: null, forkStopId: null, model: null, effort: null, permissionMode: "ask", color: null, contextTokens: null, pinned: false, folded: false, orphanOf: null, createdAt: 0, archivedAt: null, ...patch });
 const stop = (id: string, routeId: string, seq: number, patch: Partial<Stop> = {}): Stop => ({ id, routeId, seq, kind: "normal", name: id, nameState: "final", prompt: id, status: "done", syncState: "synced", messageId: null, lastMessageId: null, error: null, startedAt: 0, endedAt: 0, ...patch });
@@ -56,6 +56,30 @@ describe("通知：只提醒要你处理的", () => {
     expect(reduceNotices([], created, ctx({ stops: before.stops }))).toEqual([]);
     // 那一站也结束了，通知就过时了
     expect(reduceNotices(list, { type: "stop.updated", stop: stop("s2", "r2", 2, { prompt: "下一个问题" }) }, before)).toEqual([]);
+  });
+
+  it("你没在看的那一路答完了：提示一下，带上回答的头一两句；正看着、Lanes 又在最前面的不提示", () => {
+    const live = { s1: { items: [{ kind: "text" as const, text: "改好了：\n\n- `callback()` 里先比对 **state**\n- 清掉 `oauth_tmp`" }] } };
+    const before = ctx({ stops: { s1: stop("s1", "r2", 1, { status: "answering" }), s0: stop("s0", "r1", 1, { status: "answering" }) }, live });
+    const done: BwEvent = { type: "stop.updated", stop: stop("s1", "r2", 1) };
+    expect(reduceNotices([], done, before)).toEqual([{ id: "done:r2", kind: "done", routeId: "r2", stopId: "s1", text: "改好了： callback() 里先比对 state 清掉 oauth_tmp" }]);
+    const mine: BwEvent = { type: "stop.updated", stop: stop("s0", "r1", 1) };
+    expect(reduceNotices([], mine, before)).toEqual([]);
+    // Lanes 不在最前面：正看着的那一路答完也提示
+    expect(kinds(reduceNotices([], mine, { ...before, focused: false }))).toEqual(["done"]);
+    // 摘要站、本来就不是在答的，不提示
+    expect(reduceNotices([], { type: "stop.updated", stop: stop("s1", "r2", 1, { kind: "summary" }) }, before)).toEqual([]);
+    expect(reduceNotices([], done, ctx({ stops: { s1: stop("s1", "r2", 1) } }))).toEqual([]);
+    // 这一路又发了新的一站：上一条“答完了”过时了
+    const list = reduceNotices([], done, before);
+    expect(reduceNotices(list, { type: "stop.created", stop: stop("s2", "r2", 2, { status: "answering" }) }, before)).toEqual([]);
+  });
+
+  it("回答的头一两句：去掉 Markdown 记号，太长截断", () => {
+    expect(answerLead([{ kind: "text", text: "## 结论\n\n> 引用\n\n| a | b |" }])).toBe("结论 引用 a b");
+    expect(answerLead([{ kind: "text", text: "看 [文档](https://x.y) 第 3 节" }])).toBe("看 文档 第 3 节");
+    expect(answerLead([{ kind: "text", text: "字".repeat(100) }])).toBe("字".repeat(90) + "…");
+    expect(answerLead(undefined)).toBe("");
   });
 
   it("点开某一路后，它的冲突和中断通知不用留着；等你登车的还留着", () => {

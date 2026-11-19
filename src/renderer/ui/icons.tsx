@@ -103,3 +103,4 @@ export const IconPlug = (p: P) => <Icon {...p}><path d="M9 3v5M15 3v5M6 8h12v4a6
 export const IconNet = (p: P) => <Icon {...p}><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" /></Icon>;
 export const IconErr = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></Icon>;
 export const IconReload = (p: P) => <Icon {...p}><path d="M20 12a8 8 0 11-2.3-5.6M20 4v5h-5" /></Icon>;
+export const IconCheckCircle = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M8 12.5l3 3 5-6" /></Icon>;

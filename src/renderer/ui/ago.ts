@@ -18,3 +18,17 @@ export function agoFine(at: number, now = Date.now()): string {
   if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} 小时前`;
   return ago(at, now);
 }
+
+/** 左栏每一路的“最近一次对话”（设计稿 9-14）：刚刚 / N 分钟前 / 14:20 / 昨天 / 11月12日 / 2025/11/12 */
+export function lastTime(at: number, now = Date.now()): string {
+  const minutes = Math.floor((now - at) / 60_000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const d = new Date(at);
+  const today = new Date(now);
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  if (at >= startOfToday) return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (at >= startOfToday - 86_400_000) return "昨天";
+  if (d.getFullYear() === today.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}

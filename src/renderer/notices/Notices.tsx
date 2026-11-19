@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import type { Project, Route, Stop } from "../../shared";
 import type { Notice } from "../stores/notices";
-import { IconAlert, LaneGlyph, IconClose, IconCompress, IconWarn } from "../ui/icons";
+import { IconAlert, IconCheckCircle, LaneGlyph, IconClose, IconCompress, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Notices.module.css";
@@ -31,6 +31,8 @@ interface Props {
 
 /** “已自动发出”只是告知，不用你处理：过一会儿自己消失 */
 const ARRIVED_MS = 12_000;
+/** “答完了”（设计稿 9-14）：8 秒后自己收起 */
+const DONE_MS = 8_000;
 const MAX = 4;
 
 /** 右下角的通知：只提醒要你处理的事。只收数据、发事件 */
@@ -56,8 +58,8 @@ function Card({ n, ...p }: Props & { n: Notice }) {
     close();
   };
   useEffect(() => {
-    if (n.kind !== "arrived") return;
-    const t = setTimeout(() => p.onDismiss(n.id), ARRIVED_MS);
+    if (n.kind !== "arrived" && n.kind !== "done") return;
+    const t = setTimeout(() => p.onDismiss(n.id), n.kind === "done" ? DONE_MS : ARRIVED_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n.id, n.kind]);
@@ -148,6 +150,22 @@ function Card({ n, ...p }: Props & { n: Notice }) {
           <button onClick={act(() => p.onGoToRoute(route.id))}>去看看</button>
         </>,
       );
+    case "done": {
+      const stop = p.stops[n.stopId];
+      return frame(
+        "plain",
+        <i className={css.green}>
+          <IconCheckCircle size={16} />
+        </i>,
+        <>
+          {who} {stop ? `第 ${p.stopNumber(stop)} 站` : "这一站"}答完了
+        </>,
+        n.text ? <span className={css.lead}>{n.text}</span> : null,
+        <button className={css.primary} onClick={act(() => p.onGoToRoute(route.id))}>
+          去看看
+        </button>,
+      );
+    }
     case "arrived": {
       const stop = p.stops[n.stopId];
       const num = stop ? p.stopNumber(stop) : 0;

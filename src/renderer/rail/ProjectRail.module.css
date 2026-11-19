@@ -55,6 +55,36 @@
   text-align: left;
   color: var(--fg-3);
 }
+/* 项目名旁边有在跑的端口：名字不再撑满，端口小牌紧跟在名字后面 */
+.project[data-fit="true"],
+.project[data-fit="true"] b {
+  flex: 0 1 auto;
+}
+.headFill {
+  flex: 1;
+  align-self: stretch;
+  cursor: pointer;
+}
+.ports {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: 20px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-pill);
+  background: var(--green-bg);
+  color: var(--green);
+}
+.ports:hover,
+.ports:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+.ports code {
+  font-family: var(--mono);
+  font-size: var(--fs-11);
+  font-weight: 600;
+}
 .project b {
   flex: 1;
   color: var(--fg-1);
@@ -94,20 +124,62 @@
 .label {
   flex: 1;
 }
+/* 右边一格：平时写最近一次对话的时间，鼠标移上去换成“⋯”（设计稿 9-14） */
+.tail {
+  flex: none;
+  display: grid;
+  align-items: center;
+  justify-items: end;
+  margin-right: var(--sp-4);
+}
+.tail > * {
+  grid-area: 1 / 1;
+}
+.when {
+  padding-right: var(--sp-6);
+  font-size: var(--fs-12);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--fg-4);
+  pointer-events: none;
+}
 .more {
   flex: none;
   width: 28px;
   height: var(--h-28);
-  margin-right: var(--sp-4);
   display: grid;
   place-items: center;
   border-radius: var(--r-6);
   color: var(--fg-4);
 }
-.row:hover .more,
-.more:focus-visible,
-.more[aria-expanded="true"] {
+.tail .more {
+  opacity: 0;
+}
+.row:hover .tail .more,
+.tail .more:focus-visible,
+.tail .more[aria-expanded="true"] {
   opacity: 1;
+}
+.row:hover .when,
+.tail:has(.more:focus-visible) .when,
+.tail:has(.more[aria-expanded="true"]) .when {
+  opacity: 0;
+}
+/* 答完了还没看：名字加粗，时间绿色，前面一个绿点 */
+.row[data-unread="true"] .label {
+  font-weight: 700;
+}
+.row[data-unread="true"] .when {
+  font-weight: 700;
+  color: var(--green);
+}
+.unread {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-round);
+  background: var(--green);
 }
 .more:hover {
   background: var(--press);
@@ -325,7 +397,8 @@
 }
 .pip,
 .pipAmber,
-.pipRed {
+.pipRed,
+.pipGreen {
   position: absolute;
   top: 3px;
   right: 3px;
@@ -339,6 +412,9 @@
 }
 .pipRed {
   background: var(--red);
+}
+.pipGreen {
+  background: var(--green);
 }
 .stripNew {
   flex: none;

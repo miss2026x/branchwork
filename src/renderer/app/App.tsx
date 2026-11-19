@@ -30,6 +30,7 @@ import { RouteMap } from "../map/RouteMap";
 import { WaitingArea } from "../panels/WaitingArea";
 import { ProjectRail } from "../rail/ProjectRail";
 import { useRoutes, useStops, useStore } from "../stores/store";
+import { useUnread } from "../stores/useUnread";
 import { IconChat, IconSearch, IconSliders, LanesMark } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import css from "./App.module.css";
@@ -88,6 +89,9 @@ export function App() {
   const terminalSessions = useStore((s) => s.terminalSessions);
   const addDropped = useStore((s) => s.addDropped);
   const dismissNotice = useStore((s) => s.dismissNotice);
+  const notifyDone = useStore((s) => s.notifyDone);
+  const unread = useUnread();
+  const setNotifyDone = useStore((s) => s.setNotifyDone);
   const jumpToStop = useStore((s) => s.jumpToStop);
   const focus = useStore((s) => s.focus);
   const allQueues = useStore((s) => s.queue);
@@ -424,7 +428,7 @@ export function App() {
           <IconSliders size={18} />
         </button>
       </header>
-      {settings && <Settings load={environment} onClose={() => setSettings(false)} onMcp={projectId ? (tab) => useStore.getState().openMcp(projectId, tab) : undefined} />}
+      {settings && <Settings load={environment} onClose={() => setSettings(false)} onMcp={projectId ? (tab) => useStore.getState().openMcp(projectId, tab) : undefined} notifyDone={notifyDone} onNotifyDone={setNotifyDone} />}
 
       <div ref={bodyRef} className={css.body} data-tier={tier} data-overview={overview} style={layout.width.rail ? ({ "--rail-w": `${layout.width.rail}px` } as React.CSSProperties) : undefined}>
         {overview && (
@@ -507,6 +511,7 @@ export function App() {
                     ) : (
                       <>
                         <RouteMap
+                          unread={unread}
                           leading={projectId ? <LocalTab projectId={projectId} selected={!!route?.local} /> : undefined}
                           resizing={!!anim}
                           activityLabel={(routeId) => (activities[routeId] ? activityText(activities[routeId]!) : null)}
