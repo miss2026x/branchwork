@@ -886,10 +886,13 @@ describe("应用", () => {
     await page.getByRole("button", { name: "截图", exact: true }).click();
     await expect.poll(() => composer().getByRole("img", { name: /^图 1/ }).count(), { timeout: 15000 }).toBe(1);
     await shot("27b-browser-refs");
-    // 关掉窗口：条上写“窗口关了”，能重新打开
+    // 关掉窗口：浏览器条收起，工具栏的“浏览器”回来了，菜单第一项是重新打开上次的页面
     await page.getByRole("button", { name: "更多", exact: true }).click();
     await page.getByRole("menuitem", { name: "关掉这一路的窗口" }).click();
-    await expect.poll(() => page.getByText("窗口关了").isVisible(), { timeout: 15000 }).toBe(true);
+    await expect.poll(() => page.getByRole("button", { name: "浏览器", exact: true }).isVisible(), { timeout: 15000 }).toBe(true);
+    await page.getByRole("button", { name: "浏览器", exact: true }).click();
+    expect(await page.getByRole("menuitem", { name: /^重新打开/ }).isVisible()).toBe(true);
+    await page.keyboard.press("Escape");
 
     // MCP 设置：加一个只在 Lanes 里的服务，列表里出现，删掉
     await page.getByRole("button", { name: "设置", exact: true }).click();

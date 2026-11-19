@@ -3,7 +3,7 @@ import type { BrowserIssue, BrowserState, ChatItem, PromptImage, RouteActivity, 
 import { splitMcpTool } from "../../shared";
 import { useStore, type BrowserRef } from "../stores/store";
 import { IconCamera, IconClose, IconErr, IconGlobe, IconMore, IconNet, IconPick, IconPlug, IconWarn, IconWindowUp } from "../ui/icons";
-import { browserDoing, browserStep, lastUrl, shortPath } from "./browser-steps";
+import { browserDoing, browserStep, hostPath, lastUrl, shortPath } from "./browser-steps";
 import css from "./Browser.module.css";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
@@ -70,19 +70,8 @@ export function BrowserBar({ routeId, state, activity, onScreenshot, onSettings 
       </div>
     );
   }
-  if (!state.open) {
-    if (!state.lastUrl) return null;
-    return (
-      <div className={css.bar}>
-        <IconWindowUp size={14} />
-        <span>窗口关了</span>
-        <code className="ell">上次在 {shortPath(state.lastUrl)}</code>
-        <button className={css.text} onClick={() => void open(routeId, state.lastUrl ?? undefined)}>
-          重新打开
-        </button>
-      </div>
-    );
-  }
+  // 窗口关了：条收起来，工具栏的“浏览器”还在，菜单第一项是“重新打开上次的页面”
+  if (!state.open) return null;
   const doing = activity?.kind === "running" ? browserDoing(activity.tool, activity.detail) : null;
   const cite = (list: BrowserIssue[]) => {
     for (const issue of list) addRef(routeId, { kind: "issue", issue });
@@ -219,7 +208,7 @@ function Buttons({ dim, onPick, onShot, onShow, onMore }: { dim?: boolean; onPic
 }
 
 /** 输入框工具栏里的“浏览器”（这一路还没开窗口时）：认出开发服务器就直接打开它 */
-export function BrowserOpenButton({ routeId, dev, disabled }: { routeId: string; dev: { url: string; command: string } | null; disabled?: boolean }) {
+export function BrowserOpenButton({ routeId, dev, lastUrl, disabled }: { routeId: string; dev: { url: string; command: string } | null; /** 窗口关之前在的页面 */ lastUrl?: string | null; disabled?: boolean }) {
   const open = useStore((s) => s.browserOpen);
   const pick = useStore((s) => s.browserPick);
   const [menu, setMenu] = useState(false);
@@ -228,8 +217,13 @@ export function BrowserOpenButton({ routeId, dev, disabled }: { routeId: string;
   useEffect(() => {
     if (!menu) return;
     const down = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && (setMenu(false), setGoto(false));
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (setMenu(false), setGoto(false));
     window.addEventListener("pointerdown", down);
-    return () => window.removeEventListener("pointerdown", down);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("keydown", key);
+    };
   }, [menu]);
   return (
     <span className={css.openWrap} ref={wrap}>
@@ -239,7 +233,14 @@ export function BrowserOpenButton({ routeId, dev, disabled }: { routeId: string;
       </button>
       {menu && (
         <div className={css.menu} data-up role="menu">
-          {dev && (
+          {lastUrl && (
+            <button role="menuitem" onClick={() => (setMenu(false), void open(routeId, lastUrl))}>
+              <IconWindowUp size={14} />
+              <span className="ell">重新打开 {hostPath(lastUrl)}</span>
+              <code>上次的页面</code>
+            </button>
+          )}
+          {dev && (!lastUrl || hostPath(lastUrl).split("/")[0] !== hostPath(dev.url).split("/")[0]) && (
             <button role="menuitem" onClick={() => (setMenu(false), void open(routeId, dev.url))}>
               <IconGlobe size={14} />
               <span className="ell">打开 {dev.url.replace(/^https?:\/\//, "")}</span>

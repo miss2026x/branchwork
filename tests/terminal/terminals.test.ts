@@ -86,6 +86,10 @@ describe("后台终端", () => {
   it("从输出里认端口", () => {
     expect(detectPort("  ➜  Local:   http://localhost:5173/")).toBe(5173);
     expect(detectPort("Server listening on 0.0.0.0:8080")).toBe(8080);
+    // 端口被占：Vite 先说占用的那个，后面才给出真正的地址（以后面的为准）
+    expect(detectPort("Port 4173 is in use, trying another one...\nPort 5173 is in use, trying another one...\n  ➜  Local:   http://localhost:5176/")).toBe(5176);
+    expect(detectPort("Port 5173 is in use, trying another one...")).toBe(null);
+    expect(detectPort("dev server on port 3000")).toBe(3000);
     expect(detectPort("started server on port 3000")).toBe(3000);
     expect(detectPort("compiled 12 modules in 300 ms")).toBeNull();
   });

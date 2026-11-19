@@ -581,7 +581,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
                   <IconClip size={16} />
                 </button>
-                {!browser?.open && !browser?.lastUrl && !browser?.error && <BrowserOpenButton routeId={route.id} dev={devUrl(terminals)} disabled={blocked} />}
+                {!browser?.open && <BrowserOpenButton routeId={route.id} dev={devUrl(terminals)} lastUrl={browser?.lastUrl} disabled={blocked} />}
               </span>
               <PermissionModeControl mode={permissionMode} routeLabel={routeLabel(route)} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
               <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={routeLabel(route)} onChange={onModel} />

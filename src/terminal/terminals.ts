@@ -70,14 +70,18 @@ export class TerminalError extends Error {
   }
 }
 
-/** 开发服务器常见的几种“我在哪个端口”的说法 */
-const PORT_PATTERNS = [/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\])(?::(\d{2,5}))/i, /\bport\s*[:=]?\s*(\d{2,5})\b/i, /\blistening\s+(?:on|at)\s+\S*?:(\d{2,5})\b/i];
+/**
+ * 开发服务器常见的几种“我在哪个端口”的说法，靠前的更可信。
+ * 每种都取最后一次出现的：端口被占时 Vite 先说“Port 5173 is in use, trying another one...”，后面才给出真正的地址
+ */
+const PORT_PATTERNS = [/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\])(?::(\d{2,5}))/gi, /\blistening\s+(?:on|at)\s+\S*?:(\d{2,5})\b/gi, /\bport\s*[:=]?\s*(\d{2,5})\b(?!\s*(?:is\s+)?(?:already\s+)?(?:in\s+use|busy|taken|occupied|unavailable))/gi];
 // eslint-disable-next-line no-control-regex
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g;
 
-export function detectPort(text: string): number | null {
-  for (const p of PORT_PATTERNS) {
-    const n = Number(p.exec(text)?.[1]);
+/** strong：只认写出地址或“listening on”的说法（已经认出过端口之后，只凭这两种改） */
+export function detectPort(text: string, strong = false): number | null {
+  for (const p of strong ? PORT_PATTERNS.slice(0, 2) : PORT_PATTERNS) {
+    const n = Number([...text.matchAll(p)].at(-1)?.[1]);
     if (n > 0 && n < 65536) return n;
   }
   return null;
@@ -144,9 +148,10 @@ export function createTerminals(opts: TerminalsOptions = {}): Terminals {
         if (!text) return;
         entry.output = (entry.output + text).slice(-maxOutput);
         emit({ type: "output", id: info.id, text });
-        if (entry.info.port === null) {
-          const port = detectPort(entry.output.slice(-4000));
-          if (port) {
+        // 每次有新输出都重新认：后来说出的地址为准（端口被占后换了一个、服务重启换了端口）
+        {
+          const port = detectPort(entry.output.slice(-4000), entry.info.port !== null);
+          if (port && port !== entry.info.port) {
             entry.info = { ...entry.info, port };
             emit({ type: "updated", terminal: entry.info });
           }

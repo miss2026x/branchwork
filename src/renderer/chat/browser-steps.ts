@@ -110,11 +110,23 @@ export function lastUrl(tools: ToolItem[]): string {
   return "";
 }
 
-/** 网址只留路径（同一个开发服务器下，主机名没有信息量） */
+/** 网址只留路径（同一个开发服务器下，主机名没有信息量）；只剩“/”时写主机名，不然看不出是哪里 */
 export function shortPath(url: string): string {
   try {
     const u = new URL(url);
-    return u.protocol.startsWith("http") ? u.pathname + u.search || "/" : url;
+    if (!u.protocol.startsWith("http")) return url;
+    const p = u.pathname + u.search;
+    return p === "/" || !p ? `${u.host}/` : p;
+  } catch {
+    return url;
+  }
+}
+
+/** 主机名加路径（localhost:5176/login）：菜单里“重新打开”用 */
+export function hostPath(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.protocol.startsWith("http") ? `${u.host}${u.pathname === "/" ? "" : u.pathname}${u.search}` : url;
   } catch {
     return url;
   }

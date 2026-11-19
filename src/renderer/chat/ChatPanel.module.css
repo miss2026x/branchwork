@@ -387,22 +387,30 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-12);
   margin-bottom: var(--sp-10);
 }
-.running span {
+/* 一行写完：“回答中”不折行，后面在做什么太长就省略（命令可能很长） */
+.running > span {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--sp-8);
   font-size: var(--fs-13);
   font-weight: 600;
+  white-space: nowrap;
 }
 .running i {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: var(--r-round);
   animation: pulse var(--t-loop) ease-in-out infinite;
 }
 .running button {
+  flex: none;
+  white-space: nowrap;
   height: var(--h-32);
   padding: 0 var(--sp-12);
   display: flex;
@@ -838,7 +846,10 @@
 }
 /* 底部状态行：回答中后面跟一句在做什么；停车中整行变琥珀色 */
 .running em {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-style: normal;
   font-weight: 400;
   color: var(--fg-3);
