@@ -461,56 +461,89 @@
   }
 }
 
-/* 开什么：新的一路 / Local 专车（设计稿 9-16） */
+/* 开什么：新的一路 / Local 专车（设计稿 9-16）：两张并排的选项卡 */
 .kinds {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  padding: 3px; /* 例外：分段按钮的内边 */
-  border-radius: var(--r-10);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--border);
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--sp-8);
 }
 .kinds button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-6);
-  height: var(--h-32);
-  padding: 0 var(--sp-12) 0 var(--sp-8);
-  border-radius: var(--r-8);
-  font-size: var(--fs-13);
-  font-weight: 600;
-  color: var(--fg-3);
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-10);
+  padding: var(--sp-10) var(--sp-12);
+  border-radius: var(--r-10);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  text-align: left;
+  transition:
+    box-shadow var(--t-fast) ease-out,
+    background var(--t-fast) ease-out;
 }
-.kinds button small {
-  font-size: var(--fs-11);
-  font-weight: 400;
-  color: var(--fg-4);
+.kinds button:hover {
+  box-shadow: inset 0 0 0 1px var(--line-1);
 }
 .kinds button[aria-checked="true"] {
-  background: var(--surface);
-  color: var(--fg-1);
-  box-shadow: var(--e1), inset 0 0 0 1px var(--border);
-}
-.kinds button[aria-checked="true"] small {
-  color: var(--fg-3);
+  background: color-mix(in srgb, var(--lane) 7%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--lane);
 }
 .kindPlate {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
-  height: 18px; /* 例外：小牌子 */
+  gap: 1px; /* 例外：数字和“路”之间 */
+  min-width: 20px;
+  height: 20px; /* 例外：小牌子 */
+  margin-top: 1px; /* 例外：和标题的第一行对齐 */
   padding: 0 var(--sp-4);
+  box-sizing: border-box;
   border-radius: var(--r-4);
   color: var(--fg-on-color);
   font-size: var(--fs-11);
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
-.kindPlate small {
-  font-size: 8px; /* 例外：牌子上的“路” */
+.kindPlate i {
+  font-style: normal;
+  font-size: var(--fs-11);
+  font-weight: 700;
 }
 .kindPlate[data-local] {
-  min-width: 18px;
   background: var(--local);
+}
+.kindText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.kindText b {
+  font-size: var(--fs-13);
+  line-height: var(--lh-20);
+  color: var(--fg-1);
+}
+.kindText span {
+  font-size: var(--fs-12);
+  line-height: var(--lh-16);
+  color: var(--fg-3);
+}
+/* 右上角的圆点：选中时是这一路的颜色 */
+.kindDot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: var(--sp-2);
+  box-sizing: border-box;
+  border: 1.5px solid var(--fg-4);
+  border-radius: var(--r-round);
+  background: var(--surface);
+}
+[aria-checked="true"] > .kindDot {
+  border: 4px solid var(--lane);
 }

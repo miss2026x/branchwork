@@ -20,8 +20,8 @@ const DIR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const WARN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19L12 3zM12 10v5M12 18v.01"/></svg>`;
 
 export interface PromptInputHandle {
-  /** 放进几张图：at 是拖到的位置（插在那里），不给就插在光标处（输入框没有过光标就放最后） */
-  insertFiles(files: File[], at?: { x: number; y: number }): void;
+  /** 放进图片和别的文件（dirs：第几个是文件夹）：at 是拖到的位置（插在那里），不给就插在光标处（输入框没有过光标就放最后） */
+  insertFiles(files: File[], at?: { x: number; y: number }, dirs?: boolean[]): void;
   /** 打开选文件的窗口（回形针）：image 只选图片，file 什么文件都行（图片照样变成图） */
   pickFiles(kind?: "image" | "file"): void;
   /** 选一个文件夹附上 */
@@ -416,8 +416,16 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
     e.dataTransfer.dropEffect = "copy";
     const r = document.caretRangeFromPoint?.(e.clientX, e.clientY);
     const box = wrap.current!.getBoundingClientRect();
-    const rect = r && el.current?.contains(r.startContainer) ? r.getClientRects()[0] ?? (r.startContainer as Element).getBoundingClientRect?.() : null;
-    setDropAt(rect ? { left: rect.left - box.left, top: rect.top - box.top, height: rect.height || 20 } : null);
+    const root = el.current!;
+    let rect: { left: number; top: number; height: number } | null = r && root.contains(r.startContainer) ? (r.getClientRects()[0] ?? null) : null;
+    // 认不出光标落点（输入框是空的、拖到了空白处）：画在第一行开头，一行高，不画成整个框那么高
+    if (!rect || rect.height === 0 || rect.height > 40) {
+      const er = root.getBoundingClientRect();
+      const cs = getComputedStyle(root);
+      const line = parseFloat(cs.lineHeight) || 20;
+      rect = root.textContent ? null : { left: er.left + parseFloat(cs.paddingLeft), top: er.top + parseFloat(cs.paddingTop), height: line };
+    }
+    setDropAt(rect ? { left: rect.left - box.left, top: rect.top - box.top, height: Math.min(rect.height, 28) } : null);
   };
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     if (!hasFiles(e) || disabled) return;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Effort, PermissionMode, QueueItem } from "../../shared";
 import { EffortControl } from "../chat/EffortControl";
 import { ModelControl } from "../chat/ModelControl";
@@ -55,24 +55,32 @@ export function NameRow({ id, value, onChange, placeholder, color, onColor, auto
 }
 
 /**
- * 开什么（设计稿 9-16）：新的一路（自己的工作区）或 Local 专车（直接改项目文件夹）
- * hasLocal：这个项目已经有专车了（选它就是接着它问）
+ * 开什么（设计稿 9-16）：两张并排的选项卡，新的一路（自己的工作区）或 Local 专车（直接改项目文件夹）。
+ * 选中的描这一路的颜色、淡淡的底。hasLocal：这个项目已经有专车了（选它就是接着它问）
  */
 export function RouteKindSwitch({ local, onLocal, number, color, hasLocal }: { local: boolean; onLocal(local: boolean): void; number: number; color: string; hasLocal: boolean }) {
   return (
     <div className={own.kinds} role="radiogroup" aria-label="开什么">
-      <button type="button" role="radio" aria-checked={!local} onClick={() => onLocal(false)}>
+      <button type="button" role="radio" aria-checked={!local} style={{ "--lane": color } as CSSProperties} onClick={() => onLocal(false)}>
         <span className={own.kindPlate} style={{ background: color }}>
           {number}
-          <small>路</small>
+          <i>路</i>
         </span>
-        新的一路<small>自己的工作区</small>
+        <span className={own.kindText}>
+          <b>新的一路</b>
+          <span>自己的工作区，答完合进 Local</span>
+        </span>
+        <i className={own.kindDot} aria-hidden />
       </button>
-      <button type="button" role="radio" aria-checked={local} onClick={() => onLocal(true)}>
+      <button type="button" role="radio" aria-checked={local} style={{ "--lane": "var(--local)" } as CSSProperties} onClick={() => onLocal(true)}>
         <span className={own.kindPlate} data-local>
           L
         </span>
-        Local 专车<small>{hasLocal ? "已开着，接着它问" : "直接改项目文件夹"}</small>
+        <span className={own.kindText}>
+          <b>Local 专车</b>
+          <span>{hasLocal ? "已开着，接着它问" : "直接改项目文件夹，没有工作区"}</span>
+        </span>
+        <i className={own.kindDot} aria-hidden />
       </button>
     </div>
   );

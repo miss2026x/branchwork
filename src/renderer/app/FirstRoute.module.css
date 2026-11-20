@@ -102,9 +102,6 @@
   background: var(--surface);
   box-shadow: var(--e3);
 }
-.card > [role="radiogroup"]:first-child {
-  align-self: flex-start;
-}
 .where {
   display: flex;
   align-items: flex-start;

@@ -98,7 +98,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const patchDraftImage = useStore((s) => s.patchDraftImage);
   const input = useRef<PromptInputHandle>(null);
   /** 拖着图片经过对话栏：整栏变成落点，显示有几张 */
-  const [dropping, setDropping] = useState<number | null>(null);
+  /** 拖着东西经过对话栏：几张图、几个别的文件（设计稿 9-16） */
+  const [dropping, setDropping] = useState<{ images: number; files: number } | null>(null);
   const ask = useStore((s) => s.ask);
   const stop = useStore((s) => s.stop);
   const answerPermission = useStore((s) => s.answerPermission);
@@ -236,7 +237,12 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
     input.current?.focus();
   };
   const canDrop = !viewing && !blocked;
-  const fileCount = (e: React.DragEvent) => [...e.dataTransfer.items].filter((i) => i.kind === "file").length;
+  // 拖着的时候只看得到类型，看不到名字：image/ 开头的算图，别的（包括文件夹）算文件
+  const fileCount = (e: React.DragEvent) => {
+    const items = [...e.dataTransfer.items].filter((i) => i.kind === "file");
+    const images = items.filter((i) => i.type.startsWith("image/")).length;
+    return { images, files: items.length - images };
+  };
 
   return (
     <aside
@@ -252,13 +258,14 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         setDropping(null);
         if (!canDrop || ![...e.dataTransfer.types].includes("Files")) return;
         e.preventDefault();
-        input.current?.insertFiles([...e.dataTransfer.files]);
+        const dirs = [...e.dataTransfer.items].filter((i) => i.kind === "file").map((i) => !!i.webkitGetAsEntry?.()?.isDirectory);
+        input.current?.insertFiles([...e.dataTransfer.files], undefined, dirs);
       }}
     >
       {dropping !== null && (
         <div className={imgCss.dropZone} aria-hidden>
           <b>松开，插在光标处</b>
-          <span>{dropping > 0 ? `${dropping} 个文件 · ` : ""}PNG、JPG、GIF、WebP</span>
+          <span>{dropText(dropping)}</span>
         </div>
       )}
       <header className={css.head} style={{ borderColor: colors.tag }}>
@@ -779,4 +786,12 @@ function Tools({ tools, running, now = 0 }: { tools: Extract<ChatItem, { kind: "
       ))}
     </div>
   );
+}
+
+/** 拖进对话栏时的那一行说明：按拖进来的是图还是文件说清楚（设计稿 9-16） */
+function dropText({ images, files }: { images: number; files: number }): string {
+  if (images && files) return `${images} 张图、${files} 个文件 · 图直接给 Claude 看，文件按位置去读`;
+  if (images) return `${images} 张图 · 直接发给 Claude 看`;
+  if (files) return `${files} 个文件 · 不上传，Claude 按位置去读`;
+  return "图片直接发给 Claude 看；别的文件不上传，Claude 按位置去读";
 }
