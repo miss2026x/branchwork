@@ -64,8 +64,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-4);
-  height: 22px;
-  margin: 0 var(--sp-2);
+  height: 20px;
+  /* 和文字对齐：20px 高、上下各 1px，正好一行（22px 行高），贴着行的顶上放。不靠字体的基线，换字体也不歪 */
+  margin: 1px var(--sp-2);
   padding: 0 var(--sp-6) 0 var(--sp-2);
   border-radius: var(--r-6);
   background: var(--info-bg);
@@ -73,7 +74,7 @@
   font-size: var(--fs-12);
   line-height: 1;
   font-weight: 700;
-  vertical-align: -5px; /* 例外：22px 的标签和 22px 行高的文字对齐 */
+  vertical-align: top;
   white-space: nowrap;
   user-select: none;
   cursor: pointer;
@@ -85,8 +86,8 @@
 .tag > i,
 .tag svg {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: var(--r-4);
 }
 .tag img {
@@ -371,8 +372,8 @@
   align-items: center;
   gap: var(--sp-4);
   max-width: 260px; /* 例外：长文件名截断 */
-  height: 22px;
-  margin: 0 var(--sp-2);
+  height: 20px;
+  margin: 1px var(--sp-2);
   padding: 0 var(--sp-6) 0 var(--sp-4);
   border-radius: var(--r-6);
   background: var(--surface-2);
@@ -381,7 +382,7 @@
   font-size: var(--fs-12);
   line-height: 1;
   font-weight: 600;
-  vertical-align: -5px; /* 例外：和 .tag 一样 */
+  vertical-align: top; /* 和 .tag 一样 */
   white-space: nowrap;
   user-select: none;
 }
@@ -399,4 +400,10 @@
 }
 .file[data-picked] {
   box-shadow: 0 0 0 2px var(--fg-1);
+}
+
+/* 一行高的小输入框（行高 20px）：标签贴满一行，不留上下的 1px */
+.editor[data-compact] .tag,
+.editor[data-compact] .file {
+  margin-block: 0;
 }
