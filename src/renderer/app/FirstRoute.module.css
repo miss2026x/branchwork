@@ -1,0 +1,193 @@
+/* 项目还没有车（设计稿 9-16）：地图那一栏直接是开车的表单 */
+.page {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--canvas) radial-gradient(circle, var(--grid-dot) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+/* 一条还没跑起来的线：两头淡出，起点是这一路的牌子 */
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 56px;
+  height: var(--h-28);
+  pointer-events: none;
+}
+.track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lane) 22%, transparent) 15%, color-mix(in srgb, var(--lane) 38%, transparent) 50%, color-mix(in srgb, var(--lane) 18%, transparent) 85%, transparent);
+  transition: background var(--t-base);
+}
+.plate {
+  position: absolute;
+  left: max(var(--sp-24), calc(50% - 300px));
+  top: 1px;
+  height: 26px; /* 例外：牌子 */
+  min-width: 26px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  grid-auto-flow: column;
+  padding: 0 var(--sp-6);
+  border-radius: var(--r-6);
+  color: var(--fg-on-color);
+  font-size: var(--fs-13);
+  font-weight: 800;
+  transition: background var(--t-base);
+}
+.plate small {
+  font-size: var(--fs-11);
+}
+.stop,
+.ghost {
+  position: absolute;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: var(--r-round);
+  background: var(--surface);
+}
+.stop {
+  left: calc(max(var(--sp-24), calc(50% - 300px)) + 90px);
+  border: 3px solid var(--lane);
+}
+.ghost {
+  left: calc(max(var(--sp-24), calc(50% - 300px)) + 230px);
+  top: 8px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--lane) 30%, transparent);
+}
+.ghost[data-far] {
+  left: calc(max(var(--sp-24), calc(50% - 300px)) + 370px);
+  border-color: color-mix(in srgb, var(--lane) 18%, transparent);
+}
+
+.body {
+  position: relative;
+  width: min(600px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: calc(var(--sp-64) + var(--sp-48)) 0 var(--sp-40);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-20);
+}
+.head h1 {
+  margin: 0;
+  font-size: var(--fs-30);
+  line-height: var(--lh-38);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.head p {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-14);
+  color: var(--fg-2);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16) var(--sp-20);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  box-shadow: var(--e3);
+}
+.card > [role="radiogroup"]:first-child {
+  align-self: flex-start;
+}
+.where {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-6);
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
+}
+.where svg {
+  flex: none;
+  margin-top: var(--sp-2);
+}
+.where code {
+  font: var(--fs-11) var(--mono);
+  overflow-wrap: anywhere;
+}
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-radius: var(--r-8);
+  background: var(--red-bg);
+  color: var(--red-text);
+  font-size: var(--fs-13);
+}
+.error button {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding-top: var(--sp-4);
+}
+.foot code {
+  flex: 1;
+  min-width: 0;
+  font: var(--fs-12) var(--mono);
+  color: var(--fg-4);
+}
+.go {
+  flex: none;
+  height: var(--h-44);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-16);
+  border-radius: var(--r-10);
+  color: var(--fg-on-color);
+  font-size: var(--fs-14);
+  font-weight: 700;
+  transition: background var(--t-base);
+}
+.go kbd {
+  font: var(--fs-11) var(--mono);
+  color: var(--on-dark-2);
+}
+.go:disabled {
+  opacity: 0.9;
+  cursor: progress;
+}
+.spin {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--on-dark-hover);
+  border-top-color: var(--fg-on-color);
+  border-radius: var(--r-round);
+  animation: spin var(--t-spin) linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

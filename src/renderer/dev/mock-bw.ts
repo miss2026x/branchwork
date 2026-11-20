@@ -66,7 +66,7 @@ export function installMockBw(): void {
 
   if (!q.has("empty")) {
     const p: Project = { id: "p1", name: "auth-service", localDir: "D:/work/auth-service", permissionMode: "ask", createdAt: 1 };
-    projects.push(p, { id: "p2", name: "web-console", localDir: "D:/work/web-console", permissionMode: "ask", createdAt: 2 });
+    projects.push(p, { id: "p2", name: "web-console", localDir: "D:/work/web-console", permissionMode: "ask", createdAt: 2 }, { id: "p3", name: "homepage", localDir: "C:/Users/me/Desktop/homepage", permissionMode: "ask", createdAt: 3 });
     const r1 = addRoute(p.id, "登录重构");
     addStop(r1.id, "梳理认证结构", "先帮我梳理一下现在的认证代码结构，不要改代码。", [
       { kind: "tool", tool: "Glob", detail: "src/auth/**/*.ts" },
@@ -401,6 +401,7 @@ export function installMockBw(): void {
       emit({ type: "chrome.download", state: chromeDl });
     },
     chromeDownloadState: async () => chromeDl,
+    saveAttachment: async (name) => `C:\\Users\\me\\AppData\\Roaming\\Lanes\\attachments\\2026-11-20-abc123\\${name}`,
     browserState: async (routeId) => browserStates.get(routeId) ?? closedBrowser(routeId),
     async browserOpen(routeId, url) {
       await wait(500);

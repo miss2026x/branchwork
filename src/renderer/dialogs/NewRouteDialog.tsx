@@ -6,7 +6,7 @@ import { SUBMIT_KEYS } from "../ui/keys";
 import { routeColors } from "../ui/route-color";
 import css from "./Dialog.module.css";
 import { useDraft } from "../chat/use-draft";
-import { cliCommand, FirstStop, NameRow, usableRun, type RunChoice } from "./FirstStop";
+import { cliCommand, FirstStop, NameRow, RouteKindSwitch, usableRun, type RunChoice } from "./FirstStop";
 import own from "./NewRoute.module.css";
 
 interface Props {
@@ -20,9 +20,11 @@ interface Props {
   /** 这个项目能选的模型和批准方式（从这台电脑上的 Claude Code 读的）；没读过时 onLoadClaudeOptions 去读 */
   claudeOptions(projectId: string): OptionsState;
   onLoadClaudeOptions(projectId: string): void;
-  onCreate(opts: { projectId: string; name: string; color: number | null; model: string | null; effort: Effort | null; permissionMode: PermissionMode; question: string; images?: PromptImage[]; itemId?: string }): void;
-  /** 点了发车、正在建工作区：做到哪一步（设计稿 4-8 的做法：按钮马上变样，显示步骤和计时） */
-  preparing?: { step: string; since: number } | null;
+  onCreate(opts: { projectId: string; local: boolean; name: string; color: number | null; model: string | null; effort: Effort | null; permissionMode: PermissionMode; question: string; images?: PromptImage[]; itemId?: string }): void;
+  /** 这个项目有没有 Local 专车了 */
+  hasLocal(projectId: string): boolean;
+  /** 项目的文件夹（选 Local 专车时写“直接在 … 里改”） */
+  localDir(projectId: string): string;
   onCancel(): void;
 }
 
@@ -30,7 +32,8 @@ interface Props {
  * “开一路新车”（设计稿 3-4）：一栏。项目、名称和颜色在上；下面就是这一路第一站的输入框，
  * 和对话栏底下的输入框一个样子，左下角是这一路的批准方式、模型、思考强度，右下角从候车区选
  */
-export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, preparing, onCancel }: Props) {
+export function NewRouteDialog({ projects, projectId: initial, nextNumber, parked, onAddProject, claudeOptions, onLoadClaudeOptions, onCreate, hasLocal, localDir, onCancel }: Props) {
+  const [local, setLocal] = useState(false);
   const [projectId, setProjectId] = useState(initial);
   const [name, setName] = useState("");
   const [color, setColor] = useState<number | null>(null);
@@ -44,7 +47,7 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
   const run = usableRun({ model: null, effort: null, permissionMode: projectMode, ...chosen }, options);
   const number = nextNumber(projectId);
   const colors = routeColors({ number, express: null, color });
-  const label = `${number}路`;
+  const label = local ? "Local 专车" : `${number}路`;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
@@ -52,26 +55,27 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!preparing) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [preparing]);
   const create = () => {
-    if (preparing || question.status === "loading" || question.status === "bad") return;
+    if (question.status === "loading" || question.status === "bad") return;
     const q = question.prompt();
-    onCreate({ projectId, name, color, ...run, question: q.text, images: q.images, itemId: from && q.text === from.text ? from.id : undefined });
+    onCreate({ projectId, local, name, color, ...run, question: q.text, images: q.images, itemId: from && q.text === from.text ? from.id : undefined });
   };
+  const tag = local ? "var(--local)" : colors.tag;
   const submit = (e: FormEvent) => (e.preventDefault(), create());
 
   return (
     <div className={css.scrim} onMouseDown={(e) => e.target === e.currentTarget && !name && question.status === "empty" && onCancel()}>
       <form className={`${css.dialog} ${own.dialog}`} role="dialog" aria-modal aria-label="开一路新车" onSubmit={submit}>
         <header className={own.head}>
-          <span className={own.plate} style={{ background: colors.tag }}>
-            {number}
-            <small>路</small>
+          <span className={own.plate} style={{ background: tag }}>
+            {local ? (
+              "L"
+            ) : (
+              <>
+                {number}
+                <small>路</small>
+              </>
+            )}
           </span>
           <h2>开一路新车</h2>
           <button type="button" aria-label="关闭" onClick={onCancel}>
@@ -93,7 +97,11 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
               </button>
             </div>
           </div>
-          <NameRow id="nr-name" autoFocus value={name} onChange={setName} placeholder="不填就用第一个问题起名" color={colors.line} onColor={setColor} />
+          <div className={own.row}>
+            <span className={own.label}>开什么</span>
+            <RouteKindSwitch local={local} onLocal={setLocal} number={number} color={colors.tag} hasLocal={hasLocal(projectId)} />
+          </div>
+          {!local && <NameRow id="nr-name" autoFocus value={name} onChange={setName} placeholder="不填就用第一个问题起名" color={colors.line} onColor={setColor} />}
           <FirstStop
             title="第一站"
             draft={question}
@@ -107,34 +115,25 @@ export function NewRouteDialog({ projects, projectId: initial, nextNumber, parke
             picked={from}
             onPick={setFrom}
           />
-          <p className={own.workspace} title="每站答完，改动自动同步进 Local；下一站开始前，先拿到 Local 的最新代码">
-            <IconFolder size={13} /> 有自己的工作区，代码从 Local 的现在开始
-          </p>
+          {local ? (
+            <p className={own.workspace}>
+              <IconFolder size={13} /> 直接在 <code>{localDir(projectId)}</code> 里改，没有单独的工作区
+            </p>
+          ) : (
+            <p className={own.workspace} title="每站答完，改动自动同步进 Local；下一站开始前，先拿到 Local 的最新代码">
+              <IconFolder size={13} /> 有自己的工作区，代码从 Local 的现在开始；发车后在后台建好
+            </p>
+          )}
         </div>
 
         <footer className={own.foot}>
-          {preparing ? (
-            <span className={`${own.preparing} ell`} role="status">
-              正在建工作区 · {preparing.step}
-              {now - preparing.since >= 2000 ? ` · ${Math.round((now - preparing.since) / 1000)} 秒` : ""}
-            </span>
-          ) : (
-            <code className="ell" title="同样的设置在终端里这样写（思考强度没有对应的参数）">$ {cliCommand(run)}</code>
-          )}
-          <button type="button" className={own.cancel} onClick={onCancel} disabled={!!preparing}>
+          <code className="ell" title="同样的设置在终端里这样写（思考强度没有对应的参数）">$ {cliCommand(run)}</code>
+          <button type="button" className={own.cancel} onClick={onCancel}>
             取消
           </button>
-          <button type="submit" className={own.go} style={{ background: colors.tag }} disabled={!!preparing}>
-            {preparing ? (
-              <>
-                <i className={own.spin} /> 正在开出 {label}…
-              </>
-            ) : (
-              <>
-                {question.status !== "empty" ? "发车" : `开出 ${label}`}
-                <kbd>{SUBMIT_KEYS}</kbd>
-              </>
-            )}
+          <button type="submit" className={own.go} style={{ background: tag }}>
+            {local ? "上 Local 专车" : question.status !== "empty" ? "发车" : `开出 ${label}`}
+            <kbd>{SUBMIT_KEYS}</kbd>
           </button>
         </footer>
       </form>

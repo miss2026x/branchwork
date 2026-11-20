@@ -12,7 +12,7 @@ import { draftStatus, toPrompt, type DraftImage } from "./draft";
 import { PromptInput, type PromptInputHandle } from "./PromptInput";
 import { PromptView } from "./PromptView";
 import imgCss from "./Images.module.css";
-import { IconChevron, IconClip, IconEdit, IconEye, IconFork, IconMore, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
+import { IconChevron, IconEdit, IconEye, IconFork, IconMore, IconSend, IconStop, IconTerminal, IconWait, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import { ordinal } from "../stores/numbering";
@@ -20,6 +20,7 @@ import css from "./ChatPanel.module.css";
 import { LocalIntro, LocalMenu, LocalNow, LocalPresetBar, LocalResetConfirm, LocalWaiting, runningDev } from "./LocalCar";
 import type { PresetChip } from "./local-presets";
 import { Md, StreamingMd } from "./Md";
+import { AttachButton } from "./AttachButton";
 import { BrowserBar, BrowserGroup, BrowserOpenButton, BrowserRefs, BrowserStateChip, devUrls, McpCall } from "./Browser";
 import { isBrowserTool, isOtherMcpTool } from "./browser-steps";
 
@@ -183,6 +184,8 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const num = (s: Stop) => offset + ordinal(s, stops);
   const total = offset + counted;
   const [discarding, setDiscarding] = useState(false);
+  const [retracting, setRetracting] = useState(false);
+  const retractStop = useStore((s) => s.retractStop);
   const denyNote = useRef<HTMLInputElement>(null);
   // 等你批准时：按 1、2、3 直接选（正在打字时不抢）
   useEffect(() => {
@@ -379,7 +382,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
               {s.status === "interrupted" && (
                 <>
                 <p className={css.noteAmber}>
-                  没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（已停车）"}。{route.local ? "专车直接改 Local：已经做了的改动就在 Local 里，接着问可以让它做完。" : "这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。"}{" "}
+                  没答完{s.error && s.error !== "已停车" ? `：${s.error}` : "（你停下的）"}。{route.local ? "专车直接改 Local：已经做了的改动就在 Local 里，接着问可以让它做完。" : "这一站的改动留在这一路的工作区里，没有进 Local；接着问，下一站正常到站后会一起带过去。"}{" "}
                   {s.syncState === "unsynced" && (
                     <button className={css.inlineLink} onClick={onViewChanges}>
                       看改了什么
@@ -391,6 +394,23 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                     <button className={css.primaryBtn} onClick={() => void ask(route.id, "接着上一站没做完的地方继续，把它做完。")}>
                       让 Claude 接着做完
                     </button>
+                    {/* 撤掉这一站（设计稿 9-16）：对话退回到它之前，Claude 再也看不到；改动一起丢掉；问题放回输入框。专车改的就是 Local，撤不回 */}
+                    {!route.local &&
+                      (retracting ? (
+                        <>
+                          <span>{s.syncState === "unsynced" ? "这一站的改动会丢掉，对话退回到它之前，确定？" : "对话退回到这一站之前，确定？"}</span>
+                          <button className={css.dangerBtn} onClick={() => (setRetracting(false), void retractStop(route.id, s.id))}>
+                            撤掉
+                          </button>
+                          <button onClick={() => setRetracting(false)}>不撤</button>
+                        </>
+                      ) : (
+                        !discarding && (
+                          <button title="对话退回到这一站之前，Claude 再也看不到它；这一站的改动丢掉；问题放回输入框，改一改再发" onClick={() => setRetracting(true)}>
+                            撤掉这一站，改了再问
+                          </button>
+                        )
+                      ))}
                     {s.syncState === "unsynced" &&
                       (discarding ? (
                         <>
@@ -401,7 +421,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                           <button onClick={() => setDiscarding(false)}>不丢</button>
                         </>
                       ) : (
-                        <button onClick={() => setDiscarding(true)}>丢掉这些改动</button>
+                        !retracting && <button onClick={() => setDiscarding(true)}>丢掉这些改动</button>
                       ))}
                   </div>
                 )}
@@ -582,9 +602,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
             <div className={css.controls}>
               {/* 回形针和“浏览器”算一格：后面几个选择按位置定谁先缩（见 .controls） */}
               <span className={css.attachGroup}>
-                <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
-                  <IconClip size={16} />
-                </button>
+                <AttachButton input={input} className={css.attach} disabled={blocked} />
                 {!browser?.open && <BrowserOpenButton routeId={route.id} devs={devUrls(terminals)} localDevs={devUrls(localTerminals)} lastUrl={browser?.lastUrl} disabled={blocked} />}
               </span>
               <PermissionModeControl mode={permissionMode} routeLabel={routeLabel(route)} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />

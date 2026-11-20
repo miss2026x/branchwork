@@ -4,3 +4,4 @@ export type * from "./events";
 export type * from "./api";
 export * from "./images";
 export * from "./mcp";
+export * from "./files";

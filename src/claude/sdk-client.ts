@@ -150,6 +150,24 @@ export interface ClaudeClientOptions {
 /** 一次提问期间才有的东西。进程可能是提前启动的，启动时还不知道这些，所以放在一个可以后填的格子里 */
 interface Turn {
   onPermission?: AskOptions["onPermission"];
+  /** 这一站用户附的文件和文件夹：读它们不问（设计稿 9-16） */
+  readable?: string[];
+}
+
+/** 只读的内置工具和它们读的位置在哪个参数里 */
+const READ_TOOLS: Record<string, string> = { Read: "file_path", Glob: "path", Grep: "path", NotebookRead: "notebook_path", LS: "path" };
+
+/** path 是不是 roots 里某一个，或在它下面（Windows 不分大小写） */
+export function insideAny(p: string, roots: string[]): boolean {
+  const norm = (x: string) => {
+    const r = path.resolve(x).replace(/[\\/]+$/, "");
+    return process.platform === "win32" ? r.toLowerCase() : r;
+  };
+  const target = norm(p);
+  return roots.some((root) => {
+    const r = norm(root);
+    return target === r || target.startsWith(r + path.sep);
+  });
 }
 
 /** 一个 Claude 进程用的配置：目录、接着哪个会话、怎么停、怎么问批准 */
@@ -163,6 +181,10 @@ function processOptions(cwd: string, sessionId: string | undefined, run: RunSett
     const suggestions = extra.suggestions ?? [];
     const mine = own.get(toolName);
     if (mine?.readonly) return { behavior: "allow", updatedInput: input };
+    // 读用户附上的文件、文件夹：不问
+    const key = READ_TOOLS[toolName];
+    const target = key ? input[key] : undefined;
+    if (typeof target === "string" && turn.readable?.length && insideAny(target, turn.readable)) return { behavior: "allow", updatedInput: input };
     // 外部 MCP 服务的工具：设了“直接放行”的、内置浏览器的（除了上传本机文件这类）不问
     const ext = mcp ? splitMcpTool(toolName) : null;
     if (ext && mcp) {
@@ -304,6 +326,7 @@ export function createClaudeClient(fns: SdkFunctions = realSdk, clientOpts: Clau
         }
       }
       turn.onPermission = opts.onPermission;
+      turn.readable = opts.readable;
       // 停车：先请它停下；5 秒还没停下就强制结束进程（设计稿 4-8）
       let force: ReturnType<typeof setTimeout> | undefined;
       const onAbort = () => {

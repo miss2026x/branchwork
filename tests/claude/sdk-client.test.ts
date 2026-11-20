@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createClaudeClient, promptBlocks, type ClaudeEvent, type SdkFunctions } from "../../src/claude";
 import { inputProgress } from "../../src/claude/sdk-client";
@@ -250,6 +251,28 @@ describe("Claude 封装：把 SDK 的消息流变成“一站的结果”", () =
       }),
     ).ask({ cwd: "/wt", prompt: "x" });
     expect(answer).toMatchObject({ behavior: "deny" });
+  });
+
+  it("读用户附上的文件、文件夹不问（设计稿 9-16）；别的位置、写文件照样问", async () => {
+    const answers: unknown[] = [];
+    const asked: string[] = [];
+    const dir = path.resolve("/data/spec");
+    await createClaudeClient(
+      fakeSdk([], {
+        query: (p) =>
+          (async function* () {
+            const can = (p.options as { canUseTool: (...a: unknown[]) => Promise<unknown> }).canUseTool;
+            const sig = { signal: new AbortController().signal };
+            answers.push(await can("Read", { file_path: path.join(dir, "auth.yaml") }, sig));
+            answers.push(await can("Grep", { pattern: "x", path: dir }, sig));
+            answers.push(await can("Read", { file_path: path.resolve("/data/other.txt") }, sig));
+            answers.push(await can("Write", { file_path: path.join(dir, "auth.yaml") }, sig));
+            yield success;
+          })(),
+      }),
+    ).ask({ cwd: "/wt", prompt: "x", readable: [dir], onPermission: async (r) => (asked.push(r.tool), "deny") });
+    expect(answers.map((a) => (a as { behavior: string }).behavior)).toEqual(["allow", "allow", "deny", "deny"]);
+    expect(asked).toEqual(["Read", "Write"]);
   });
 
   it("分叉把“到哪条消息为止”交给 SDK；历史按消息返回", async () => {

@@ -93,32 +93,83 @@
   border-color: var(--red);
 }
 /* 放到后台：左下角一枚深色小条 */
-.pill {
+/* 左下角的小条（设计稿 9-16）：放在左栏“新对话”按钮上面，往上叠 */
+.stack {
   position: fixed;
   z-index: 40;
-  left: var(--sp-16);
+  left: var(--sp-10);
   bottom: 72px; /* 例外：放在左栏“新对话”按钮上面，不挡住它 */
-  max-width: 420px;
+  width: 244px; /* 例外：和左栏的“新对话”按钮一样宽 */
   display: flex;
-  align-items: center;
-  gap: var(--sp-10);
-  height: var(--h-40);
-  padding: 0 var(--sp-16) 0 var(--sp-12);
-  border-radius: var(--r-pill);
+  flex-direction: column-reverse;
+  gap: var(--sp-8);
+  pointer-events: none;
+}
+.pill {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-10) var(--sp-12);
+  border-radius: var(--r-12);
   background: var(--fg-1);
   color: var(--fg-on-color);
   font-size: var(--fs-13);
+  text-align: left;
   box-shadow: var(--e-dark);
+  pointer-events: auto;
   animation: rise var(--t-base) var(--ease);
 }
-.pill span {
-  min-width: 0;
-  color: var(--on-dark-2);
+.pill[data-error] {
+  background: var(--red);
 }
-.pill em {
-  flex: none;
+.pillTop {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.pillTop b {
+  white-space: nowrap;
+}
+.pillTop code {
+  font: var(--fs-12) var(--mono);
+  color: var(--on-dark-2);
+  white-space: nowrap;
+}
+.pillTop em {
+  margin-left: auto;
+  display: flex;
+  gap: var(--sp-10);
   font-style: normal;
   font-weight: 600;
+  white-space: nowrap;
+  color: var(--on-dark-2);
+}
+.pillTop em button {
+  font-weight: 700;
+  color: var(--fg-on-color);
+  text-decoration: underline;
+}
+.pillSub {
+  min-width: 0;
+  font-size: var(--fs-12);
+  color: var(--on-dark-2);
+}
+.pill[data-error] .pillSub {
+  overflow-wrap: anywhere;
+}
+.pillBar {
+  height: 3px; /* 例外：细进度条 */
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--on-dark-divider);
+}
+.pillBar i {
+  display: block;
+  height: 100%;
+  background: var(--fg-on-color);
+  transition: width var(--t-slow) var(--ease);
 }
 .spin {
   flex: none;

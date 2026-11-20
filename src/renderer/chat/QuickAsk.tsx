@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { PromptImage } from "../../shared";
 import { draftId } from "../stores/store";
-import { IconClip } from "../ui/icons";
+import { AttachButton } from "./AttachButton";
 import { PromptInput, type PromptInputHandle } from "./PromptInput";
 import { useDraft } from "./use-draft";
 import css from "./QuickAsk.module.css";
@@ -25,9 +25,7 @@ export function QuickAsk({ label, placeholder, button, disabled, onSubmit }: { l
       <div className={css.field}>
         <PromptInput ref={input} compact text={draft.text} images={draft.images} onChange={draft.set} onImage={draft.patch} onEnter={submit} newId={draftId} label={label} placeholder={placeholder} disabled={disabled} />
       </div>
-      <button type="button" className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={disabled} onClick={() => input.current?.pickFiles()}>
-        <IconClip size={15} />
-      </button>
+      <AttachButton input={input} className={css.attach} size={15} disabled={disabled} />
       <button type="button" className={css.go} disabled={!ok} title={draft.status === "loading" ? "图片还在处理，等一下" : draft.status === "bad" ? "有图片读不了：去掉它或换一张" : undefined} onClick={submit}>
         {button}
       </button>

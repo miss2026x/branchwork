@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
-import { IMAGE_MAX_COUNT, imageTokens } from "../../shared";
+import { baseName, fileMark, IMAGE_MAX_COUNT, imageTokens, splitFiles } from "../../shared";
+import { fileOnDisk, pickFolder } from "../stores/store";
 import { OBJ, imageUrl, type DraftImage } from "./draft";
 import { ImageProblem, looksLikeImage, readImage } from "./image-files";
 import css from "./Images.module.css";
@@ -10,16 +11,21 @@ import css from "./Images.module.css";
  * 用 contenteditable 做：文字是文本节点，换行是“\n”（white-space: pre-wrap），每张图是一个不可编辑的小标签，
  * 后面跟一个零宽空格（不然光标停不到标签后面）。读的时候标签换成 OBJ，零宽空格去掉。
  * 插入和删除都走 document.execCommand，Ctrl+Z 能撤销（包括找回删掉的图）。
+ * 别的文件、文件夹（设计稿 9-16）也是小标签：读出来是“[文件 位置]”“[文件夹 位置]”，Claude 用自己的工具去读。
  */
 
 const ZW = "​";
+const FILE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/></svg>`;
+const DIR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>`;
 const WARN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19L12 3zM12 10v5M12 18v.01"/></svg>`;
 
 export interface PromptInputHandle {
   /** 放进几张图：at 是拖到的位置（插在那里），不给就插在光标处（输入框没有过光标就放最后） */
   insertFiles(files: File[], at?: { x: number; y: number }): void;
-  /** 打开选文件的窗口（回形针） */
-  pickFiles(): void;
+  /** 打开选文件的窗口（回形针）：image 只选图片，file 什么文件都行（图片照样变成图） */
+  pickFiles(kind?: "image" | "file"): void;
+  /** 选一个文件夹附上 */
+  pickFolder(): void;
   focus(): void;
 }
 
@@ -41,12 +47,21 @@ interface Props {
 }
 
 const isTag = (n: Node | null | undefined): n is HTMLElement => n instanceof HTMLElement && !!n.dataset.img;
+/** 附件的小标签（文件、文件夹） */
+const isFile = (n: Node | null | undefined): n is HTMLElement => n instanceof HTMLElement && n.dataset.file !== undefined;
+/** 能整个删掉的小标签：图、附件 */
+const isChip = (n: Node | null | undefined): n is HTMLElement => isTag(n) || isFile(n);
 const blank = (n: Node | null) => !!n && n.nodeType === Node.TEXT_NODE && (n.nodeValue ?? "").replaceAll(ZW, "") === "";
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 /** 一个小标签的 HTML（插入用；之后由 decorate 更新编号、状态和小图） */
 function tagHtml(img: DraftImage): string {
   return `<span class="${css.tag}" contenteditable="false" data-img="${escapeHtml(img.id)}" role="img"></span>${ZW}`;
+}
+
+/** 附件小标签的 HTML */
+function fileHtml(path: string, dir: boolean): string {
+  return `<span class="${css.file}" contenteditable="false" data-file="${escapeHtml(path)}"${dir ? ' data-dir="1"' : ""} role="img"></span>${ZW}`;
 }
 
 /** 输入框的内容 → 文字（图片换成 OBJ）和图片的顺序 */
@@ -57,6 +72,7 @@ function read(el: HTMLElement): { text: string; ids: string[] } {
     for (const c of n.childNodes) {
       if (c.nodeType === Node.TEXT_NODE) text += (c.nodeValue ?? "").replaceAll(ZW, "").replaceAll(" ", " ");
       else if (isTag(c)) (text += OBJ), ids.push(c.dataset.img!);
+      else if (isFile(c)) text += fileMark(c.dataset.file!, !!c.dataset.dir);
       else if (c.nodeName === "BR") text += "\n";
       else if (c.nodeName === "DIV" || c.nodeName === "P") {
         if (text && !text.endsWith("\n")) text += "\n";
@@ -87,7 +103,8 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
   const lastRange = useRef<Range | null>(null);
   /** 从输入框复制出去的文字，和里面的图（粘贴回来时还原成标签） */
   const clip = useRef<{ text: string; ids: string[] } | null>(null);
-  const [picked, setPicked] = useState<number | null>(null);
+  /** 按了一次退格、等着再按一次删掉的小标签（“图 2”、文件名） */
+  const [picked, setPicked] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ id: string; n: number; left: number; bottom: number; pinned: boolean } | null>(null);
   const hoverTimer = useRef<number | undefined>(undefined);
   const [dropAt, setDropAt] = useState<{ left: number; top: number; height: number } | null>(null);
@@ -111,6 +128,16 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
       const pic = state === "ready" && img?.image ? `<img src="${imageUrl(img.image)}" alt="" draggable="false">` : state === "loading" ? "<i></i>" : WARN;
       t.innerHTML = `${pic}<b>图 ${n}</b>`;
     });
+    root.querySelectorAll<HTMLElement>("[data-file]").forEach((t) => {
+      const path = t.dataset.file!;
+      if (t.dataset.look === path) return;
+      t.dataset.look = path;
+      const name = baseName(path);
+      t.title = `${path}\nClaude 用自己的工具读它，不用再批准`;
+      t.setAttribute("aria-label", `${t.dataset.dir ? "文件夹" : "文件"}：${name}`);
+      t.innerHTML = `${t.dataset.dir ? DIR_ICON : FILE_ICON}<b></b>`;
+      t.querySelector("b")!.textContent = name;
+    });
   };
 
   /** 外面给的内容画进输入框 */
@@ -120,20 +147,33 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
     let k = 0;
     let run = "";
     const flush = () => run && (root.append(run), (run = ""));
-    for (const ch of value) {
-      if (ch !== OBJ) {
-        run += ch;
+    for (const part of splitFiles(value)) {
+      if (part.kind === "file") {
+        flush();
+        const span = document.createElement("span");
+        span.className = css.file!;
+        span.contentEditable = "false";
+        span.dataset.file = part.path;
+        if (part.dir) span.dataset.dir = "1";
+        span.setAttribute("role", "img");
+        root.append(span, ZW);
         continue;
       }
-      flush();
-      const img = list[k++];
-      if (!img) continue;
-      const span = document.createElement("span");
-      span.className = css.tag!;
-      span.contentEditable = "false";
-      span.dataset.img = img.id;
-      span.setAttribute("role", "img");
-      root.append(span, ZW);
+      for (const ch of part.text) {
+        if (ch !== OBJ) {
+          run += ch;
+          continue;
+        }
+        flush();
+        const img = list[k++];
+        if (!img) continue;
+        const span = document.createElement("span");
+        span.className = css.tag!;
+        span.contentEditable = "false";
+        span.dataset.img = img.id;
+        span.setAttribute("role", "img");
+        root.append(span, ZW);
+      }
     }
     if (value.endsWith("\n")) run += "\n";
     flush();
@@ -209,8 +249,19 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
     decorate();
   };
 
-  const insertFiles = (files: File[], at?: { x: number; y: number }) => {
-    const pics = files.filter(looksLikeImage);
+  /** 别的文件、文件夹：找到它们在电脑上的位置，变成附件小标签插进去 */
+  const insertAttachments = (items: { file?: File; path?: string; dir: boolean }[], range: Range | null) => {
+    if (items.length === 0 || disabled) return;
+    void Promise.all(items.map(async (i) => ({ path: i.path ?? (i.file ? await fileOnDisk(i.file) : null), dir: i.dir }))).then((got) => {
+      const ok = got.filter((g): g is { path: string; dir: boolean } => !!g.path);
+      if (ok.length > 0) insertHtml(ok.map((g) => fileHtml(g.path, g.dir)).join(" "), range && el.current?.contains(range.startContainer) ? range : null);
+    });
+  };
+
+  const insertFiles = (files: File[], at?: { x: number; y: number }, dirs?: boolean[]) => {
+    const pics = files.filter((f, i) => !dirs?.[i] && looksLikeImage(f));
+    const others = files.map((file, i) => ({ file, dir: !!dirs?.[i] })).filter((x) => x.dir || !looksLikeImage(x.file));
+    if (others.length > 0) insertAttachments(others, at ? (document.caretRangeFromPoint?.(at.x, at.y) ?? null) : null);
     if (pics.length === 0 || disabled) return;
     const have = el.current?.querySelectorAll("[data-img]").length ?? 0;
     const entries = pics.map((f, i): DraftImage => {
@@ -231,7 +282,13 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
 
   useImperativeHandle(ref, () => ({
     insertFiles,
-    pickFiles: () => fileInput.current?.click(),
+    pickFiles: (kind = "image") => {
+      const input = fileInput.current;
+      if (!input) return;
+      input.accept = kind === "image" ? "image/png,image/jpeg,image/gif,image/webp,image/*" : "";
+      input.click();
+    },
+    pickFolder: () => void pickFolder().then((path) => path && insertAttachments([{ path, dir: true }], null)),
     focus: () => el.current?.focus(),
   }));
 
@@ -255,7 +312,7 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
       n = before ? (node.childNodes[off - 1] ?? null) : (node.childNodes[off] ?? null);
     }
     while (blank(n)) n = before ? n!.previousSibling : n!.nextSibling;
-    return isTag(n) ? n : null;
+    return isChip(n) ? n : null;
   };
   const removeTag = (t: HTMLElement) => {
     const s = getSelection()!;
@@ -289,7 +346,7 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
         } else {
           clearPicked();
           t.dataset.picked = "true";
-          setPicked(numberOf(t));
+          setPicked(isFile(t) ? baseName(t.dataset.file!) : `图 ${numberOf(t)}`);
         }
         return;
       }
@@ -309,6 +366,7 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
       for (const c of n.childNodes) {
         if (c.nodeType === Node.TEXT_NODE) out += (c.nodeValue ?? "").replaceAll(ZW, "");
         else if (isTag(c)) (out += `[图 ${all.indexOf(c.dataset.img!) + 1}]`), ids.push(c.dataset.img!);
+        else if (isFile(c)) out += fileMark(c.dataset.file!, !!c.dataset.dir);
         else if (c.nodeName === "BR") out += "\n";
         else walk(c);
       }
@@ -324,7 +382,8 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
   };
   const onPaste = (e: ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const files = [...e.clipboardData.files].filter(looksLikeImage);
+    // 图片变成图，别的文件（比如在资源管理器里复制的）变成附件
+    const files = [...e.clipboardData.files];
     if (files.length > 0) return insertFiles(files);
     const plain = e.clipboardData.getData("text/plain");
     if (!plain) return;
@@ -365,7 +424,9 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
     e.preventDefault();
     e.stopPropagation();
     setDropAt(null);
-    insertFiles([...e.dataTransfer.files], { x: e.clientX, y: e.clientY });
+    // 拖进来的是不是文件夹
+    const dirs = [...e.dataTransfer.items].filter((i) => i.kind === "file").map((i) => !!i.webkitGetAsEntry?.()?.isDirectory);
+    insertFiles([...e.dataTransfer.files], { x: e.clientX, y: e.clientY }, dirs);
   };
 
   // ── 悬停 / 点标签：预览 ──
@@ -393,7 +454,7 @@ export const PromptInput = forwardRef<PromptInputHandle, Props>(function PromptI
     <div ref={wrap} className={css.wrap} onDragLeave={() => setDropAt(null)} onMouseLeave={() => (window.clearTimeout(hoverTimer.current), setPreview((p) => (p?.pinned ? p : null)))}>
       {picked !== null && (
         <div className={css.hint} role="status">
-          选中了 <b>图 {picked}</b>，再按一次删掉；Ctrl+Z 能找回来
+          选中了 <b>{picked}</b>，再按一次删掉；Ctrl+Z 能找回来
         </div>
       )}
       <div

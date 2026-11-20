@@ -59,38 +59,79 @@ export function ImportProgressDialog({ progress, onBackground, onCancel, onClose
   );
 }
 
-/** 放到后台的导入：左下角一枚小条，点开回到进度窗口 */
+/** 左下角叠在一起的几枚小条（设计稿 9-16）：导入、开新车，往上排，不再压在一起 */
+export function PillStack({ children }: { children: React.ReactNode }) {
+  return <div className={own.stack}>{children}</div>;
+}
+
+/** 放到后台的导入：左下角一枚小条，两行，底下一道进度；点开回到进度窗口（设计稿 9-16） */
 export function ImportPill({ progress, onOpen }: { progress: ImportProgress; onOpen(): void }) {
   const running = progress.items.find((i) => i.state === "running");
+  const done = doneCount(progress);
+  const n = progress.items.length;
   return (
-    <button type="button" className={own.pill} onClick={onOpen} aria-label="正在导入，点开看进度">
-      <i className={own.spin} />
-      <b>
-        正在导入 {Math.min(doneCount(progress) + 1, progress.items.length)} / {progress.items.length}
-      </b>
+    <button type="button" className={own.pill} onClick={onOpen} aria-label={`正在导入 ${done} / ${n}，点开看进度`}>
+      <span className={own.pillTop}>
+        <i className={own.spin} />
+        <b>正在导入</b>
+        <code>
+          {done} / {n}
+        </code>
+        <em>查看 ›</em>
+      </span>
       {running && (
-        <span className="ell">
+        <span className={`${own.pillSub} ell`}>
           {running.title} · {running.step ?? "准备"}
         </span>
       )}
-      <em>查看</em>
+      <span className={own.pillBar}>
+        <i style={{ width: `${Math.max(6, (done / Math.max(1, n)) * 100)}%` }} />
+      </span>
     </button>
   );
 }
 
-/** 正在开新的一路（开新对话、压缩成快线时窗口已经关了）：左下角一枚小条，写着在做哪一步、多久了 */
-export function PreparingPill({ label, step, since }: { label: string; step: string; since: number }) {
+/** 每秒走一下的“N 秒” */
+function useSecs(since: number): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
-  const secs = Math.round((now - since) / 1000);
+  return Math.round((now - since) / 1000);
+}
+
+/** 正在开新的一路（开新对话、压缩成快线、后台开的新车）：左下角一枚小条，写着在做哪一步、多久了 */
+export function PreparingPill({ label, step, since, error, onRetry, onDrop }: { label: string; step: string; since: number; error?: string | null; onRetry?(): void; onDrop?(): void }) {
+  const secs = useSecs(since);
+  if (error)
+    return (
+      <div className={own.pill} data-error role="alert">
+        <span className={own.pillTop}>
+          <b>{label}没成</b>
+          <em>
+            {onRetry && (
+              <button type="button" onClick={onRetry}>
+                再试
+              </button>
+            )}
+            {onDrop && (
+              <button type="button" onClick={onDrop}>
+                不开了
+              </button>
+            )}
+          </em>
+        </span>
+        <span className={own.pillSub}>{error}</span>
+      </div>
+    );
   return (
     <div className={own.pill} role="status">
-      <i className={own.spin} />
-      <b>正在{label}</b>
-      <span className="ell">
+      <span className={own.pillTop}>
+        <i className={own.spin} />
+        <b>正在{label}</b>
+      </span>
+      <span className={`${own.pillSub} ell`}>
         {step}
         {secs >= 2 ? ` · ${secs} 秒` : ""}
       </span>

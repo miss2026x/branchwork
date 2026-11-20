@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { browserBriefText, createBrowserHub, downloadedChrome, findChrome, installCft, latestCft, relativeSource, type CftRelease } from "../browser";
 import type { ClaudeClient, McpRun } from "../claude";
@@ -245,6 +246,15 @@ export function createExtras(db: Db, claude: ClaudeClient, home: string, fetchFn
           abort?.abort();
         },
         chromeDownloadState: async () => download,
+        async saveAttachment(name: string, data: Uint8Array) {
+          // 每次一个新文件夹，文件名保持原样（Claude 看到的就是这个名字）
+          const safe = path.basename(name).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").slice(0, 120) || "附件";
+          const dir = path.join(home, "attachments", `${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 8)}`);
+          await fs.promises.mkdir(dir, { recursive: true });
+          const file = path.join(dir, safe);
+          await fs.promises.writeFile(file, data);
+          return file;
+        },
       };
     },
   };

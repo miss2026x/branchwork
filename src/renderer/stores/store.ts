@@ -3,10 +3,13 @@ import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
 import { loadSeen, markSeen, saveSeen, type Seen } from "./seen";
 import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus, BrowserIssue, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement, ElementSource, ChromeDownload } from "../../shared";
 import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
+import { withoutImageMarks } from "../../shared";
 import { routeLabel } from "../ui/route-color";
 
-/** 输入框里引用的浏览器里的东西（设计稿 9-12）：点选的元素、报错或失败的请求。发车时写成文字附在提问后面 */
-/** 引用进输入框的浏览器内容。点选的元素默认不附局部截图（最占地方），小标签上点小相机才附（设计稿 9-15） */
+/**
+ * 输入框里引用的浏览器里的东西（设计稿 9-12）：点选的元素、报错或失败的请求。发车时写成文字附在提问后面。
+ * 点选的元素默认不附局部截图（最占地方），小标签上点小相机才附（设计稿 9-15）
+ */
 export type BrowserRef = { kind: "element"; el: PickedElement; withImage: boolean } | { kind: "issue"; issue: BrowserIssue };
 
 const VIA: Record<ElementSource["via"], string> = { react: "React 组件", vue: "Vue 组件", svelte: "Svelte 组件", attr: "组件" };
@@ -131,8 +134,12 @@ interface State {
   importShown: string | null;
   /** 刚点了导入、进度窗口还没出现：等这个项目的第一条进度来了就打开 */
   importAwaiting: string | null;
-  /** 正在开新的一路（开新车、开新对话、压缩成快线）：在开哪一路、做到哪一步、从什么时候开始（设计稿 4-8 的做法） */
+  /** 正在开新的一路（开新对话、压缩成快线）：在开哪一路、做到哪一步、从什么时候开始（设计稿 4-8 的做法） */
   preparing: { label: string; step: string; since: number } | null;
+  /** 在后台开的新车（设计稿 9-16）：发车后弹窗马上关，左栏先出现这一路，建好了再变成真的 */
+  opening: Opening[];
+  /** 空项目时点“新对话”：让首屏表单的输入框拿到光标（每点一次加一） */
+  firstFocus: number;
   permissions: Record<string, PendingPermission>;
   lastSync: Record<string, SyncLogEntry>;
   /** 各项目候车区里的问题 */
@@ -234,7 +241,11 @@ interface State {
   importCancel(jobId: string): void;
   openNewRoute(): void;
   /** 开一路新车：名称、颜色、模型可选；带了第一个问题就直接发车；问题来自候车区时把那一条移走 */
-  startRoute(opts: { projectId: string; name?: string; color?: number | null; model?: string | null; effort?: Effort | null; permissionMode?: PermissionMode; question?: string; images?: PromptImage[]; itemId?: string }): Promise<void>;
+  /** 开一路新车（在后台建工作区）；local：上 Local 专车，把第一站发给它 */
+  startRoute(opts: StartRoute): Promise<void>;
+  /** 没开成的那一路：再试一次 / 不开了 */
+  retryOpening(key: string): void;
+  dropOpening(key: string): void;
   /** 看这个项目的同步记录；null 关掉 */
   viewLog(projectId: string | null): void;
   closeDialog(): void;
@@ -317,6 +328,8 @@ interface State {
   viewStop(stopId: string | null): void;
   /** 截线；requeue 为真时把那一站的提问放回输入框（改站） */
   truncate(routeId: string, stopId: string, requeue: boolean): Promise<void>;
+  /** 撤掉没答完的这一站：丢掉它的改动、对话退回到它之前、问题放回输入框（设计稿 9-16） */
+  retractStop(routeId: string, stopId: string): Promise<void>;
   /** 打开一个后台终端看输出；null 关掉 */
   viewTerminal(terminalId: string | null): void;
   /** 还在跑的停掉；已退出的从列表里拿掉 */
@@ -378,6 +391,39 @@ interface State {
 }
 
 let draftSeq = 0;
+let openingSeq = 0;
+/** 后台开新车一个接一个：同时建几个工作区会抢 git 的锁 */
+let openingChain: Promise<void> = Promise.resolve();
+
+/** 开一路新车要的东西 */
+export interface StartRoute {
+  projectId: string;
+  /** 上 Local 专车（设计稿 9-16） */
+  local?: boolean;
+  name?: string;
+  color?: number | null;
+  model?: string | null;
+  effort?: Effort | null;
+  permissionMode?: PermissionMode;
+  question?: string;
+  images?: PromptImage[];
+  itemId?: string;
+}
+
+/** 在后台开的一路（还没建好） */
+export interface Opening {
+  key: string;
+  projectId: string;
+  /** 预计是几路（建好后以真的为准） */
+  number: number;
+  name: string;
+  color: number | null;
+  step: string;
+  since: number;
+  /** 没开成的原因 */
+  error: string | null;
+  opts: StartRoute;
+}
 /** 草稿里图片的编号（只在这个窗口里用） */
 export const draftId = () => `img${++draftSeq}`;
 
@@ -387,6 +433,23 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).rep
  * 界面拿数据的唯一通道。启动时取一次快照，之后只按事件更新；界面不自己改主进程的数据。
  * 只有这个文件碰 window.bw。
  */
+/**
+ * 附到输入框里的文件在电脑上的位置（设计稿 9-16）。拖进来、选的、从资源管理器复制的都有位置；
+ * 只有内容没有位置的（从别的程序复制来的）先存到 Lanes 的数据文件夹里。存不下返回 null
+ */
+export async function fileOnDisk(file: File): Promise<string | null> {
+  const p = window.bw.droppedPath(file);
+  if (p) return p;
+  try {
+    return await window.bw.saveAttachment(file.name || "附件", new Uint8Array(await file.arrayBuffer()));
+  } catch {
+    return null;
+  }
+}
+
+/** 选一个文件夹附上（系统的选文件夹窗口）；没选返回 null */
+export const pickFolder = (): Promise<string | null> => window.bw.pickDirectory().catch(() => null);
+
 /** 主进程报“没找到 Chrome”（src/browser 里的 NO_CHROME 开头） */
 const noChrome = (e: unknown) => message(e).includes("没找到 Chrome");
 
@@ -571,7 +634,12 @@ let started = false;
         set((s) => ({ thinking: { ...s.thinking, [e.stopId]: (s.thinking[e.stopId] ?? "") + e.text } }));
         break;
       case "route.preparing":
-        if (e.step) set((s) => (s.preparing ? { preparing: { ...s.preparing, step: e.step! } } : {}));
+        if (e.step)
+          set((s) => ({
+            ...(s.preparing ? { preparing: { ...s.preparing, step: e.step! } } : {}),
+            // 后台开的新车：这个项目里正在建的那一路（一次只建一路）
+            opening: s.opening.map((o) => (o.projectId === e.projectId && !o.error && o.step !== "排队" ? { ...o, step: e.step! } : o)),
+          }));
         break;
       case "import.progress": {
         const p = e.progress;
@@ -693,6 +761,8 @@ let started = false;
     importShown: null,
     importAwaiting: null,
     preparing: null,
+    opening: [],
+    firstFocus: 0,
     permissions: {},
     lastSync: {},
     queue: {},
@@ -853,26 +923,67 @@ let started = false;
     importCancel: (jobId) => void window.bw.importCancel(jobId),
 
     openNewRoute() {
-      if (get().projects.length > 0) set({ dialog: { kind: "new-route" } });
+      if (get().projects.length === 0) return;
+      // 空项目：地图那一栏本来就是开车的表单（设计稿 9-16），不再叠一层弹窗，让表单的输入框拿到光标
+      const pid = get().selectedProjectId;
+      const empty = pid && !Object.values(get().routes).some((r) => r.projectId === pid && r.status !== "archived") && !get().opening.some((o) => o.projectId === pid);
+      if (empty) set((s) => ({ firstFocus: s.firstFocus + 1, overview: false }));
+      else set({ dialog: { kind: "new-route" } });
     },
 
-    async startRoute({ projectId, name, color, model, effort, permissionMode, question, images = [], itemId }) {
-      if (get().preparing) return; // 已经在开了：别点两下开出两路
-      const next = Math.max(0, ...Object.values(get().routes).filter((r) => r.projectId === projectId).map((r) => r.number)) + 1;
-      set({ preparing: { label: `开出 ${next}路`, step: "准备", since: Date.now() } });
-      try {
-        let route = await window.bw.createRoute(projectId, name?.trim() || undefined);
-        if (color) route = await window.bw.setRouteColor(route.id, color);
-        route = await applyRun(route, { model: model ?? null, effort: effort ?? null, permissionMode: permissionMode ?? route.permissionMode });
-        set((s) => ({ dialog: null, routes: { ...s.routes, [route.id]: route } }));
-        get().selectRoute(route.id);
-        if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
-        if (question?.trim() || images.length) void get().ask(route.id, question ?? "", images);
-      } catch (e) {
-        set({ error: message(e) });
-      } finally {
-        set({ preparing: null });
+    async startRoute(opts) {
+      const { projectId, model, effort, permissionMode, question, images = [], itemId } = opts;
+      const run = { model: model ?? null, effort: effort ?? null, permissionMode: permissionMode ?? "ask" };
+      // Local 专车：没有工作区要建，马上就好
+      if (opts.local) {
+        try {
+          let route = Object.values(get().routes).find((r) => r.projectId === projectId && r.local) ?? (await window.bw.localRoute(projectId));
+          route = await applyRun(route, { ...run, permissionMode: permissionMode ?? route.permissionMode });
+          set((s) => ({ dialog: s.dialog?.kind === "new-route" ? null : s.dialog, routes: { ...s.routes, [route.id]: route } }));
+          get().selectRoute(route.id);
+          get().refreshLocal(projectId);
+          if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
+          if (question?.trim() || images.length) void get().ask(route.id, question ?? "", images);
+        } catch (e) {
+          set({ error: message(e) });
+        }
+        return;
       }
+      // 新的一路：弹窗马上关，左栏先出现这一路，工作区在后台建（设计稿 9-16）。几路一起开时一个接一个建
+      const key = `o${++openingSeq}`;
+      const taken = [...Object.values(get().routes).filter((r) => r.projectId === projectId).map((r) => r.number), ...get().opening.filter((o) => o.projectId === projectId).map((o) => o.number)];
+      const number = Math.max(0, ...taken) + 1;
+      const entry: Opening = { key, projectId, number, name: opts.name?.trim() || withoutImageMarks(question ?? "").trim().split("\n")[0]!.slice(0, 40) || "新的一路", color: opts.color ?? null, step: "排队", since: Date.now(), error: null, opts };
+      const selected = get().selectedRouteId;
+      set((s) => ({ dialog: s.dialog?.kind === "new-route" ? null : s.dialog, opening: [...s.opening, entry] }));
+      const patch = (p: Partial<Opening>) => set((s) => ({ opening: s.opening.map((o) => (o.key === key ? { ...o, ...p } : o)) }));
+      openingChain = openingChain.then(async () => {
+        if (!get().opening.some((o) => o.key === key)) return; // 排队时去掉了
+        patch({ step: "准备", since: Date.now() });
+        try {
+          let route = await window.bw.createRoute(projectId, opts.name?.trim() || undefined);
+          if (opts.color) route = await window.bw.setRouteColor(route.id, opts.color);
+          route = await applyRun(route, { ...run, permissionMode: permissionMode ?? route.permissionMode });
+          set((s) => ({ routes: { ...s.routes, [route.id]: route }, opening: s.opening.filter((o) => o.key !== key) }));
+          // 你这段时间没去看别的路：选中它；去看别的了就只让它出现，不抢视线
+          const now = get().selectedRouteId;
+          if (now === selected || now === null) get().selectRoute(route.id);
+          if (itemId) await window.bw.queueRemove(itemId).catch(() => {});
+          if (question?.trim() || images.length) void get().ask(route.id, question ?? "", images);
+        } catch (e) {
+          patch({ error: message(e) });
+        }
+      });
+      await openingChain;
+    },
+    retryOpening(key) {
+      const o = get().opening.find((x) => x.key === key);
+      if (!o) return;
+      set((s) => ({ opening: s.opening.filter((x) => x.key !== key) }));
+      void get().startRoute(o.opts);
+    },
+    dropOpening(key) {
+      set((s) => ({ opening: s.opening.filter((x) => x.key !== key) }));
     },
 
     viewLog(projectId) {
@@ -1508,6 +1619,16 @@ let started = false;
 
     async discardChanges(routeId) {
       await window.bw.discardChanges(routeId).catch((e) => set({ error: message(e) }));
+    },
+    async retractStop(routeId, stopId) {
+      // 撤掉没答完的这一站（设计稿 9-16）：先丢掉它没进 Local 的改动，再把对话退回到它之前，问题放回输入框
+      try {
+        if (get().stops[stopId]?.syncState === "unsynced") await window.bw.discardChanges(routeId);
+      } catch (e) {
+        set({ error: message(e) });
+        return;
+      }
+      await get().truncate(routeId, stopId, true);
     },
 
     async exportRoute(routeId) {

@@ -168,6 +168,8 @@ export interface BwApi {
   chromeDownload(): Promise<string>;
   chromeCancelDownload(): Promise<void>;
   chromeDownloadState(): Promise<ChromeDownload>;
+  /** 附件只有内容、没有位置（从别的程序复制来的）：存到 Lanes 的数据文件夹里，返回存到哪了（设计稿 9-16） */
+  saveAttachment(name: string, data: Uint8Array): Promise<string>;
 
   /** 订阅事件，返回取消订阅的函数 */
   onEvent(listener: BwListener): () => void;

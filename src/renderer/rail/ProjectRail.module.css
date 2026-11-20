@@ -554,3 +554,54 @@
     translate: var(--fx, 0px) calc(var(--fy, 0px) + 6px);
   }
 }
+
+/* 在后台开的新车（设计稿 9-16）：名字灰着，右边转圈写在做哪一步；没开成是红的 */
+.row[data-opening] .route {
+  cursor: default;
+}
+.row[data-opening="busy"] .label {
+  color: var(--fg-3);
+}
+.openStep {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  margin-right: var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+.openSpin {
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 2px solid var(--border);
+  border-top-color: var(--fg-2);
+  border-radius: var(--r-round);
+  animation: openSpin var(--t-spin) linear infinite;
+}
+@keyframes openSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.openErr {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  margin-right: var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--red-text);
+}
+.openErr button {
+  font-weight: 700;
+  color: var(--red-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .openSpin {
+    animation: none;
+  }
+}

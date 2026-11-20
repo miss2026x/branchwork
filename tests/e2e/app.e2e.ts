@@ -55,7 +55,7 @@ describe("应用", () => {
     }));
     expect(seen.require).toBe("undefined");
     expect(seen.process).toBe("undefined");
-    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "browserCancelPick", "browserClose", "browserOpen", "browserPick", "browserScreenshot", "browserSettings", "browserShow", "browserState", "cancelDistill", "changes", "chromeCancelDownload", "chromeDownload", "chromeDownloadState", "chromeLatest", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "focusWindow", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "localPresets", "localRoute", "localStatus", "mcpCheck", "mcpOverview", "mcpRemove", "mcpSave", "mcpSetEnabled", "mcpSetPolicy", "mcpTest", "mcpTrust", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resetLocal", "resolveConflict", "resync", "routeMcp", "setBrowserSettings", "setLocalPresets", "setRouteColor", "setRouteFlags", "setRouteMcp", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
+    expect(seen.bw).toEqual(["addProject", "answerPermission", "archiveRoute", "ask", "browserCancelPick", "browserClose", "browserOpen", "browserPick", "browserScreenshot", "browserSettings", "browserShow", "browserState", "cancelDistill", "changes", "chromeCancelDownload", "chromeDownload", "chromeDownloadState", "chromeLatest", "claudeOptions", "createExpress", "createRoute", "deleteRoute", "discardChanges", "distill", "droppedPath", "environment", "exportRoute", "focusWindow", "fork", "history", "images", "importCancel", "importSessions", "inspectDirectory", "keptWorktrees", "listProjects", "localPresets", "localRoute", "localStatus", "mcpCheck", "mcpOverview", "mcpRemove", "mcpSave", "mcpSetEnabled", "mcpSetPolicy", "mcpTest", "mcpTrust", "onEvent", "openKept", "openLocal", "openSystemTerminal", "pickDirectory", "projectLog", "queueAdd", "queueAssign", "queueBoard", "queueRemove", "queueStartNew", "removeKept", "removeProject", "renameRoute", "renameStop", "resetLocal", "resolveConflict", "resync", "routeMcp", "saveAttachment", "setBrowserSettings", "setLocalPresets", "setRouteColor", "setRouteFlags", "setRouteMcp", "setRouteModel", "setRoutePermissionMode", "snapshot", "stop", "syncLog", "terminalOutput", "terminalSessions", "terminalStop", "terminals", "truncate", "unarchiveRoute", "warm"]);
   });
 
   it("空白状态 → 加项目 → 开出第一路", async () => {
@@ -72,14 +72,15 @@ describe("应用", () => {
     expect(await add.getByLabel("项目名称").inputValue()).toBe("my-project");
     await shot("1b-add-project");
     await add.getByRole("button", { name: "添加", exact: true }).click();
-    // 空项目：地图上直接写第一站；“更多选项”打开开一路新车的弹窗，什么都不填也能开
-    await expect.poll(() => page.getByRole("heading", { name: "my-project 还没有车" }).isVisible()).toBe(true);
-    expect(await page.getByLabel("第一站").isVisible()).toBe(true);
+    // 空项目（设计稿 9-16）：地图那一栏直接是开车的表单，能选新的一路或 Local 专车；什么都不填也能开
+    await expect.poll(() => page.getByRole("heading", { name: "my-project" }).isVisible()).toBe(true);
+    expect(await page.getByRole("textbox", { name: "第一个问题" }).isVisible()).toBe(true);
+    expect(await page.getByRole("radio", { name: /新的一路/ }).getAttribute("aria-checked")).toBe("true");
+    await page.getByRole("radio", { name: /Local 专车/ }).click();
+    expect(await page.getByRole("button", { name: /上 Local 专车/ }).isVisible()).toBe(true);
+    await page.getByRole("radio", { name: /新的一路/ }).click();
     await shot("1c-empty-project");
-    await page.getByRole("button", { name: "更多选项…" }).click();
-    const fresh = page.getByRole("dialog", { name: "开一路新车" });
-    await shot("1d-new-route");
-    await fresh.getByRole("button", { name: /开出 1路/ }).click();
+    await page.getByRole("button", { name: /开出 1路/ }).click();
     await expect.poll(() => page.getByText("这一路还没有站").isVisible()).toBe(true);
     expect(await page.getByRole("heading", { name: "新对话" }).isVisible()).toBe(true);
     await shot("2-first-route");
@@ -520,6 +521,19 @@ describe("应用", () => {
     await page.getByRole("button", { name: "丢掉", exact: true }).click();
     await expect.poll(() => page.getByRole("button", { name: "看改了什么" }).count(), { timeout: 30000 }).toBe(0);
     expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).not.toContain("写完拖一会儿");
+  });
+  it("撤掉没答完的一站（设计稿 9-16）：改动丢掉、这一站没了、问题放回输入框", async () => {
+    const before = await page.getByRole("log").locator("section").count();
+    await composer().fill("写完拖一会儿，这次撤掉");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.getByRole("log").locator("section").last().locator('[class*="_tool_"]:not([data-active])', { hasText: "demo-notes.md" }).count(), { timeout: 60000 }).toBeGreaterThan(0);
+    await page.getByRole("button", { name: "停车" }).click();
+    await page.getByRole("button", { name: "撤掉这一站，改了再问" }).click({ timeout: 60000 });
+    await page.getByRole("button", { name: "撤掉", exact: true }).click();
+    await expect.poll(() => page.getByRole("log").locator("section").count(), { timeout: 30000 }).toBe(before);
+    await expect.poll(() => composer().textContent()).toContain("写完拖一会儿，这次撤掉");
+    expect(fs.readFileSync(path.join(local, "demo-notes.md"), "utf8")).not.toContain("这次撤掉");
+    await composer().fill("");
   });
   it("改名和换色：路的菜单里改线路名称、换颜色；站的菜单里改站名", async () => {
     const rail = page.getByRole("complementary").first();

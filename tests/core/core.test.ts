@@ -182,6 +182,17 @@ describe("提问带图片（设计稿 4-7）", () => {
   });
 });
 
+describe("附文件（设计稿 9-16）", () => {
+  it("提问里附的文件交给 Claude 时能直接读；站名里写文件名，不写长长的位置", async () => {
+    const route = await core.createRoute(project.id);
+    const r = await core.ask(route.id, "照着[文件 /home/me/docs/需求说明.pdf]改");
+    expect(claude.asks[0]!.prompt).toBe("照着[文件 /home/me/docs/需求说明.pdf]改");
+    expect(claude.asks[0]!.readable).toEqual(["/home/me/docs/需求说明.pdf"]);
+    expect(r.kind === "answered" && r.stop.name).toContain("需求说明.pdf");
+    expect(r.kind === "answered" && r.stop.name).not.toContain("/home");
+  });
+});
+
 describe("没答完", () => {
   it("停车：不同步，工作区保留，这一站标记没答完；接着问，下一站正常结束后一起进 Local", async () => {
     const route = await core.createRoute(project.id);
@@ -209,6 +220,30 @@ describe("没答完", () => {
       ["done", "synced"],
     ]);
     expect(routeOf(route.id).status).toBe("idle");
+    // 设计稿 9-16：下一站附一句，告诉 Claude 上一站是用户停下的、改动还在
+    const told = claude.asks.at(-1)!.prompt;
+    expect(told.startsWith("继续\n\n<lanes-note>")).toBe(true);
+    expect(told).toContain("用户中途停下了它");
+    expect(told).toContain("还在工作区里");
+  });
+
+  it("停车后丢掉了改动：下一站告诉 Claude 改动已经没了；再下一站不再附", async () => {
+    const route = await core.createRoute(project.id);
+    claude.script = async (t) => {
+      write(t.cwd, "b.txt", "half done\n");
+      t.say("正在改……");
+      await new Promise<void>((r) => t.signal.addEventListener("abort", () => r()));
+    };
+    const asking = core.ask(route.id, "改两个文件");
+    await until("stop.delta");
+    core.stop(route.id);
+    await asking;
+    await core.discardChanges(route.id);
+    claude.script = () => undefined;
+    await core.ask(route.id, "换个思路");
+    expect(claude.asks.at(-1)!.prompt).toContain("用户已经丢掉了");
+    await core.ask(route.id, "再问一个");
+    expect(claude.asks.at(-1)!.prompt).not.toContain("<lanes-note>");
   });
 
   it("停车：点下去马上发“正在停车”（等 Claude 停下 → 看一眼工作区），停好了清掉；再点不重复发", async () => {

@@ -16,7 +16,7 @@ import { ordinal, stopOffset } from "../stores/numbering";
 import { activityText, ChatPanel } from "../chat/ChatPanel";
 import { ImageViewer } from "../chat/ImageViewer";
 import { StopImages } from "../chat/StopImages";
-import { ImportPill, ImportProgressDialog, PreparingPill } from "../dialogs/ImportProgress";
+import { ImportPill, ImportProgressDialog, PillStack, PreparingPill } from "../dialogs/ImportProgress";
 import { Notices } from "../notices/Notices";
 import { Settings } from "./Settings";
 import { McpDialog } from "../dialogs/McpDialog";
@@ -130,6 +130,11 @@ export function App() {
   const addProjectAt = useStore((s) => s.addProjectAt);
   const openNewRoute = useStore((s) => s.openNewRoute);
   const startRoute = useStore((s) => s.startRoute);
+  const opening = useStore((s) => s.opening);
+  const retryOpening = useStore((s) => s.retryOpening);
+  const dropOpening = useStore((s) => s.dropOpening);
+  // 只有 Local 专车、还没有别的路：照样画地图（左上角是专车的标签），不再显示空项目的表单
+  const hasLocal = Object.values(allRoutes).some((r) => r.projectId === projectId && r.local);
   const overview = useStore((s) => s.overview);
   const setOverview = useStore((s) => s.setOverview);
   const selectProject = useStore((s) => s.selectProject);
@@ -513,8 +518,18 @@ export function App() {
                   <main className={css.center}>
                     {!ready ? null : projects.length === 0 ? (
                       <Welcome onPick={() => void openAddProject()} onDrop={addDropped} loadEnvironment={environment} />
-                    ) : routes.length === 0 ? (
-                      <FirstRoute project={project} onStart={(question, images) => projectId && void startRoute({ projectId, question, images })} onMore={() => openNewRoute()} />
+                    ) : routes.length === 0 && !hasLocal && project ? (
+                      <FirstRoute
+                        key={project.id}
+                        project={project}
+                        hasLocal={hasLocal}
+                        parked={(allQueues[project.id] ?? []).filter((q) => !q.routeId)}
+                        options={allOptions[project.id]}
+                        onLoadOptions={loadClaudeOptions}
+                        opening={opening.find((o) => o.projectId === project.id)}
+                        onCreate={(o) => void startRoute(o)}
+                        onRetry={retryOpening}
+                      />
                     ) : (
                       <>
                         <RouteMap
@@ -717,7 +732,8 @@ export function App() {
           claudeOptions={(id) => allOptions[id]}
           onLoadClaudeOptions={loadClaudeOptions}
           onCreate={(o) => void startRoute(o)}
-          preparing={preparing}
+          hasLocal={(id) => Object.values(allRoutes).some((r) => r.projectId === id && r.local)}
+          localDir={(id) => projects.find((p) => p.id === id)?.localDir ?? ""}
           onCancel={closeDialog}
         />
       )}
@@ -850,13 +866,20 @@ export function App() {
       {/* 导入终端会话的进度（设计稿 4-8）：窗口，或放到后台时左下角的小条 */}
       {importShown && imports[importShown] && <ImportProgressDialog progress={imports[importShown]!} onBackground={() => showImport(null)} onCancel={() => importCancel(importShown)} onClose={() => showImport(null)} />}
       {/* 开新的一路时窗口已经关了（开新对话、快线、空项目的第一路）：左下角小条显示进度；“开一路新车”的窗口自己显示 */}
-      {preparing && dialog?.kind !== "new-route" && <PreparingPill {...preparing} />}
-      {Object.values(imports)
-        .filter((p) => !p.finished && p.jobId !== importShown)
-        .slice(0, 1)
-        .map((p) => (
-          <ImportPill key={p.jobId} progress={p} onOpen={() => showImport(p.jobId)} />
-        ))}
+      <PillStack>
+        {preparing && <PreparingPill {...preparing} />}
+        {/* 后台开的新车（设计稿 9-16）：空项目那一路在表单上就看得到进度，不再重复 */}
+        {opening
+          .filter((o) => o.projectId !== projectId || routes.length > 0 || hasLocal)
+          .map((o) => (
+            <PreparingPill key={o.key} label={`开出 ${o.number}路`} step={o.step} since={o.since} error={o.error} onRetry={() => retryOpening(o.key)} onDrop={() => dropOpening(o.key)} />
+          ))}
+        {Object.values(imports)
+          .filter((p) => !p.finished && p.jobId !== importShown)
+          .map((p) => (
+            <ImportPill key={p.jobId} progress={p} onOpen={() => showImport(p.jobId)} />
+          ))}
+      </PillStack>
     </div>
   );
 }

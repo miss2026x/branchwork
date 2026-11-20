@@ -64,6 +64,8 @@ export interface AskOptions {
   permissionMode?: PermissionMode;
   /** 外部 MCP 服务（设计稿 9-13） */
   mcp?: McpRun;
+  /** 用户在提问里附的文件和文件夹（设计稿 9-16）：Claude 读这些位置时直接放行，不问 */
+  readable?: string[];
   /** 停车：abort 之后这一站算没答完 */
   signal?: AbortSignal;
   onEvent?: (e: ClaudeEvent) => void;

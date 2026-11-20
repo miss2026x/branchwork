@@ -76,6 +76,9 @@ export function ProjectRail({
   const createRoute = useStore((s) => s.createRoute);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const viewTerminal = useStore((s) => s.viewTerminal);
+  const opening = useStore((s) => s.opening);
+  const retryOpening = useStore((s) => s.retryOpening);
+  const dropOpening = useStore((s) => s.dropOpening);
   const unread = useUnread();
   // 时间每分钟走一下（“3 分钟前”）
   const [, tick] = useState(0);
@@ -343,7 +346,35 @@ export function ProjectRail({
                     </div>
                     );
                   })}
-                {open && list.length === 0 && (
+                {/* 在后台开的新车（设计稿 9-16）：先出现在这里，建好后变成真的一路 */}
+                {open &&
+                  opening
+                    .filter((o) => o.projectId === p.id)
+                    .map((o) => (
+                      <div key={o.key} className={css.row} data-opening={o.error ? "error" : "busy"}>
+                        <span className={css.route} title={o.error ?? `正在建工作区：${o.step}`}>
+                          <Plate route={{ number: o.number, express: null, color: o.color }} />
+                          <span className={`ell ${css.label}`}>{o.name}</span>
+                          {o.error ? (
+                            <span className={css.openErr}>
+                              没开成
+                              <button type="button" onClick={() => retryOpening(o.key)}>
+                                再试
+                              </button>
+                              <button type="button" aria-label="不开了" onClick={() => dropOpening(o.key)}>
+                                ×
+                              </button>
+                            </span>
+                          ) : (
+                            <span className={css.openStep}>
+                              <i className={css.openSpin} />
+                              {o.step}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                {open && list.length === 0 && !opening.some((o) => o.projectId === p.id) && (
                   <p className={css.none}>还没有路</p>
                 )}
                 {open && archived.length > 0 && (

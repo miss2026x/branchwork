@@ -5,7 +5,8 @@ import { ModelControl } from "../chat/ModelControl";
 import { PermissionModeControl } from "../chat/PermissionModeControl";
 import { currentModel, modeItems, type OptionsState } from "../ui/claude-options";
 import { agoFine } from "../ui/ago";
-import { IconCheck, IconClip, IconClose, IconWait, IconWarn } from "../ui/icons";
+import { IconCheck, IconClose, IconWait, IconWarn } from "../ui/icons";
+import { AttachButton } from "../chat/AttachButton";
 import { PromptInput, type PromptInputHandle } from "../chat/PromptInput";
 import type { Draft } from "../chat/use-draft";
 import { draftId, useStore } from "../stores/store";
@@ -49,6 +50,30 @@ export function NameRow({ id, value, onChange, placeholder, color, onColor, auto
           <button key={n} type="button" role="radio" aria-checked={c === color} aria-label={`颜色 ${i + 1}`} style={{ background: c }} onClick={() => onColor(n)} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 开什么（设计稿 9-16）：新的一路（自己的工作区）或 Local 专车（直接改项目文件夹）
+ * hasLocal：这个项目已经有专车了（选它就是接着它问）
+ */
+export function RouteKindSwitch({ local, onLocal, number, color, hasLocal }: { local: boolean; onLocal(local: boolean): void; number: number; color: string; hasLocal: boolean }) {
+  return (
+    <div className={own.kinds} role="radiogroup" aria-label="开什么">
+      <button type="button" role="radio" aria-checked={!local} onClick={() => onLocal(false)}>
+        <span className={own.kindPlate} style={{ background: color }}>
+          {number}
+          <small>路</small>
+        </span>
+        新的一路<small>自己的工作区</small>
+      </button>
+      <button type="button" role="radio" aria-checked={local} onClick={() => onLocal(true)}>
+        <span className={own.kindPlate} data-local>
+          L
+        </span>
+        Local 专车<small>{hasLocal ? "已开着，接着它问" : "直接改项目文件夹"}</small>
+      </button>
     </div>
   );
 }
@@ -101,9 +126,7 @@ export function FirstStop({ title, draft, placeholder, onSubmit, run, onRun, opt
         <PromptInput ref={input} text={draft.text} images={draft.images} onChange={draft.set} onImage={draft.patch} onEnter={onSubmit} newId={draftId} label="第一个问题" placeholder={placeholder} />
         <div className={own.toolbar}>
           <div className={own.controls}>
-            <button type="button" className={own.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" onClick={() => input.current?.pickFiles()}>
-              <IconClip size={16} />
-            </button>
+            <AttachButton input={input} className={own.attach} />
             {run && onRun && model && (
               <>
                 <PermissionModeControl mode={run.permissionMode} routeLabel={routeLabel} options={options} model={model} onChange={(permissionMode) => onRun({ ...run, permissionMode })} />

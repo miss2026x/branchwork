@@ -460,3 +460,57 @@
     translate: var(--fx, 0px) calc(var(--fy, 0px) + 6px);
   }
 }
+
+/* 开什么：新的一路 / Local 专车（设计稿 9-16） */
+.kinds {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: 3px; /* 例外：分段按钮的内边 */
+  border-radius: var(--r-10);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.kinds button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: var(--h-32);
+  padding: 0 var(--sp-12) 0 var(--sp-8);
+  border-radius: var(--r-8);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--fg-3);
+}
+.kinds button small {
+  font-size: var(--fs-11);
+  font-weight: 400;
+  color: var(--fg-4);
+}
+.kinds button[aria-checked="true"] {
+  background: var(--surface);
+  color: var(--fg-1);
+  box-shadow: var(--e1), inset 0 0 0 1px var(--border);
+}
+.kinds button[aria-checked="true"] small {
+  color: var(--fg-3);
+}
+.kindPlate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  height: 18px; /* 例外：小牌子 */
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-4);
+  color: var(--fg-on-color);
+  font-size: var(--fs-11);
+  font-weight: 800;
+}
+.kindPlate small {
+  font-size: 8px; /* 例外：牌子上的“路” */
+}
+.kindPlate[data-local] {
+  min-width: 18px;
+  background: var(--local);
+}

@@ -36,9 +36,10 @@ import type {
   Terminal,
   TerminalSession,
 } from "../shared";
-import { IMAGE_MAX_COUNT, withoutImageMarks } from "../shared";
+import { fileMarks, IMAGE_MAX_COUNT, withFileNames, withoutImageMarks } from "../shared";
 import { createSyncEngine, fetchUpstream, gitVersionText, inspectRepo, readLocalGit, type LocalGit, type SyncEngine, type SyncHooks } from "../sync";
 import { LOCAL_ROUTE_NAME, localBrief, localStatus as buildLocalStatus, routeLabel } from "./local";
+import { interruptedNote } from "./notes";
 import { createTerminals, type TerminalInfo, type Terminals } from "../terminal";
 
 export type CoreErrorCode = "NOT_FOUND" | "ROUTE_BUSY" | "ROUTE_BLOCKED" | "ROUTE_ARCHIVED" | "ROUTE_NOT_BLOCKED" | "CANNOT_FORK" | "DISTILL_FAILED" | "BAD_IMAGE" | "LOCAL_ROUTE";
@@ -265,6 +266,8 @@ export function createCore(opts: CoreOptions): Core {
   const extras: CoreExtras = opts.extras ?? {};
   /** 这一站不附浏览器现状（输入框里点掉了） */
   const skipBrowserBrief = new Set<string>();
+  /** 丢掉过改动、还没问下一站的路（下一站附一句告诉 Claude） */
+  const discarded = new Set<string>();
   const makeEngine = opts.createEngine ?? ((localDir, worktreesDir, hooks) => createSyncEngine({ localDir, worktreesDir, hooks }));
   /** 各项目里刚发现的“你直接在 Local 里改了这些文件”，等下一次同步时记进同步记录 */
   const localEdits = new Map<string, SyncFile[]>();
@@ -701,17 +704,26 @@ export function createCore(opts: CoreOptions): Core {
 
       // ── 回答 ──
       const previous = db.stops.listByRoute(routeId);
+      // 上一站没答完（你停下的、或中断了）：告诉 Claude，免得它自作主张把上一站做完，或以为丢掉的改动还在（设计稿 9-16）
+      const last = previous.at(-1);
+      const wasDiscarded = discarded.delete(routeId);
+      if (!resolving && last?.status === "interrupted" && route.sessionId) {
+        const note = interruptedNote(last, wasDiscarded, !!route.local);
+        brief = brief ? `${note}\n\n${brief}` : note;
+      }
       // “继续”“好的”这类短确认：不起名，画成小点。斜杠命令：直接用命令名
       const minor = !resolving && images.length === 0 && previous.length > 0 && previous.at(-1)!.kind !== "summary" && isShortConfirm(text);
       const command = resolving ? null : slashCommand(text);
       // 只发了图、没写字：没东西可起名，就叫“看图”
-      const fixedName = minor || command !== null || !withoutImageMarks(text);
+      // 起名用的文字：图的记号去掉、附件写成文件名（设计稿 9-16）
+      const plain = withoutImageMarks(withFileNames(text));
+      const fixedName = minor || command !== null || !plain;
       let stop: Stop = {
         id: id("s"),
         routeId,
         seq: db.stops.nextSeq(routeId),
         kind: minor ? "minor" : "normal",
-        name: resolving?.name ?? command ?? (minor ? text.trim() : tempName(text)),
+        name: resolving?.name ?? command ?? (minor ? text.trim() : tempName(withFileNames(text))),
         nameState: resolving || fixedName ? "final" : "temp",
         prompt: text,
         status: "answering",
@@ -728,7 +740,7 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "stop.created", stop });
       // 还没起名的路，用它自己的第一站当名字
       if (route.name === NEW_ROUTE_NAME && !resolving) route = setRoute(routeId, { name: stop.name });
-      if (!resolving && !fixedName) nameStop(stop.id, routeId, withoutImageMarks(text), stop.name);
+      if (!resolving && !fixedName) nameStop(stop.id, routeId, plain, stop.name);
       runningStop.set(routeId, stop.id);
 
       const stopId = stop.id;
@@ -742,6 +754,8 @@ export function createCore(opts: CoreOptions): Core {
           // 快线的第一个问题：连同交接摘要一起交给 Claude（这是个全新的会话，它看不到原来的对话）
           prompt: !route.sessionId && previous[0]?.kind === "summary" ? handover(previous[0].prompt, text) : brief && !command ? `${text}\n\n${brief}` : text,
           images,
+          // 提问里附的文件和文件夹：Claude 读的时候不用再批准
+          readable: fileMarks(text).map((f) => f.path),
           sessionId: route.sessionId ?? undefined,
           ...runFor(route),
           afterMessageId: previous.findLast((s) => s.lastMessageId)?.lastMessageId ?? undefined,
@@ -1174,6 +1188,7 @@ export function createCore(opts: CoreOptions): Core {
       emit({ type: "stops.removed", routeId, stopIds: removed });
       // 没答完的那一站被截掉了，这一路就不再是“没答完”
       route = setRoute(routeId, { sessionId, contextTokens: null, status: route.status === "interrupted" ? "idle" : route.status });
+      discarded.delete(routeId);
       if (old && old !== sessionId) await claude.deleteSession(old).catch(() => {});
       warmRoute(route);
       return { prompt: target.prompt, images };
@@ -1646,6 +1661,8 @@ export function createCore(opts: CoreOptions): Core {
       const engine = await engineFor(mustProject(route.projectId));
       claude.cool(route.worktreePath);
       await engine.discard(routeId);
+      // 下一站告诉 Claude：那一站的改动已经丢了
+      discarded.add(routeId);
       // 没进 Local 的改动都没了：相关的站不再标“没同步”，这一路也不再卡在冲突上
       for (const s of db.stops.listByRoute(routeId)) if (s.syncState === "unsynced" || s.syncState === "conflict") setStop(s.id, { syncState: "none" });
       const next = setRoute(routeId, { status: route.status === "conflict" ? "idle" : route.status });

@@ -75,6 +75,7 @@ const api: BwApi = {
   chromeDownload: call("chromeDownload"),
   chromeCancelDownload: call("chromeCancelDownload"),
   chromeDownloadState: call("chromeDownloadState"),
+  saveAttachment: call("saveAttachment"),
   localRoute: call("localRoute"),
   localStatus: call("localStatus"),
   localPresets: call("localPresets"),
