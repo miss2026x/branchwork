@@ -7,6 +7,7 @@ import { EffortControl } from "./EffortControl";
 import { PermissionModeControl } from "./PermissionModeControl";
 import { firstStops } from "../stores/numbering";
 import { draftId, useStore, type LiveStop } from "../stores/store";
+import { useLocalTerminals } from "../stores/useLocalTerminals";
 import { draftStatus, toPrompt, type DraftImage } from "./draft";
 import { PromptInput, type PromptInputHandle } from "./PromptInput";
 import { PromptView } from "./PromptView";
@@ -115,6 +116,9 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
   const briefOff = useStore((s) => !!s.browserBriefOff[route.id]);
   const setBriefOff = useStore((s) => s.setBrowserBriefOff);
   const removeRef = useStore((s) => s.removeBrowserRef);
+  const toggleRefImage = useStore((s) => s.toggleRefImage);
+  // Local 专车里在跑的后台终端：各路的浏览器菜单里也能打开 Local 的开发服务器（设计稿 9-15）
+  const localTerminals = useLocalTerminals(route);
   const loadBrowser = useStore((s) => s.loadBrowser);
   const openMcp = useStore((s) => s.openMcp);
   useEffect(() => loadBrowser(route.id), [route.id, loadBrowser]);
@@ -559,7 +563,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
         {!blocked && <BrowserBar routeId={route.id} state={browser} activity={activity} onScreenshot={insertImage} onSettings={() => openMcp(route.projectId, "browser")} />}
         {/* 设计稿 4-6：输入框、这一路的三个选择、发车按钮在同一个框里 */}
         <div className={css.box} data-disabled={blocked}>
-          <BrowserRefs refs={browserRefs ?? []} onRemove={(i) => removeRef(route.id, i)}>
+          <BrowserRefs refs={browserRefs ?? []} onRemove={(i) => removeRef(route.id, i)} onToggleImage={(i) => toggleRefImage(route.id, i)}>
             {browser?.open && <BrowserStateChip state={browser} off={briefOff} onToggle={(off) => setBriefOff(route.id, off)} />}
           </BrowserRefs>
           <PromptInput
@@ -581,7 +585,7 @@ export function ChatPanel({ route, stops, offset, parent, onGoToRoute, permissio
                 <button className={css.attach} aria-label="添加图片" title="添加图片（也可以直接粘贴或拖进来）" disabled={blocked} onClick={() => input.current?.pickFiles()}>
                   <IconClip size={16} />
                 </button>
-                {!browser?.open && <BrowserOpenButton routeId={route.id} devs={devUrls(terminals)} lastUrl={browser?.lastUrl} disabled={blocked} />}
+                {!browser?.open && <BrowserOpenButton routeId={route.id} devs={devUrls(terminals)} localDevs={devUrls(localTerminals)} lastUrl={browser?.lastUrl} disabled={blocked} />}
               </span>
               <PermissionModeControl mode={permissionMode} routeLabel={routeLabel(route)} options={claudeOptions} model={currentModel(claudeOptions, route.model)} onChange={onPermissionMode} />
               <ModelControl model={route.model} effort={route.effort} options={claudeOptions} routeLabel={routeLabel(route)} onChange={onModel} />

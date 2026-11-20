@@ -119,7 +119,7 @@ describe.skipIf(!exe)("内置浏览器：每一路只看得到自己的窗口", 
   }, 60_000);
 
   it("点选元素：像 DevTools 的检查一样点一下，拿到它的位置、大小、样式和局部截图", async () => {
-    await hub.open("r4", "data:text/html;charset=utf-8,<body style='margin:0'><form class='login'><button class='primary' style='margin-left:40px;width:200px;height:44px'>登录</button></form></body>");
+    await hub.open("r4", "data:text/html;charset=utf-8,<body style='margin:0'><form class='login'><button class='primary' data-insp-path='/app/src/Login.vue:12:5:button' style='margin-left:40px;width:200px;height:44px'>登录</button></form></body>");
     await new Promise((r) => setTimeout(r, 500));
     const picking = hub.pick("r4");
     await new Promise((r) => setTimeout(r, 500));
@@ -133,5 +133,9 @@ describe.skipIf(!exe)("内置浏览器：每一路只看得到自己的窗口", 
     expect(el!.width).toBe(200);
     expect(el!.styles).toContain("margin: 0px 0px 0px 40px");
     expect(el!.image?.data.length).toBeGreaterThan(100);
+    // 设计稿 9-15：认出插件加的源码位置；页面里打上标记，HTML 里不带这个标记
+    expect(el!.source).toMatchObject({ file: "/app/src/Login.vue", line: 12, column: 5, via: "attr" });
+    expect(el!.mark).toBe("1");
+    expect(el!.html).not.toContain("data-lanes-pick");
   }, 60_000);
 });

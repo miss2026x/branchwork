@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { BrowserIssue, BrowserState, ChatItem, PromptImage, RouteActivity, Terminal } from "../../shared";
+import type { BrowserIssue, BrowserState, ChatItem, PickedElement, PromptImage, RouteActivity, Terminal } from "../../shared";
 import { splitMcpTool } from "../../shared";
 import { useStore, type BrowserRef } from "../stores/store";
-import { IconCamera, IconClose, IconErr, IconGlobe, IconMore, IconNet, IconPick, IconPlug, IconWarn, IconWindowUp } from "../ui/icons";
+import { IconCamera, IconCameraOff, IconClose, IconFileCode, IconErr, IconGlobe, IconMore, IconNet, IconPick, IconPlug, IconWarn, IconWindowUp } from "../ui/icons";
 import { browserDoing, browserStep, hostPath, lastUrl, shortPath } from "./browser-steps";
 import css from "./Browser.module.css";
 
@@ -10,6 +10,14 @@ type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 const imgSrc = (i: PromptImage) => `data:${i.type};base64,${i.data}`;
 
 /** 这一路正在跑的开发服务器的网址（“浏览器”菜单第一项直接打开它） */
+/** 小标签第二行：Login.tsx:42 · LoginForm */
+function shortSource(src: NonNullable<PickedElement["source"]>): string {
+  const name = src.file.split("/").pop() ?? src.file;
+  const where = src.line === null ? name : `${name}:${src.approx ? "~" : ""}${src.line}`;
+  const comp = src.components.at(-1);
+  return comp ? `${where} · ${comp}` : where;
+}
+
 export function devUrls(terminals: Terminal[]): { url: string; command: string }[] {
   return terminals
     .filter((x) => x.status === "running")
@@ -210,8 +218,32 @@ function Buttons({ dim, onPick, onShot, onShow, onMore }: { dim?: boolean; onPic
 }
 
 /** 输入框工具栏里的“浏览器”（这一路还没开窗口时）：认出开发服务器就直接打开它 */
-export function BrowserOpenButton({ routeId, devs, lastUrl, disabled }: { routeId: string; /** 这一路在跑的开发服务器的地址（一个终端可能有好几个端口） */ devs: { url: string; command: string }[]; /** 窗口关之前在的页面 */ lastUrl?: string | null; disabled?: boolean }) {
-  const dev = devs[0] ?? null;
+export function BrowserOpenButton({
+  routeId,
+  devs,
+  localDevs = [],
+  lastUrl,
+  disabled,
+}: {
+  routeId: string;
+  /** 这一路在跑的开发服务器的地址（一个终端可能有好几个端口） */
+  devs: { url: string; command: string }[];
+  /** Local 专车里在跑的（设计稿 9-15：各路也能打开 Local 的）；这一路就是 Local 时不给 */
+  localDevs?: { url: string; command: string }[];
+  /** 窗口关之前在的页面 */
+  lastUrl?: string | null;
+  disabled?: boolean;
+}) {
+  const dev = devs[0] ?? localDevs[0] ?? null;
+  // 上次的页面已经列在最前面了：同一个地址不再列
+  const fresh = (d: { url: string }) => !lastUrl || hostPath(lastUrl).split("/")[0] !== hostPath(d.url).split("/")[0];
+  const item = (d: { url: string; command: string }) => (
+    <button key={d.url} role="menuitem" onClick={() => (setMenu(false), void open(routeId, d.url))}>
+      <IconGlobe size={14} />
+      <span className="ell">打开 {d.url.replace(/^https?:\/\//, "")}</span>
+      <code>{d.command}</code>
+    </button>
+  );
   const open = useStore((s) => s.browserOpen);
   const pick = useStore((s) => s.browserPick);
   const [menu, setMenu] = useState(false);
@@ -243,15 +275,26 @@ export function BrowserOpenButton({ routeId, devs, lastUrl, disabled }: { routeI
               <code>上次的页面</code>
             </button>
           )}
-          {devs
-            .filter((d) => !lastUrl || hostPath(lastUrl).split("/")[0] !== hostPath(d.url).split("/")[0])
-            .map((d) => (
-              <button key={d.url} role="menuitem" onClick={() => (setMenu(false), void open(routeId, d.url))}>
-                <IconGlobe size={14} />
-                <span className="ell">打开 {d.url.replace(/^https?:\/\//, "")}</span>
-                <code>{d.command}</code>
-              </button>
-            ))}
+          {localDevs.length === 0 ? (
+            devs.filter(fresh).map(item)
+          ) : (
+            <>
+              {devs.length > 0 && (
+                <>
+                  <h4 className={css.menuHead}>
+                    这一路的<small>你这一路刚改的代码</small>
+                  </h4>
+                  {devs.filter(fresh).map(item)}
+                </>
+              )}
+              <h4 className={css.menuHead}>
+                Local 的<small>各路答完合进来的代码</small>
+              </h4>
+              {localDevs.filter(fresh).map(item)}
+              {devs.length === 0 && <p className={css.menuHint}>这一路刚改的要等这一站答完才进 Local。想马上看，让 Claude 在这一路自己起一个。</p>}
+              <hr />
+            </>
+          )}
           {goto ? (
             <form
               className={css.goto}
@@ -283,7 +326,7 @@ export function BrowserOpenButton({ routeId, devs, lastUrl, disabled }: { routeI
 }
 
 /** 输入框里引用的东西：点选的元素、报错、失败的请求（发车时一起交给 Claude） */
-export function BrowserRefs({ refs, onRemove, children }: { refs: BrowserRef[]; onRemove(i: number): void; /** 排在最后的（“附上浏览器现状”） */ children?: ReactNode }) {
+export function BrowserRefs({ refs, onRemove, onToggleImage, children }: { refs: BrowserRef[]; onRemove(i: number): void; /** 点选的元素附不附局部截图（小相机） */ onToggleImage(i: number): void; /** 排在最后的（“附上浏览器现状”） */ children?: ReactNode }) {
   const [hover, setHover] = useState<number | null>(null);
   if (refs.length === 0 && !children) return null;
   return (
@@ -294,8 +337,20 @@ export function BrowserRefs({ refs, onRemove, children }: { refs: BrowserRef[]; 
             <span className={css.thumb}>{r.el.image ? <img src={imgSrc(r.el.image)} alt="" /> : <IconPick size={14} />}</span>
             <span className={css.chipText}>
               <b className="ell">{r.el.label}</b>
-              <code className="ell">{r.el.selector}</code>
+              {r.el.source ? (
+                <code className="ell" data-source>
+                  <IconFileCode size={10} />
+                  {shortSource(r.el.source)}
+                </code>
+              ) : (
+                <code className="ell">{r.el.selector}</code>
+              )}
             </span>
+            {r.el.image && (
+              <button className={css.cam} aria-pressed={r.withImage} aria-label={r.withImage ? "不附局部截图" : "附上局部截图"} title={r.withImage ? "附着局部截图；点一下不附" : "没附局部截图；点一下附上"} onClick={() => onToggleImage(i)}>
+                {r.withImage ? <IconCamera size={13} /> : <IconCameraOff size={13} />}
+              </button>
+            )}
             <button aria-label="去掉" onClick={() => onRemove(i)}>
               <IconClose size={11} />
             </button>
@@ -303,8 +358,26 @@ export function BrowserRefs({ refs, onRemove, children }: { refs: BrowserRef[]; 
               <div className={css.detail}>
                 <b>{r.el.label}</b>
                 <dl>
+                  {r.el.source && (
+                    <>
+                      <dt>源码</dt>
+                      <dd data-source>{r.el.source.line === null ? r.el.source.file : r.el.source.approx ? `${r.el.source.file}（约第 ${r.el.source.line} 行）` : `${r.el.source.file}:${r.el.source.line}`}</dd>
+                      {r.el.source.components.length > 0 && (
+                        <>
+                          <dt>组件</dt>
+                          <dd>{r.el.source.components.join(" › ")}</dd>
+                        </>
+                      )}
+                    </>
+                  )}
                   <dt>位置</dt>
                   <dd>{r.el.selector}</dd>
+                  {r.el.mark && (
+                    <>
+                      <dt>页面标记</dt>
+                      <dd>data-lanes-pick=&quot;{r.el.mark}&quot;</dd>
+                    </>
+                  )}
                   <dt>大小</dt>
                   <dd>
                     {r.el.width} × {r.el.height}，在 ({r.el.x}, {r.el.y})
@@ -322,7 +395,7 @@ export function BrowserRefs({ refs, onRemove, children }: { refs: BrowserRef[]; 
                     </>
                   )}
                 </dl>
-                <span className={css.dim}>{r.el.image ? "还有一张这个元素的局部截图" : ""}</span>
+                {r.el.image && <span className={css.dim}>{r.withImage ? "附着这个元素的局部截图" : "局部截图没附上；点小相机附上"}</span>}
               </div>
             )}
           </span>

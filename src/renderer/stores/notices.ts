@@ -19,7 +19,11 @@ export type Notice =
   /** 你没在看的那一路答完了一站（设计稿 9-14）；text 是回答的头一两句 */
   | { id: string; kind: "done"; routeId: string; stopId: string; text: string }
   /** 同步出错（不是冲突） */
-  | { id: string; kind: "sync-error"; routeId: string; message: string };
+  | { id: string; kind: "sync-error"; routeId: string; message: string }
+  /** Claude 想用浏览器，没找到 Chrome（设计稿 9-15） */
+  | { id: string; kind: "chrome-missing"; routeId: string }
+  /** Chrome for Testing 下好了；不属于哪一路，routeId 是空的 */
+  | { id: string; kind: "chrome-ready"; routeId: ""; version: string };
 
 /** 事件发生之前的数据 */
 export interface NoticeContext {
@@ -117,6 +121,14 @@ export function reduceNotices(list: Notice[], e: BwEvent, s: NoticeContext): Not
       if (entry.status === "ok" || entry.status === "noop") return list.filter((n) => !(n.routeId === entry.routeId && (n.kind === "sync-error" || (n.kind === "conflict" && entry.direction !== "pull"))));
       return list;
     }
+    case "chrome.missing":
+      return put(list, { id: `chrome:${e.routeId}`, kind: "chrome-missing", routeId: e.routeId });
+    case "chrome.download":
+      if (e.state.status !== "done") return list;
+      return put(
+        list.filter((n) => n.kind !== "chrome-missing"),
+        { id: "chrome-ready", kind: "chrome-ready", routeId: "", version: e.state.version ?? "" },
+      );
     case "queue.updated":
       // 只看这个项目的：别的项目的候车区没变
       return list.filter((n) => n.kind !== "board" || s.routes[n.routeId]?.projectId !== e.projectId || e.items.some((q) => q.id === n.itemId && q.mode === "manual" && q.routeId === n.routeId));

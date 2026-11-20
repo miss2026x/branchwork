@@ -1,4 +1,4 @@
-import type { BrowserSettings, BrowserState, BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, LocalPreset, McpOverview, McpServerEntry, McpServerState, Project, PromptImage, ToolResult, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
+import type { BrowserInfo, BrowserSettings, BrowserState, ChromeDownload, BwApi, BwEvent, BwListener, ChatItem, ClaudeOptions, Effort, ImportProgress, LocalPreset, McpOverview, McpServerEntry, McpServerState, Project, PromptImage, ToolResult, QueueItem, Route, Stop, StopContent, SyncLogEntry, Terminal } from "../../shared";
 
 /**
  * 假的后端：只在普通浏览器里打开界面时用（没有 Electron 主进程）。
@@ -267,6 +267,8 @@ export function installMockBw(): void {
     g.fillText("登录", 366, 293);
     return { type: "image/png", data: c.toDataURL("image/png").split(",")[1]!, name: "截图", width: 760, height: 470 };
   };
+  /** 点选过几次（页面标记的编号） */
+  let picks = 0;
   const browserStates = new Map<string, BrowserState>();
   const closedBrowser = (routeId: string): BrowserState => ({ routeId, open: false, url: "", title: "", pages: [], issues: [], picking: false, lastUrl: null, error: null });
   const openBrowser = (routeId: string, url = "http://localhost:5174/login"): BrowserState => {
@@ -289,8 +291,16 @@ export function installMockBw(): void {
     sentry: { status: "failed", error: "HTTP 401 Unauthorized", checkedAt: Date.now() },
   };
   const mcpPolicies: McpOverview["policies"] = {};
-  const overview = (projectId: string): McpOverview => ({ projectId, servers: mcpServers.map((x) => ({ ...x })), states: { ...mcpStates }, policies: mcpPolicies, browser: { ...browserSettings, found: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" } });
+  const overview = (projectId: string): McpOverview => ({ projectId, servers: mcpServers.map((x) => ({ ...x })), states: { ...mcpStates }, policies: mcpPolicies, browser: browserInfo() });
   const routeOff = new Map<string, string[]>();
+  let noChrome = q.has("nochrome");
+  let chromeDl: ChromeDownload = { status: "idle", version: null, received: 0, total: 0, error: null };
+  const CFT_PATH = "C:\\Users\\me\\AppData\\Roaming\\Lanes\\chrome\\147.0.7727.56\\chrome-win64\\chrome.exe";
+  const browserInfo = (): BrowserInfo => ({
+    ...browserSettings,
+    found: noChrome ? null : chromeDl.status === "done" ? CFT_PATH : "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    downloaded: chromeDl.status === "done" ? { version: "147.0.7727.56", path: CFT_PATH } : null,
+  });
   if (q.has("browser")) {
     const r1 = [...routes.values()][0];
     if (r1) {
@@ -361,14 +371,40 @@ export function installMockBw(): void {
     },
     routeMcp: async (routeId) => routeOff.get(routeId) ?? [],
     setRouteMcp: async (routeId, off) => void routeOff.set(routeId, off),
-    browserSettings: async () => ({ ...browserSettings, found: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" }),
+    browserSettings: async () => browserInfo(),
     async setBrowserSettings(patch) {
       browserSettings = { ...browserSettings, ...patch };
-      return { ...browserSettings, found: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" };
+      return browserInfo();
     },
+    // 没找到 Chrome（?nochrome）：下载 Chrome for Testing 的样子（设计稿 9-15）
+    chromeLatest: async () => (await wait(400), { version: "147.0.7727.56", size: 161 * 1024 * 1024 }),
+    async chromeDownload() {
+      const total = 161 * 1024 * 1024;
+      chromeDl = { status: "downloading", version: "147.0.7727.56", received: 0, total, error: null };
+      emit({ type: "chrome.download", state: chromeDl });
+      for (let i = 1; i <= 20; i++) {
+        await wait(250);
+        if (chromeDl.status !== "downloading") throw new Error("取消了下载");
+        chromeDl = { ...chromeDl, received: Math.round((total * i) / 20) };
+        emit({ type: "chrome.download", state: chromeDl });
+      }
+      chromeDl = { ...chromeDl, status: "unpacking" };
+      emit({ type: "chrome.download", state: chromeDl });
+      await wait(600);
+      chromeDl = { ...chromeDl, status: "done" };
+      emit({ type: "chrome.download", state: chromeDl });
+      noChrome = false;
+      return CFT_PATH;
+    },
+    async chromeCancelDownload() {
+      chromeDl = { ...chromeDl, status: "idle", received: 0 };
+      emit({ type: "chrome.download", state: chromeDl });
+    },
+    chromeDownloadState: async () => chromeDl,
     browserState: async (routeId) => browserStates.get(routeId) ?? closedBrowser(routeId),
     async browserOpen(routeId, url) {
       await wait(500);
+      if (noChrome) throw new Error("没找到 Chrome。装好后再试，或在设置里指定 Chrome 的位置");
       openBrowser(routeId, url);
     },
     browserShow: async () => {},
@@ -376,6 +412,7 @@ export function installMockBw(): void {
       return fakeShot();
     },
     async browserPick(routeId) {
+      if (noChrome) throw new Error("没找到 Chrome。装好后再试，或在设置里指定 Chrome 的位置");
       const st = browserStates.get(routeId) ?? openBrowser(routeId);
       browserStates.set(routeId, { ...st, picking: true });
       emit({ type: "browser.state", state: browserStates.get(routeId)! });
@@ -383,7 +420,7 @@ export function installMockBw(): void {
       const done = { ...browserStates.get(routeId)!, picking: false };
       browserStates.set(routeId, done);
       emit({ type: "browser.state", state: done });
-      return { label: "button「登录」", selector: "form.login > button.primary", width: 340, height: 44, x: 210, y: 270, styles: "display: block;\nmargin: 0px 0px 0px 40px;\nwidth: 100%;\nfont-size: 14px;", text: "登录", html: '<button class="primary">登录</button>', image: fakeShot(), url: st.url };
+      return { label: "button「登录」", selector: "form.login > button.primary", width: 340, height: 44, x: 210, y: 270, styles: "display: block;\nmargin: 0px 0px 0px 40px;\nwidth: 100%;\nfont-size: 14px;", text: "登录", html: '<button class="primary">登录</button>', image: fakeShot(), url: st.url, source: { file: "src/pages/Login.tsx", line: 42, column: 7, components: ["LoginPage", "LoginForm"], via: "react", approx: false }, mark: String(++picks) };
     },
     async browserCancelPick(routeId) {
       const st = browserStates.get(routeId);

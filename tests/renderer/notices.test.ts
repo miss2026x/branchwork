@@ -75,6 +75,16 @@ describe("通知：只提醒要你处理的", () => {
     expect(reduceNotices(list, { type: "stop.created", stop: stop("s2", "r2", 2, { status: "answering" }) }, before)).toEqual([]);
   });
 
+  it("没找到 Chrome（设计稿 9-15）：Claude 想用时提示一条；下好后换成“下好了”", () => {
+    const missing = reduceNotices([], { type: "chrome.missing", routeId: "r2" }, ctx());
+    expect(missing).toEqual([{ id: "chrome:r2", kind: "chrome-missing", routeId: "r2" }]);
+    // 同一路再试一次不重复
+    expect(reduceNotices(missing, { type: "chrome.missing", routeId: "r2" }, ctx())).toHaveLength(1);
+    const st = { status: "downloading" as const, version: "147.0.1.2", received: 1, total: 2, error: null };
+    expect(reduceNotices(missing, { type: "chrome.download", state: st }, ctx())).toBe(missing);
+    expect(reduceNotices(missing, { type: "chrome.download", state: { ...st, status: "done" } }, ctx())).toEqual([{ id: "chrome-ready", kind: "chrome-ready", routeId: "", version: "147.0.1.2" }]);
+  });
+
   it("回答的头一两句：去掉 Markdown 记号，太长截断", () => {
     expect(answerLead([{ kind: "text", text: "## 结论\n\n> 引用\n\n| a | b |" }])).toBe("结论 引用 a b");
     expect(answerLead([{ kind: "text", text: "看 [文档](https://x.y) 第 3 节" }])).toBe("看 文档 第 3 节");

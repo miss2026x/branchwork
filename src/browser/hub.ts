@@ -5,6 +5,7 @@ import path from "node:path";
 import type { BrowserIssue, BrowserState, McpTransport, PickedElement, PromptImage } from "../shared";
 import { Cdp, type CdpEvent } from "./cdp";
 import { findChrome, launchChrome, type ChromeProcess } from "./chrome";
+import { DESCRIBE } from "./describe";
 import { startCdpProxy, type CdpProxy } from "./proxy";
 
 /**
@@ -23,7 +24,14 @@ export interface BrowserHubOptions {
   log?(s: string): void;
   /** 额外的 Chrome 启动参数（测试里用 --headless=new） */
   chromeArgs?: string[];
+  /** 电脑上找不到 Chrome 时用的（Lanes 下载的 Chrome for Testing，设计稿 9-15） */
+  fallbackChrome?(): string | null;
+  /** Claude 用浏览器工具时没找到 Chrome */
+  onMissingChrome?(routeId: string): void;
 }
+
+/** 找不到 Chrome 时的报错开头；界面认这几个字弹“下载 Chrome for Testing”（设计稿 9-15） */
+export const NO_CHROME = "没找到 Chrome";
 
 const MAX_ISSUES = 100;
 
@@ -87,8 +95,8 @@ export function createBrowserHub(opts: BrowserHubOptions) {
   async function ensure(): Promise<Cdp> {
     if (control && !control.closed) return control;
     starting ??= (async () => {
-      const exe = opts.chromePath() || findChrome();
-      if (!exe) throw new Error("没找到 Chrome。装好后再试，或在设置里指定 Chrome 的位置");
+      const exe = opts.chromePath() || findChrome() || opts.fallbackChrome?.();
+      if (!exe) throw new Error(`${NO_CHROME}。装好后再试，或在设置里指定 Chrome 的位置`);
       chrome = await launchChrome(exe, opts.profileDir, opts.chromeArgs);
       const c = await Cdp.connect(chrome.wsUrl);
       chrome.onExit(() => c.close());
@@ -394,7 +402,7 @@ export function createBrowserHub(opts: BrowserHubOptions) {
     });
     if (node === null) return null;
     const { object } = await c.send<{ object: { objectId: string } }>("DOM.resolveNode", { backendNodeId: node }, sessionId);
-    const r2 = await c.send<{ result: { value: Omit<PickedElement, "image" | "url"> } }>("Runtime.callFunctionOn", { objectId: object.objectId, functionDeclaration: DESCRIBE, returnByValue: true }, sessionId);
+    const r2 = await c.send<{ result: { value: Omit<PickedElement, "image" | "url">; exceptionDetails?: unknown } }>("Runtime.callFunctionOn", { objectId: object.objectId, functionDeclaration: DESCRIBE, returnByValue: true }, sessionId);
     const d = r2.result.value;
     let image: PromptImage | null = null;
     if (d.width > 0 && d.height > 0) {
@@ -489,7 +497,16 @@ export function createBrowserHub(opts: BrowserHubOptions) {
   return {
     /** 开好代理（Chrome 等第一次要用时才启动） */
     async start() {
-      proxy ??= await startCdpProxy({ routeOf, createFor, upstreamUrl: async () => (await ensure(), chrome!.wsUrl) }, token, log);
+      proxy ??= await startCdpProxy({ routeOf, createFor, upstreamUrl: async (routeId) => {
+          try {
+            await ensure();
+          } catch (e) {
+            if (e instanceof Error && e.message.startsWith(NO_CHROME)) opts.onMissingChrome?.(routeId);
+            throw e;
+          }
+          return chrome!.wsUrl;
+        },
+      }, token, log);
     },
     mcpServer,
     state,
@@ -509,7 +526,7 @@ export function createBrowserHub(opts: BrowserHubOptions) {
       if (!p?.sessionId) throw new Error("没有页面");
       for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 }, p.sessionId);
     },
-    found: () => findChrome(),
+    found: () => findChrome() ?? opts.fallbackChrome?.() ?? null,
     async dispose() {
       for (const t of dirty.values()) clearTimeout(t);
       dirty.clear();
@@ -539,40 +556,4 @@ function shortUrl(u: string): string {
   }
 }
 
-/** 在页面里描述被点选的元素（Runtime.callFunctionOn，this 就是那个元素） */
-const DESCRIBE = `function () {
-  const el = this.nodeType === 1 ? this : this.parentElement;
-  const esc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : s);
-  const part = (e) => {
-    let s = e.tagName.toLowerCase();
-    if (e.id) return s + "#" + esc(e.id);
-    const cls = [...e.classList].filter((c) => !/^(css|sc|jsx|_)[-_]?[a-z0-9]{4,}$/i.test(c)).slice(0, 2);
-    if (cls.length) s += "." + cls.map(esc).join(".");
-    return s;
-  };
-  const chain = [];
-  for (let e = el; e && e.nodeType === 1 && e !== document.body && e !== document.documentElement && chain.length < 4; e = e.parentElement) {
-    chain.unshift(part(e));
-    if (e.id) break;
-  }
-  if (chain.length === 0) chain.push(part(el));
-  const rect = el.getBoundingClientRect();
-  const cs = getComputedStyle(el);
-  const keys = ["display", "position", "width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "line-height", "border", "border-radius", "gap", "justify-content", "align-items", "text-align"];
-  const skip = new Set(["none", "normal", "0px", "auto", "rgba(0, 0, 0, 0)", "static", "start"]);
-  const styles = keys.map((k) => [k, cs.getPropertyValue(k)]).filter(([, v]) => v && !skip.has(v)).map(([k, v]) => k + ": " + v + ";").join("\\n");
-  const text = (el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("alt") || "").replace(/\\s+/g, " ").trim().slice(0, 200);
-  const tag = el.tagName.toLowerCase();
-  const html = el.outerHTML.length > 1500 ? el.outerHTML.slice(0, 1500) + "…" : el.outerHTML;
-  return {
-    label: tag + (text ? "「" + text.slice(0, 24) + "」" : ""),
-    selector: chain.join(" > "),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height),
-    x: Math.round(rect.left + scrollX),
-    y: Math.round(rect.top + scrollY),
-    styles,
-    text,
-    html,
-  };
-}`;
+

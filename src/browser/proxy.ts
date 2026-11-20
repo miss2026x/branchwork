@@ -17,8 +17,8 @@ export interface Ownership {
   routeOf(target: { targetId: string; type: string; openerId?: string }): Promise<string | null>;
   /** 给这一路开一个页面，返回页面的 targetId */
   createFor(routeId: string, params: Record<string, unknown>): Promise<string>;
-  /** Chrome 的地址（还没启动就启动它） */
-  upstreamUrl(): Promise<string>;
+  /** Chrome 的地址（还没启动就启动它）；routeId：是哪一路的 Claude 要连 */
+  upstreamUrl(routeId: string): Promise<string>;
 }
 
 /** 按路分开看的目标类型；其他的（service worker、浏览器本身）大家都能看到 */
@@ -71,7 +71,7 @@ async function serve(down: WebSocket, routeId: string, own: Ownership, log: (s: 
   down.on("message", onEarly);
   let up: WebSocket;
   try {
-    up = new WebSocket(await own.upstreamUrl(), { perMessageDeflate: false, maxPayload: 512 * 1024 * 1024 });
+    up = new WebSocket(await own.upstreamUrl(routeId), { perMessageDeflate: false, maxPayload: 512 * 1024 * 1024 });
     await new Promise<void>((resolve, reject) => {
       up.once("open", resolve);
       up.once("error", reject);

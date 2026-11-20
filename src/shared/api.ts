@@ -1,6 +1,6 @@
 import type { BwListener, PermissionDecision } from "./events";
 import type { PromptImage } from "./images";
-import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, LocalPreset, LocalStatus, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement } from "./model";
+import type { DirectoryInfo, ClaudeOptions, Effort, Environment, TerminalSession, FileStat, KeptWorktree, LocalPreset, LocalStatus, PermissionMode, Project, ProjectSnapshot, QueueItem, RemoveProjectResult, QueueMode, Route, StopContent, SyncFile, SyncLogEntry, Terminal, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement, BrowserInfo, ChromeDownload } from "./model";
 
 /**
  * 界面能调用的全部操作，也就是 window.bw。
@@ -148,8 +148,8 @@ export interface BwApi {
   setRouteMcp(routeId: string, off: string[]): Promise<void>;
 
   // ── 内置浏览器（设计稿 9-12） ──
-  browserSettings(): Promise<BrowserSettings & { found: string | null }>;
-  setBrowserSettings(patch: Partial<BrowserSettings>): Promise<BrowserSettings & { found: string | null }>;
+  browserSettings(): Promise<BrowserInfo>;
+  setBrowserSettings(patch: Partial<BrowserSettings>): Promise<BrowserInfo>;
   browserState(routeId: string): Promise<BrowserState>;
   /** 打开这一路的窗口（没开就开，开着就拉到前面）；给了 url 就打开它 */
   browserOpen(routeId: string, url?: string): Promise<void>;
@@ -162,6 +162,12 @@ export interface BwApi {
   browserCancelPick(routeId: string): Promise<void>;
   /** 关掉这一路的窗口 */
   browserClose(routeId: string): Promise<void>;
+  /** 没找到 Chrome 时（设计稿 9-15）：Chrome for Testing 现在的稳定版和大小（字节，不知道为 0）；这台电脑没有能用的版本时报错 */
+  chromeLatest(): Promise<{ version: string; size: number }>;
+  /** 开始下载（已经在下就等它）；下好返回程序位置。进度走 chrome.download 事件 */
+  chromeDownload(): Promise<string>;
+  chromeCancelDownload(): Promise<void>;
+  chromeDownloadState(): Promise<ChromeDownload>;
 
   /** 订阅事件，返回取消订阅的函数 */
   onEvent(listener: BwListener): () => void;

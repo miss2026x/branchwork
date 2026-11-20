@@ -1,4 +1,4 @@
-import type { BrowserState, ClaudeOptions, ImportProgress, LocalStatus, McpServerState, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal, ToolResult } from "./model";
+import type { BrowserState, ChromeDownload, ClaudeOptions, ImportProgress, LocalStatus, McpServerState, Project, QueueItem, Route, RouteActivity, Stop, SyncLogEntry, Terminal, ToolResult } from "./model";
 
 export type PermissionDecision = "allow" | "allow-always" | "deny";
 
@@ -35,6 +35,10 @@ export type BwEvent =
   | { type: "stop.toolResult"; routeId: string; stopId: string; id: string; result: ToolResult }
   /** 一路的浏览器窗口变了（开了、关了、跳了页面、多了报错） */
   | { type: "browser.state"; state: BrowserState }
+  /** 下载 Chrome for Testing 的进度（设计稿 9-15） */
+  | { type: "chrome.download"; state: ChromeDownload }
+  /** Claude 用浏览器工具时没找到 Chrome */
+  | { type: "chrome.missing"; routeId: string }
   /** MCP 服务检查完了（设计稿 9-13） */
   | { type: "mcp.states"; projectId: string; states: Record<string, McpServerState> }
   /** 等你批准；用 answerPermission(requestId, …) 回答 */

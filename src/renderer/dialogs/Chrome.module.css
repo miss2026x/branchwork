@@ -1,0 +1,75 @@
+/* 没找到 Chrome、下载 Chrome for Testing（设计稿 9-15） */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-12);
+  margin-top: var(--sp-12);
+  padding: var(--sp-10) var(--sp-12);
+  border-radius: var(--r-8);
+  background: var(--surface-1);
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}
+.facts code,
+.meta code {
+  font: var(--fs-11) / var(--lh-16) var(--mono);
+  color: var(--fg-2);
+}
+.err {
+  margin: var(--sp-8) 0 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--red-text);
+}
+.facts .err {
+  margin: 0;
+}
+.fill {
+  flex: 1;
+}
+.btn,
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: var(--h-40);
+  padding: 0 var(--sp-16);
+  border-radius: var(--r-8);
+  font-weight: 600;
+}
+.btn {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-1);
+}
+.btn:hover {
+  background: var(--surface-2);
+}
+.primary {
+  background: var(--fg-1);
+  color: var(--surface);
+}
+.primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.progress {
+  height: 8px; /* 例外：进度条 */
+  margin-top: var(--sp-12);
+  overflow: hidden;
+  border-radius: var(--r-4);
+  background: var(--surface-2);
+}
+.progress i {
+  display: block;
+  height: 100%;
+  background: var(--info);
+  transition: width var(--t-base);
+}
+.meta {
+  display: flex;
+  justify-content: space-between;
+  margin: var(--sp-6) 0 0;
+  font-size: var(--fs-12);
+  color: var(--fg-3);
+}

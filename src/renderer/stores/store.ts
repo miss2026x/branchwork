@@ -1,12 +1,21 @@
 import { create } from "zustand";
 import { noticesAfterSelecting, reduceNotices, type Notice } from "./notices";
 import { loadSeen, markSeen, saveSeen, type Seen } from "./seen";
-import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus, BrowserIssue, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement } from "../../shared";
+import type { BwEvent, ChatItem, ImportProgress, PermissionDecision, PermissionMode, Project, PromptImage, RouteActivity, QueueItem, QueueMode, Route, Stop, SyncFile, SyncLogEntry, DirectoryInfo, FileStat, KeptWorktree, Terminal, Environment, TerminalSession, RemoveProjectResult, Effort, ClaudeOptions, LocalPreset, LocalStatus, BrowserIssue, BrowserSettings, BrowserState, McpOverview, McpScope, McpServerInput, McpServerState, McpToolPolicy, PickedElement, ElementSource, ChromeDownload } from "../../shared";
 import { fromPrompt, OBJ, type DraftImage } from "../chat/draft";
 import { routeLabel } from "../ui/route-color";
 
 /** 输入框里引用的浏览器里的东西（设计稿 9-12）：点选的元素、报错或失败的请求。发车时写成文字附在提问后面 */
-export type BrowserRef = { kind: "element"; el: PickedElement } | { kind: "issue"; issue: BrowserIssue };
+/** 引用进输入框的浏览器内容。点选的元素默认不附局部截图（最占地方），小标签上点小相机才附（设计稿 9-15） */
+export type BrowserRef = { kind: "element"; el: PickedElement; withImage: boolean } | { kind: "issue"; issue: BrowserIssue };
+
+const VIA: Record<ElementSource["via"], string> = { react: "React 组件", vue: "Vue 组件", svelte: "Svelte 组件", attr: "组件" };
+
+/** 源码位置写成一行：src/pages/Login.tsx:42（React 组件 LoginPage › LoginForm） */
+export function sourceLine(src: ElementSource): string {
+  const where = src.line === null ? src.file : src.approx ? `${src.file}（约第 ${src.line} 行）` : `${src.file}:${src.line}`;
+  return src.components.length ? `${where}（${VIA[src.via]} ${src.components.join(" › ")}）` : where;
+}
 
 /** 引用写成交给 Claude 的文字；元素的局部截图按顺序接在已有的图后面（first：第一张的编号） */
 export function browserRefsText(refs: BrowserRef[], first: number): { text: string; images: PromptImage[] } {
@@ -14,11 +23,14 @@ export function browserRefsText(refs: BrowserRef[], first: number): { text: stri
   const parts = refs.map((r) => {
     if (r.kind === "issue") return `—— 浏览器里的${r.issue.kind === "request" ? "失败请求" : "报错"} ——\n${r.issue.text}${r.issue.source && r.issue.kind !== "request" ? `（${r.issue.source}）` : ""}`;
     const e = r.el;
-    const lines = [`—— 浏览器里点选的元素：${e.label} ——`, `位置：${e.selector}（${e.width} × ${e.height}，在页面 ${e.url}）`];
+    const lines = [`—— 浏览器里点选的元素：${e.label} ——`];
+    if (e.source) lines.push(`源码：${sourceLine(e.source)}`);
+    lines.push(`位置：${e.selector}（${e.width} × ${e.height}，在页面 ${e.url}）`);
+    if (e.mark) lines.push(`页面里加了标记 data-lanes-pick="${e.mark}"：要看它现在的样子，用浏览器工具运行 document.querySelector('[data-lanes-pick="${e.mark}"]')（页面刷新后标记就没了）`);
     if (e.text) lines.push(`文字：${e.text}`);
     if (e.styles) lines.push(`主要样式：\n${e.styles}`);
     lines.push(`HTML：\n${e.html}`);
-    if (e.image) {
+    if (e.image && r.withImage) {
       images.push(e.image);
       lines.push(`局部截图：[图 ${first + images.length - 1}]`);
     }
@@ -143,6 +155,8 @@ interface State {
     | { kind: "local-presets"; projectId: string }
     /** MCP 服务和内置浏览器的设置（设计稿 9-12、9-13） */
     | { kind: "mcp"; projectId: string; tab: "servers" | "browser" }
+    /** 没找到 Chrome：下载 Chrome for Testing（设计稿 9-15） */
+    | { kind: "chrome" }
     /** 移除项目；blocked 是第一次确认后发现的没进 Local 的改动和留下的工作区 */
     | { kind: "remove-project"; projectId: string; blocked: Extract<RemoveProjectResult, { status: "has-unsynced" }> | null; error: string | null };
   /** 正在问“这一路还在回答，怎么归档”的那一路 */
@@ -183,6 +197,10 @@ interface State {
   seen: Seen;
   /** 答完时、Lanes 不在最前面，发系统通知 */
   notifyDone: boolean;
+  /** 下载 Chrome for Testing 的进度（设计稿 9-15） */
+  chromeDownload: ChromeDownload;
+  /** 下好 Chrome 后接着做的事：没找到 Chrome 时你正要打开的页面、点选元素 */
+  chromeThen: { routeId: string; url?: string; pick?: boolean } | null;
   /** 各路刚从候车区自动发出的问题，通知用 */
   boarded: Record<string, string>;
   /** 各站的摘要提炼，按站记 */
@@ -243,6 +261,8 @@ interface State {
   browserShot(routeId: string): Promise<PromptImage | null>;
   addBrowserRef(routeId: string, ref: BrowserRef): void;
   removeBrowserRef(routeId: string, index: number): void;
+  /** 点选的元素附不附局部截图 */
+  toggleRefImage(routeId: string, index: number): void;
   setBrowserBriefOff(routeId: string, off: boolean): void;
   // ── MCP 服务（设计稿 9-13） ──
   openMcp(projectId: string, tab?: "servers" | "browser"): void;
@@ -280,6 +300,13 @@ interface State {
   dropDistill(stopId: string): void;
   dismissNotice(id: string): void;
   setNotifyDone(on: boolean): void;
+  /** 打开“没找到 Chrome”的对话框；then：下好后接着做的 */
+  openChromeDialog(then?: { routeId: string; url?: string; pick?: boolean } | null): void;
+  /** 下载 Chrome for Testing；下好后做 chromeThen 里记着的事 */
+  downloadChrome(): Promise<void>;
+  cancelChromeDownload(): void;
+  /** Chrome for Testing 现在的稳定版和大小 */
+  chromeLatest(): Promise<{ version: string; size: number }>;
   setRouteModel(routeId: string, model: string | null, effort?: Effort | null): Promise<void>;
   /** 读这个项目能选的模型和批准方式（每个项目只读一次；先给上次的，新的到了再换） */
   loadClaudeOptions(projectId: string): void;
@@ -360,6 +387,9 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).rep
  * 界面拿数据的唯一通道。启动时取一次快照，之后只按事件更新；界面不自己改主进程的数据。
  * 只有这个文件碰 window.bw。
  */
+/** 主进程报“没找到 Chrome”（src/browser 里的 NO_CHROME 开头） */
+const noChrome = (e: unknown) => message(e).includes("没找到 Chrome");
+
 const NOTIFY_KEY = "lanes.notifyDone";
 /** 答完时发不发系统通知：默认发 */
 function loadNotifyDone(): boolean {
@@ -515,6 +545,9 @@ let started = false;
         break;
       case "browser.state":
         set((s) => ({ browser: { ...s.browser, [e.state.routeId]: e.state } }));
+        break;
+      case "chrome.download":
+        set({ chromeDownload: e.state });
         break;
       case "mcp.states":
         set((s) => (s.mcp?.projectId === e.projectId ? { mcp: { ...s.mcp, states: e.states } } : {}));
@@ -687,6 +720,8 @@ let started = false;
     focused: typeof document === "undefined" || document.hasFocus(),
     seen: { since: Date.now(), at: {} },
     notifyDone: loadNotifyDone(),
+    chromeDownload: { status: "idle", version: null, received: 0, total: 0, error: null },
+    chromeThen: null,
     boarded: {},
     distills: {},
     compressStopId: null,
@@ -700,6 +735,7 @@ let started = false;
       if (started) return; // 开发模式下 React 会把初始化跑两遍，事件只能订阅一次
       started = true;
       set({ seen: loadSeen() });
+      void window.bw.chromeDownloadState().then((chromeDownload) => set({ chromeDownload }), () => undefined);
       window.bw.onEvent(apply);
       // 关窗口前：还在等撤销的删除现在就做掉
       window.addEventListener("beforeunload", () => void get().flushDelete());
@@ -903,7 +939,9 @@ let started = false;
         await window.bw.browserOpen(routeId, url);
         get().loadBrowser(routeId);
       } catch (e) {
-        set({ error: message(e) });
+        // 没找到 Chrome：问一下要不要下载 Chrome for Testing，下好后接着打开（设计稿 9-15）
+        if (noChrome(e)) get().openChromeDialog({ routeId, url });
+        else set({ error: message(e) });
         get().loadBrowser(routeId);
       }
     },
@@ -916,10 +954,35 @@ let started = false;
     async browserPick(routeId) {
       try {
         const el = await window.bw.browserPick(routeId);
-        if (el) get().addBrowserRef(routeId, { kind: "element", el });
+        if (el) get().addBrowserRef(routeId, { kind: "element", el, withImage: false });
       } catch (e) {
-        set({ error: message(e) });
+        if (noChrome(e)) {
+          const then = get().chromeThen;
+          get().openChromeDialog({ ...(then?.routeId === routeId ? then : {}), routeId, pick: true });
+        } else set({ error: message(e) });
       }
+    },
+    openChromeDialog(then) {
+      set((s) => ({ dialog: { kind: "chrome" }, chromeThen: then === undefined ? s.chromeThen : then }));
+    },
+    async downloadChrome() {
+      try {
+        await window.bw.chromeDownload();
+      } catch (e) {
+        // 进度里已经写着为什么失败；取消的不算错
+        if (get().chromeDownload.status === "error") set({ error: message(e) });
+        return;
+      }
+      const then = get().chromeThen;
+      set((s) => ({ chromeThen: null, dialog: s.dialog?.kind === "chrome" ? null : s.dialog }));
+      if (then) {
+        await get().browserOpen(then.routeId, then.url);
+        if (then.pick) await get().browserPick(then.routeId);
+      }
+    },
+    chromeLatest: () => window.bw.chromeLatest(),
+    cancelChromeDownload() {
+      void window.bw.chromeCancelDownload();
     },
     browserCancelPick(routeId) {
       void window.bw.browserCancelPick(routeId);
@@ -933,6 +996,8 @@ let started = false;
       }
     },
     addBrowserRef: (routeId, ref) => set((s) => ({ browserRefs: { ...s.browserRefs, [routeId]: [...(s.browserRefs[routeId] ?? []), ref] } })),
+    toggleRefImage: (routeId, index) =>
+      set((s) => ({ browserRefs: { ...s.browserRefs, [routeId]: (s.browserRefs[routeId] ?? []).map((r, i) => (i === index && r.kind === "element" ? { ...r, withImage: !r.withImage } : r)) } })),
     removeBrowserRef: (routeId, index) => set((s) => ({ browserRefs: { ...s.browserRefs, [routeId]: (s.browserRefs[routeId] ?? []).filter((_, i) => i !== index) } })),
     setBrowserBriefOff: (routeId, off) => set((s) => ({ browserBriefOff: { ...s.browserBriefOff, [routeId]: off } })),
 

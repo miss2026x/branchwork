@@ -20,6 +20,7 @@ import { ImportPill, ImportProgressDialog, PreparingPill } from "../dialogs/Impo
 import { Notices } from "../notices/Notices";
 import { Settings } from "./Settings";
 import { McpDialog } from "../dialogs/McpDialog";
+import { ChromeDialog } from "../dialogs/ChromeDialog";
 import { Welcome } from "./Welcome";
 import { OverviewQueue } from "../overview/OverviewQueue";
 import { CommandPalette } from "../palette/CommandPalette";
@@ -120,6 +121,11 @@ export function App() {
   const pickDirectory = useStore((s) => s.pickDirectory);
   const inspectDirectory = useStore((s) => s.inspectDirectory);
   const closeDialog = useStore((s) => s.closeDialog);
+  const chromeDownload = useStore((s) => s.chromeDownload);
+  const chromeLatest = useStore((s) => s.chromeLatest);
+  const downloadChrome = useStore((s) => s.downloadChrome);
+  const cancelChromeDownload = useStore((s) => s.cancelChromeDownload);
+  const openChromeDialog = useStore((s) => s.openChromeDialog);
   const openAddProject = useStore((s) => s.openAddProject);
   const addProjectAt = useStore((s) => s.addProjectAt);
   const openNewRoute = useStore((s) => s.openNewRoute);
@@ -387,6 +393,7 @@ export function App() {
               if (item) void editQueued(item, id).then(() => setDrawer(true));
               else (setDraft(id, text), void queueRemove(itemId), goToRoute(id));
             }}
+            onDownloadChrome={(id) => openChromeDialog({ routeId: id })}
           />
   );
   const chatEl = route ? (
@@ -712,6 +719,20 @@ export function App() {
           onCreate={(o) => void startRoute(o)}
           preparing={preparing}
           onCancel={closeDialog}
+        />
+      )}
+      {dialog?.kind === "chrome" && (
+        <ChromeDialog
+          download={chromeDownload}
+          latest={chromeLatest}
+          onDownload={() => void downloadChrome()}
+          onCancelDownload={cancelChromeDownload}
+          onPickPath={projectId ? () => useStore.getState().openMcp(projectId, "browser") : undefined}
+          onClose={() => {
+            // 不下了：刚才要打开的页面也不用记着；在下的话关掉窗口接着下，下好后照样打开
+            if (chromeDownload.status === "idle" || chromeDownload.status === "error" || chromeDownload.status === "done") useStore.getState().openChromeDialog(null);
+            closeDialog();
+          }}
         />
       )}
       {dialog?.kind === "mcp" && <McpDialog projectId={dialog.projectId} projectName={projects.find((p) => p.id === dialog.projectId)?.name ?? ""} tab={dialog.tab} onClose={closeDialog} />}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, net } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -34,7 +34,8 @@ function packagedClaude(): string | undefined {
 
 const claude = demo ? createDemoClaudeClient() : createClaudeClient(undefined, { appendSystemPrompt: BRANCHWORK_BRIEFING, claudeExecutable: packagedClaude() });
 // MCP 服务和内置浏览器（设计稿 9-12、9-13）
-const extras = createExtras(db, claude, home);
+// 下载 Chrome for Testing 用 Electron 的 net.fetch：走系统代理
+const extras = createExtras(db, claude, home, (url, init) => net.fetch(url, init));
 const core = createCore({
   db,
   claude,

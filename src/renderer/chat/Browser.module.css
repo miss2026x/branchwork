@@ -239,7 +239,7 @@
 }
 .menu {
   right: 0;
-  width: 270px; /* 例外：菜单宽度 */
+  width: 340px; /* 例外：菜单宽度，设计稿 9-15 */
   padding: var(--sp-6);
 }
 .menu[data-up] {
@@ -270,6 +270,28 @@
   font: var(--fs-11) / var(--lh-16) var(--mono);
   color: var(--fg-4);
   white-space: nowrap;
+}
+/* 浏览器菜单里分组：这一路的、Local 的（设计稿 9-15） */
+.menu .menuHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-6);
+  margin: 0;
+  padding: var(--sp-8) var(--sp-10) var(--sp-2);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--fg-2);
+}
+.menuHead small {
+  font-size: var(--fs-11);
+  font-weight: 400;
+  color: var(--fg-4);
+}
+.menu .menuHint {
+  padding: var(--sp-2) var(--sp-10) var(--sp-6) var(--sp-32);
+  font-size: var(--fs-12);
+  line-height: var(--lh-18);
+  color: var(--fg-3);
 }
 .menu hr {
   margin: var(--sp-4) var(--sp-8);
@@ -361,7 +383,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-8);
-  max-width: 230px; /* 例外：设计稿 */
+  max-width: 270px; /* 例外：设计稿 9-15 */
   min-height: var(--h-36);
   padding: var(--sp-2) var(--sp-6) var(--sp-2) var(--sp-4);
   border-radius: var(--r-8);
@@ -429,12 +451,32 @@
   font: var(--fs-11) / var(--lh-16) var(--mono);
   color: var(--fg-3);
 }
+/* 认出了源码位置：第二行写文件和组件，蓝色 */
+.chipText code[data-source] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--info-text);
+}
+.chipText code[data-source] svg {
+  flex: none;
+}
+/* 小相机：附不附局部截图，默认不附 */
+.chip > .cam {
+  width: 22px; /* 例外：设计稿 9-15 */
+  height: 22px; /* 例外：同上 */
+  border-radius: var(--r-6);
+}
+.chip > .cam[aria-pressed="true"] {
+  color: var(--info);
+  background: var(--info-bg);
+}
 .detail {
   position: absolute;
   left: 0;
   bottom: calc(100% + var(--sp-6));
   z-index: 20;
-  width: 300px; /* 例外：悬停卡片宽度 */
+  width: 340px; /* 例外：悬停卡片宽度 */
   display: flex;
   flex-direction: column;
   gap: var(--sp-6);
@@ -445,7 +487,7 @@
 }
 .detail dl {
   display: grid;
-  grid-template-columns: 40px 1fr; /* 例外：标签一列 */
+  grid-template-columns: 56px 1fr; /* 例外：标签一列 */
   gap: var(--sp-4) var(--sp-8);
   margin: 0;
   font-size: var(--fs-12);
@@ -458,6 +500,9 @@
   font: var(--fs-11) / var(--lh-16) var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.detail dd[data-source] {
+  color: var(--info-text);
 }
 
 /* 对话里：一组浏览器操作、一次 MCP 调用 */

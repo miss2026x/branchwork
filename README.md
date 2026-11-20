@@ -150,7 +150,9 @@ await sync.pushAfterStop("route-1");     // 只在这一站正常结束后
 ## MCP 服务和内置浏览器
 
 - **MCP 服务**（`src/mcp`）：直接读写 Claude Code 的配置——`~/.claude.json` 的全局和“这个项目”两节、项目根目录的 `.mcp.json`——另外 Lanes 自己也能存。同名时和 Claude Code 一样：本地 > 项目 > 全局。项目 `.mcp.json` 里的服务第一次用要你确认。每个 Claude 进程用 `strictMcpConfig` 启动，只用 Lanes 算好的这一套（不让它按工作区目录再读一遍）。设置在右上角“设置 › MCP 服务…”，每一路单独开关在路的菜单里。
-- **内置浏览器**（`src/browser`）：Lanes 管一个专用的 Chrome（资料在数据目录的 `browser-profile`，和你平时的 Chrome 分开），每一路一个窗口。每个 Claude 进程跑一个 [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)，连到 Lanes 的 DevTools 协议代理上；代理按“页面在哪个窗口、窗口归哪一路”过滤，所以各路共用一个 Chrome，却只看得到、动得了自己的页面。找 Chrome 的顺序：设置里写的位置、环境变量 `LANES_CHROME`、系统里装的 Chrome / Edge / Chromium。
+- **内置浏览器**（`src/browser`）：Lanes 管一个专用的 Chrome（资料在数据目录的 `browser-profile`，和你平时的 Chrome 分开），每一路一个窗口。每个 Claude 进程跑一个 [chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp)，连到 Lanes 的 DevTools 协议代理上；代理按“页面在哪个窗口、窗口归哪一路”过滤，所以各路共用一个 Chrome，却只看得到、动得了自己的页面。找 Chrome 的顺序：设置里写的位置、环境变量 `LANES_CHROME`、系统里装的 Chrome / Edge / Chromium、Lanes 下载的 Chrome for Testing。都没有时先问你，再从 Google 下载最新稳定版的 Chrome for Testing 到数据目录的 `chrome/版本号/`（`src/browser/download.ts`）。
+- **点选元素**：交给 Claude 的是元素的位置、样式、文字、HTML，加上开发模式下认出来的源码位置（React、Vue、Svelte 自己记的，或“点击跳源码”插件加的属性），并在页面里给元素打上 `data-lanes-pick` 标记，Claude 要看实时样子时一下就能找到它。局部截图默认不附，小标签上点小相机才附。
+- **开发服务器**：各路的浏览器菜单和发车时附上的说明里，分开写“这一路自己的”和“Local 的”开发服务器，并提醒 Claude：这一站的改动要等答完才进 Local。
 - 远程服务要 OAuth 登录时，Agent SDK 自己走不了浏览器登录：先在终端里运行 `claude mcp login 名字`。
 
 ## 已知的行为和限制

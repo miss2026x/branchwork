@@ -10,7 +10,7 @@ const RULES: Record<string, { modules: string[]; packages: string[] }> = {
   claude: { modules: ["shared"], packages: ["@anthropic-ai/claude-agent-sdk", "zod"] },
   terminal: { modules: [], packages: [] },
   mcp: { modules: ["shared"], packages: [] },
-  browser: { modules: ["shared"], packages: ["ws"] },
+  browser: { modules: ["shared"], packages: ["ws", "extract-zip"] },
   core: { modules: ["shared", "sync", "db", "claude", "terminal"], packages: [] },
   // Electron 只进这两个模块
   main: { modules: ["shared", "core", "db", "claude", "mcp", "browser"], packages: ["electron"] },

@@ -451,3 +451,42 @@
     animation: none;
   }
 }
+
+/* Chrome 程序：Lanes 下载的 / 没找到时下载（设计稿 9-15） */
+.cftRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.pillGreen,
+.pillRed {
+  display: inline-flex;
+  align-items: center;
+  height: 22px; /* 例外：小牌，设计稿 9-15 */
+  padding: 0 var(--sp-8);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pillGreen {
+  background: var(--green-bg);
+  color: var(--green-text);
+}
+.pillRed {
+  background: var(--red-bg);
+  color: var(--red-text);
+}
+.darkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: var(--h-28);
+  padding: 0 var(--sp-10);
+  border-radius: var(--r-8);
+  background: var(--fg-1);
+  color: var(--surface);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}

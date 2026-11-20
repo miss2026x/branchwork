@@ -397,7 +397,26 @@ export interface McpOverview {
   states: Record<string, McpServerState>;
   /** 按服务名、工具名：工具的批准方式；没写的按默认（只读的直接放行，其余跟这一路） */
   policies: Record<string, Record<string, McpToolPolicy>>;
-  browser: BrowserSettings & { /** 自动找到的 Chrome；找不到为空 */ found: string | null };
+  browser: BrowserInfo;
+}
+
+/** 浏览器设置，加上现在用的是哪个 Chrome */
+export type BrowserInfo = BrowserSettings & {
+  /** 自动找到的 Chrome（装在电脑上的，没有就是 Lanes 下载的）；都没有为空 */
+  found: string | null;
+  /** Lanes 下载的 Chrome for Testing（设计稿 9-15） */
+  downloaded: { version: string; path: string } | null;
+};
+
+/** 下载 Chrome for Testing 的进度（设计稿 9-15） */
+export interface ChromeDownload {
+  status: "idle" | "checking" | "downloading" | "unpacking" | "done" | "error";
+  /** 要下、在下、下好的版本 */
+  version: string | null;
+  received: number;
+  /** 不知道大小时是 0 */
+  total: number;
+  error: string | null;
 }
 
 /** 新加或改一个服务时交给主进程的东西 */
@@ -457,4 +476,22 @@ export interface PickedElement {
   /** 局部截图 */
   image: PromptImage | null;
   url: string;
+  /** 开发模式下认出来的源码位置；认不出是 null（设计稿 9-15） */
+  source: ElementSource | null;
+  /** 页面里给它加的 data-lanes-pick 的值（刷新后就没了） */
+  mark: string;
+}
+
+/** 元素是哪个文件、哪一行写出来的 */
+export interface ElementSource {
+  /** 项目里的相对路径（认不出前缀时是原样的绝对路径） */
+  file: string;
+  line: number | null;
+  column: number | null;
+  /** 外到里最近的几个组件：LoginPage › LoginForm */
+  components: string[];
+  /** 从哪里认出来的 */
+  via: "attr" | "react" | "vue" | "svelte";
+  /** 行号只是大概（React 19 的调用栈给的是开发服务器转换后的行号） */
+  approx: boolean;
 }

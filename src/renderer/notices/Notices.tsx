@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import type { Project, Route, Stop } from "../../shared";
 import type { Notice } from "../stores/notices";
-import { IconAlert, IconCheckCircle, LaneGlyph, IconClose, IconCompress, IconWarn } from "../ui/icons";
+import { IconAlert, IconCheckCircle, LaneGlyph, IconClose, IconCompress, IconGlobe, IconWarn } from "../ui/icons";
 import { Plate } from "../ui/Plate";
 import { routeColors, routeLabel } from "../ui/route-color";
 import css from "./Notices.module.css";
@@ -27,6 +27,8 @@ interface Props {
   onBoard(itemId: string): void;
   /** 先改一下再发：把问题放回那一路的输入框 */
   onEditFirst(itemId: string, routeId: string, text: string): void;
+  /** 没找到 Chrome：打开下载 Chrome for Testing 的对话框（设计稿 9-15） */
+  onDownloadChrome(routeId: string): void;
 }
 
 /** “已自动发出”只是告知，不用你处理：过一会儿自己消失 */
@@ -37,13 +39,36 @@ const MAX = 4;
 
 /** 右下角的通知：只提醒要你处理的事。只收数据、发事件 */
 export function Notices(p: Props) {
-  const shown = p.notices.filter((n) => p.routes[n.routeId]).slice(-MAX);
+  const shown = p.notices.filter((n) => n.kind === "chrome-ready" || p.routes[n.routeId]).slice(-MAX);
   if (shown.length === 0) return null;
   return (
     <div className={css.stack} role="region" aria-label="通知">
-      {shown.map((n) => (
-        <Card key={n.id} n={n} {...p} />
-      ))}
+      {shown.map((n) => (n.kind === "chrome-ready" ? <ChromeReady key={n.id} version={n.version} onClose={() => p.onDismiss(n.id)} /> : <Card key={n.id} n={n} {...p} />))}
+    </div>
+  );
+}
+
+/** Chrome for Testing 下好了（设计稿 9-15）：不属于哪一路，8 秒后自己收起 */
+function ChromeReady({ version, onClose }: { version: string; onClose(): void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, DONE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className={css.card} data-tone="plain" role="status">
+      <span className={css.icon}>
+        <i className={css.green}>
+          <IconGlobe size={16} />
+        </i>
+      </span>
+      <div className={css.main}>
+        <b className={css.title}>Chrome for Testing 下好了</b>
+        <p>{version ? `${version}。` : ""}现在 Lanes 的浏览器用它。</p>
+      </div>
+      <button className={css.close} aria-label="关掉这条通知" onClick={onClose}>
+        <IconClose size={14} />
+      </button>
     </div>
   );
 }
@@ -137,6 +162,20 @@ function Card({ n, ...p }: Props & { n: Notice }) {
         </>,
       );
     }
+    case "chrome-missing":
+      return frame(
+        "amber",
+        <i className={css.amber}>
+          <IconGlobe size={16} />
+        </i>,
+        <>{who} Claude 想用浏览器，没找到 Chrome</>,
+        <>这一站它没法看页面。下载一个 Chrome for Testing 后，下一站就能用。</>,
+        <button className={css.primary} onClick={act(() => p.onDownloadChrome(route.id))}>
+          下载…
+        </button>,
+      );
+    case "chrome-ready":
+      return null;
     case "sync-error":
       return frame(
         "red",

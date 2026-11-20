@@ -98,6 +98,8 @@ export const IconImage = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" hei
 export const IconGlobe = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" /></Icon>;
 export const IconPick = (p: P) => <Icon {...p}><path d="M4 4l7 17 2.5-7 7-2.5z" /><path d="M14 14l6 6" /></Icon>;
 export const IconCamera = (p: P) => <Icon {...p}><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></Icon>;
+export const IconCameraOff = (p: P) => <Icon {...p}><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /><path d="M3 3l18 18" /></Icon>;
+export const IconFileCode = (p: P) => <Icon {...p}><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z" /><path d="M14 3v6h6M10 13l-2 2 2 2M14 13l2 2-2 2" /></Icon>;
 export const IconWindowUp = (p: P) => <Icon {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8h18M10 14l2-2 2 2M12 12v5" /></Icon>;
 export const IconPlug = (p: P) => <Icon {...p}><path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 01-12 0zM12 18v3" /></Icon>;
 export const IconNet = (p: P) => <Icon {...p}><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" /></Icon>;

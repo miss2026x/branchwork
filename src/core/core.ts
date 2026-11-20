@@ -77,8 +77,8 @@ export interface CoreOptions {
 export interface CoreExtras {
   /** 交给这一路的 Claude 的外部 MCP 服务和工具规则（含内置浏览器） */
   mcpFor?(route: Route, project: Project): McpRun | undefined;
-  /** 发车时附上的浏览器现状（几行字）；这一路没开浏览器时返回空 */
-  browserBrief?(route: Route): string | null;
+  /** 发车时附上的浏览器说明（几行字：开发服务器、窗口现状）；没什么可说时返回空。servers：这一路和 Local 专车里在跑、认出了端口的后台终端 */
+  browserBrief?(route: Route, servers: { mine: { command: string; ports: number[] }[]; local: { command: string; ports: number[] }[] }): string | null;
   /** 一站结束（浏览器的报错从这里重新数） */
   stopEnded?(route: Route, stopId: string): void;
   /** 一路被删掉了（关掉它的浏览器窗口） */
@@ -675,7 +675,9 @@ export function createCore(opts: CoreOptions): Core {
         brief = localBrief(project.localDir, status, db.routes.listByProject(project.id), db.stops.listByProject(project.id), mine);
       }
       if (!skipBrowserBrief.delete(routeId)) {
-        const b = extras.browserBrief?.(route);
+        const serving = (id: string | undefined) => (id ? terminals.list({ routeId: id }).filter((t) => t.status === "running" && t.ports.length > 0).map((t) => ({ command: t.command, ports: t.ports })) : []);
+        const localId = route.local ? undefined : db.routes.listByProject(route.projectId).find((r) => r.local)?.id;
+        const b = extras.browserBrief?.(route, { mine: serving(routeId), local: serving(localId) });
         if (b) brief = brief ? `${brief}\n\n${b}` : b;
       }
       if (!route.local) {

@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { createBrowserHub, findChrome } from "../browser";
+import { browserBriefText, createBrowserHub, downloadedChrome, findChrome, installCft, latestCft, relativeSource, type CftRelease } from "../browser";
 import type { ClaudeClient, McpRun } from "../claude";
 import type { Core, CoreExtras } from "../core";
 import type { Db } from "../db";
 import { createMcpConfig, expandEnv } from "../mcp";
-import { BROWSER_SERVER, type BrowserSettings, type BwEvent, type McpOverview, type McpScope, type McpServerInput, type McpServerState, type McpToolPolicy, type McpTransport, type Project, type Route } from "../shared";
+import { BROWSER_SERVER, type BrowserInfo, type ChromeDownload, type BrowserSettings, type BwEvent, type McpOverview, type McpScope, type McpServerInput, type McpServerState, type McpToolPolicy, type McpTransport, type Project, type Route } from "../shared";
 
 const DEFAULT_BROWSER: BrowserSettings = { enabled: true, chromePath: "", localOnly: false, attachState: true, stopShots: true };
 
@@ -16,7 +16,10 @@ const BROWSER_ASK = [`mcp__${BROWSER_SERVER}__upload_file`];
  * MCP 服务（设计稿 9-13）和内置浏览器（9-12）接到 core 和界面上。
  * core 只认识 CoreExtras；界面的那些操作（设置页、浏览器条）从 ipc 直接调这里
  */
-export function createExtras(db: Db, claude: ClaudeClient, home: string) {
+/** 主进程里用的 fetch：Electron 的 net.fetch 走系统代理；测试和命令行里是 Node 自己的 */
+type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
+
+export function createExtras(db: Db, claude: ClaudeClient, home: string, fetchFn: Fetch = (u, i) => fetch(u, i)) {
   const mcp = createMcpConfig(db.settings);
   const listeners = new Set<(e: BwEvent) => void>();
   const emit = (e: BwEvent) => {
@@ -31,9 +34,33 @@ export function createExtras(db: Db, claude: ClaudeClient, home: string) {
     }
   };
 
+  // ── 没找到 Chrome 时下载 Chrome for Testing（设计稿 9-15） ──
+  const chromeRoot = path.join(home, "chrome");
+  let download: ChromeDownload = { status: "idle", version: null, received: 0, total: 0, error: null };
+  let downloading: Promise<string> | null = null;
+  let abort: AbortController | null = null;
+  let release: CftRelease | null = null;
+  const setDownload = (patch: Partial<ChromeDownload>) => {
+    download = { ...download, ...patch };
+    emit({ type: "chrome.download", state: download });
+  };
+  const browserInfo = (b: BrowserSettings = browserSettings()): BrowserInfo => {
+    const downloaded = downloadedChrome(chromeRoot);
+    return { ...b, found: findChrome() ?? downloaded?.path ?? null, downloaded };
+  };
+  /** Claude 用浏览器时没找到 Chrome：同一路一分钟内只提示一次（一站里它可能连着试好几个工具） */
+  const missingAt = new Map<string, number>();
+
   const hub = createBrowserHub({
     profileDir: path.join(home, "browser-profile"),
     chromePath: () => browserSettings().chromePath,
+    fallbackChrome: () => downloadedChrome(chromeRoot)?.path ?? null,
+    onMissingChrome: (routeId) => {
+      const now = Date.now();
+      if (now - (missingAt.get(routeId) ?? 0) < 60_000) return;
+      missingAt.set(routeId, now);
+      emit({ type: "chrome.missing", routeId });
+    },
     onState: (state) => emit({ type: "browser.state", state }),
     log: (s) => console.error("[browser]", s),
   });
@@ -76,18 +103,10 @@ export function createExtras(db: Db, claude: ClaudeClient, home: string) {
       const key = createHash("sha1").update(JSON.stringify({ servers, policy })).digest("hex");
       return { servers, key, policy, autoAllow: [BROWSER_SERVER], askTools: BROWSER_ASK };
     },
-    browserBrief(route) {
-      if (!browserSettings().attachState || !browserOn(route) || !hub.isOpen(route.id)) return null;
-      const st = hub.state(route.id);
-      const lines = ["<lanes-browser>", "（这一段是 Lanes 自动附上的浏览器现状，不是用户写的。）", "这一路有自己的浏览器窗口（Lanes 专用的 Chrome），用 browser 这组工具看和操作它；列出来的页面都是这一路的。", "窗口里的页面："];
-      st.pages.forEach((p, i) => lines.push(`  ${i + 1}. ${p.title || "（没有标题）"} · ${p.url}${p.active ? "（当前）" : ""}`));
-      const issues = st.issues.filter((i) => i.kind !== "warning").slice(-12);
-      if (issues.length) {
-        lines.push("上一站以来：");
-        for (const i of issues) lines.push(`  ${i.kind === "request" ? "请求失败" : "报错"} ${i.text}${i.source && i.kind !== "request" ? `  ${i.source}` : ""}`);
-      }
-      lines.push("</lanes-browser>");
-      return lines.join("\n");
+    browserBrief(route, servers) {
+      if (!browserOn(route)) return null;
+      const state = browserSettings().attachState && hub.isOpen(route.id) ? hub.state(route.id) : null;
+      return browserBriefText({ local: !!route.local, mine: servers.mine, inLocal: servers.local, state });
     },
     stopEnded(route) {
       hub.mark(route.id);
@@ -100,7 +119,7 @@ export function createExtras(db: Db, claude: ClaudeClient, home: string) {
 
   function overview(core: Core, projectId: string): McpOverview {
     const p = projectOf(core, projectId);
-    return { projectId, servers: mcp.list(p.localDir), states: states(p.localDir), policies: mcp.policies(), browser: { ...browserSettings(), found: findChrome() } };
+    return { projectId, servers: mcp.list(p.localDir), states: states(p.localDir), policies: mcp.policies(), browser: browserInfo() };
   }
 
   return {
@@ -165,19 +184,67 @@ export function createExtras(db: Db, claude: ClaudeClient, home: string) {
         /** 这一路关掉了哪些服务（浏览器也算一个，名字是 browser） */
         routeMcp: async (routeId: string) => mcp.routeOff(routeId),
         setRouteMcp: async (routeId: string, off: string[]) => mcp.setRouteOff(routeId, off),
-        browserSettings: async () => ({ ...browserSettings(), found: findChrome() }),
+        browserSettings: async () => browserInfo(),
         async setBrowserSettings(patch: Partial<BrowserSettings>) {
           const next = { ...browserSettings(), ...patch };
           db.settings.set("browser.settings", JSON.stringify(next));
-          return { ...next, found: findChrome() };
+          return browserInfo(next);
         },
         browserState: async (routeId: string) => hub.state(routeId),
         browserOpen: (routeId: string, url?: string) => hub.open(routeId, url),
         browserShow: (routeId: string) => hub.show(routeId),
         browserScreenshot: (routeId: string) => hub.screenshot(routeId),
-        browserPick: (routeId: string) => hub.pick(routeId),
+        async browserPick(routeId: string) {
+          const el = await hub.pick(routeId);
+          if (!el?.source) return el;
+          // 源码写成项目里的相对路径：开发服务器可能跑在 Local，也可能跑在随便哪一路的工作区里
+          const route = db.routes.get(routeId);
+          const project = route ? db.projects.get(route.projectId) : null;
+          const roots = project ? [project.localDir, ...db.routes.listByProject(project.id).map((r) => r.worktreePath)] : [];
+          return { ...el, source: relativeSource(el.source, roots) };
+        },
         browserCancelPick: async (routeId: string) => hub.cancelPick(routeId),
         browserClose: (routeId: string) => hub.closeRoute(routeId),
+        async chromeLatest() {
+          release = await latestCft(fetchFn);
+          // 大小：问一下 zip 有多大（HEAD），问不到就不写
+          const head = await fetchFn(release.url, { method: "HEAD" }).catch(() => null);
+          return { version: release.version, size: Number(head?.headers.get("content-length") ?? 0) || 0 };
+        },
+        chromeDownload() {
+          downloading ??= (async () => {
+            abort = new AbortController();
+            try {
+              setDownload({ status: "checking", received: 0, total: 0, error: null });
+              const r = release ?? (await latestCft(fetchFn, undefined, abort.signal));
+              setDownload({ status: "downloading", version: r.version });
+              const got = await installCft({
+                root: chromeRoot,
+                release: r,
+                fetch: fetchFn,
+                signal: abort.signal,
+                onProgress: (p) => {
+                  if (p.total && p.received >= p.total) setDownload({ status: "unpacking", received: p.received, total: p.total });
+                  else setDownload({ received: p.received, total: p.total });
+                },
+              });
+              setDownload({ status: "done", version: got.version });
+              return got.path;
+            } catch (e) {
+              const message = e instanceof Error ? e.message : String(e);
+              setDownload({ status: abort?.signal.aborted ? "idle" : "error", error: abort?.signal.aborted ? null : message });
+              throw new Error(message);
+            } finally {
+              downloading = null;
+              abort = null;
+            }
+          })();
+          return downloading;
+        },
+        async chromeCancelDownload() {
+          abort?.abort();
+        },
+        chromeDownloadState: async () => download,
       };
     },
   };

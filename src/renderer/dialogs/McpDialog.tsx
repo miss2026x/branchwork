@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { parseMcpJson, validMcpName, type McpOverview, type McpScope, type McpServerEntry, type McpServerInput, type McpServerState, type McpToolPolicy, type McpTransport } from "../../shared";
 import { useStore } from "../stores/store";
-import { IconClose, IconGlobe, IconPlug, IconTerminal } from "../ui/icons";
+import { IconClose, IconDownload, IconGlobe, IconPlug, IconTerminal } from "../ui/icons";
 import css from "./Dialog.module.css";
 import own from "./Mcp.module.css";
 
@@ -424,6 +424,7 @@ function ServerForm({ projectId, entry, onDone }: { projectId: string; entry: Mc
 
 function BrowserSettingsView({ mcp }: { mcp: McpOverview }) {
   const set = useStore((s) => s.setBrowserSettings);
+  const openChrome = useStore((s) => s.openChromeDialog);
   const b = mcp.browser;
   const [path, setPath] = useState(b.chromePath);
   return (
@@ -440,7 +441,22 @@ function BrowserSettingsView({ mcp }: { mcp: McpOverview }) {
         <b>Chrome 程序</b>
         <div className={own.scol}>
           <input className={own.mono} value={path} placeholder={b.found ?? "没找到 Chrome：写一下它的位置"} onChange={(e) => setPath(e.target.value)} onBlur={() => path !== b.chromePath && void set({ chromePath: path.trim() })} />
-          <small className={own.hint}>{b.chromePath ? "用你指定的这个" : b.found ? "自动找到的。可以换成 Canary、Beta、Edge，或别的位置" : "没找到。装好 Chrome，或在这里写它的位置"}</small>
+          {!b.chromePath && b.downloaded && b.found === b.downloaded.path && (
+            <span className={own.cftRow}>
+              <span className={own.pillGreen}>Lanes 下载的</span>
+              <small className={own.hint}>Chrome for Testing {b.downloaded.version.split(".")[0]}。装了正式的 Chrome 后自动改用正式的</small>
+            </span>
+          )}
+          {!b.chromePath && !b.found && (
+            <span className={own.cftRow}>
+              <span className={own.pillRed}>没找到 Chrome</span>
+              <button className={own.darkBtn} onClick={() => openChrome(null)}>
+                <IconDownload size={13} />
+                下载 Chrome for Testing
+              </button>
+            </span>
+          )}
+          <small className={own.hint}>{b.chromePath ? "用你指定的这个" : b.found && b.found !== b.downloaded?.path ? "自动找到的。可以换成 Canary、Beta、Edge，或别的位置" : b.found ? "" : "或者在上面写 Chrome 的位置"}</small>
         </div>
       </div>
       <div className={own.srow}>
